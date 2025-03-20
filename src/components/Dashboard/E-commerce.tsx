@@ -1,9 +1,8 @@
 "use client";
-import dynamic from "next/dynamic";
 import React from "react";
 
 const ECommerce: React.FC = () => {
-  return <div></div>;
+  return <div> just test </div>;
 };
 
 export default ECommerce;
