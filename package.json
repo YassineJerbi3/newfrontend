@@ -12,11 +12,14 @@
     "apexcharts": "^4.5.0",
     "flatpickr": "^4.6.13",
     "jsvectormap": "^1.6.0",
+    "konva": "^9.3.20",
     "next": "^14.2.4",
     "react": "^18",
     "react-apexcharts": "^1.4.1",
     "react-dom": "^18",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "react-konva": "^19.0.3",
+    "react-modal": "^3.16.3"
   },
   "devDependencies": {
     "@types/node": "^20",
