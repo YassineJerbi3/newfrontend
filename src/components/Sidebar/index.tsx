@@ -1,6 +1,5 @@
 "use client";
-
-import React from "react";
+import React, { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,11 +14,11 @@ import {
   FiClock,
   FiGrid,
   FiBell,
-  FiAlertTriangle, // Intervention et rapport d'incident
-  FiSettings, // Intervention et rapport sur applicatif
-  FiFileText, // Rapport menu principal
-  FiUsers, // Liste des utilisateurs
-  FiUserPlus, // Ajouter utilisateur
+  FiAlertTriangle,
+  FiSettings,
+  FiFileText,
+  FiUsers,
+  FiUserPlus,
 } from "react-icons/fi";
 import { FaUserGraduate, FaBuilding } from "react-icons/fa";
 
@@ -28,7 +27,7 @@ interface SidebarProps {
   setSidebarOpen: (arg: boolean) => void;
 }
 
-// 📌 Définition du menu
+// 📌 Menu configuration with allowed roles updated to uppercase
 const menuGroups = [
   {
     name: "MENU",
@@ -37,10 +36,12 @@ const menuGroups = [
         label: "Tableau de bord",
         route: "/",
         icon: <FiHome size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
       {
         label: "Intervention",
         icon: <FiAlertTriangle size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
         children: [
           {
             label: "Incident",
@@ -57,6 +58,7 @@ const menuGroups = [
       {
         label: "Inventaire",
         icon: <FiBox size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
         children: [
           {
             label: "Ajouter Equipement",
@@ -74,15 +76,18 @@ const menuGroups = [
         label: "Notification",
         route: "/notification",
         icon: <FiBell size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
       {
         label: "Planification",
         route: "/planification",
         icon: <FiClock size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
       {
         label: "Rapport",
         icon: <FiFileText size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI", "TECHNICIEN"],
         children: [
           {
             label: "Rapport d'incident",
@@ -105,11 +110,13 @@ const menuGroups = [
         label: "Classes",
         route: "/classes",
         icon: <FaUserGraduate size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI", "TECHNICIEN", "PROFESSOR", "ADMINISTRATIF"],
       },
       {
         label: "Bureaux",
         route: "/bureaux",
         icon: <FaBuilding size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI", "TECHNICIEN", "PROFESSOR", "ADMINISTRATIF"],
       },
     ],
   },
@@ -120,6 +127,7 @@ const menuGroups = [
         label: "Gestion de stock",
         route: "/depot",
         icon: <FiBox size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
     ],
   },
@@ -130,16 +138,19 @@ const menuGroups = [
         label: "Liste des équipements",
         route: "/equipements",
         icon: <FiBox size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
       {
         label: "Liste des utilisateurs",
         route: "/utilisateurs",
         icon: <FiUsers size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
       {
         label: "Ajouter utilisateur",
         route: "/utilisateurs/ajouter",
         icon: <FiUserPlus size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
       },
     ],
   },
@@ -149,14 +160,53 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const pathname = usePathname();
   const [pageName, setPageName] = useLocalStorage("selectedMenu", "dashboard");
 
+  // Retrieve user from localStorage only once
+  const userRole = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          return user.role;
+        } catch (err) {
+          console.error("User parse error", err);
+        }
+      }
+    }
+    return "PROFESSOR"; // default if not found
+  }, []);
+
+  // Memoize the filtered menu groups so they only recalc when userRole changes
+  const filteredMenuGroups = useMemo(() => {
+    const filterMenuItems = (menuItems: any[]) => {
+      return menuItems.filter((item) => {
+        if (item.roles && !item.roles.includes(userRole)) {
+          return false;
+        }
+        if (item.children) {
+          item.children = filterMenuItems(item.children);
+          if (item.children.length === 0) return false;
+        }
+        return true;
+      });
+    };
+
+    return menuGroups
+      .map((group) => ({
+        ...group,
+        menuItems: filterMenuItems(group.menuItems),
+      }))
+      .filter((group) => group.menuItems.length > 0);
+  }, [userRole]);
+
   return (
     <ClickOutside onClick={() => setSidebarOpen(false)}>
       <aside
-        className={`fixed left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* 📌 HEADER DU SIDEBAR */}
+        {/* Header of the Sidebar */}
         <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
           <Link href="/">
             <Image
@@ -187,12 +237,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             </svg>
           </button>
         </div>
-        {/* 📌 FIN HEADER */}
+        {/* End of Sidebar Header */}
 
-        {/* 📌 MENU SIDEBAR */}
+        {/* Sidebar Menu */}
         <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
           <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
-            {menuGroups.map((group, groupIndex) => (
+            {filteredMenuGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
                 <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">
                   {group.name}
@@ -211,7 +261,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             ))}
           </nav>
         </div>
-        {/* 📌 FIN MENU */}
+        {/* End of Sidebar Menu */}
       </aside>
     </ClickOutside>
   );

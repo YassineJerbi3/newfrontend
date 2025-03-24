@@ -2,7 +2,7 @@
 import React from "react";
 
 const ECommerce: React.FC = () => {
-  return <div> just test </div>;
+  return <div> here dashboard </div>;
 };
 
 export default ECommerce;

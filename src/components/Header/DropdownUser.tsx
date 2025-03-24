@@ -1,11 +1,23 @@
-import { useState } from "react";
+"use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import ClickOutside from "@/components/ClickOutside";
-// Import the icons from react-icons (you can choose any icon library you prefer)
 import { FiSettings, FiLogOut, FiUser } from "react-icons/fi";
 
 const DropdownUser = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [user, setUser] = useState({ name: "Nom d’utilisateur", role: "Rôle" });
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Error parsing user from localStorage", error);
+      }
+    }
+  }, []);
 
   return (
     <ClickOutside onClick={() => setDropdownOpen(false)} className="relative">
@@ -13,15 +25,15 @@ const DropdownUser = () => {
         onClick={() => setDropdownOpen(!dropdownOpen)}
         className="flex items-center gap-4"
       >
-        {/* Placeholder for user information – this will eventually be populated by your backend */}
+        {/* Display the user name and role from localStorage */}
         <span className="hidden text-right lg:block">
           <span className="block text-sm font-medium text-black dark:text-white">
-            Nom d’utilisateur
+            {user.name}
           </span>
-          <span className="block text-xs">Rôle</span>
+          <span className="block text-xs">{user.role}</span>
         </span>
 
-        {/* Instead of a user photo, we show a default avatar icon */}
+        {/* Default avatar icon */}
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200">
           <FiUser size={28} className="text-gray-600" />
         </span>
