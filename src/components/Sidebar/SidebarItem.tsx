@@ -1,16 +1,34 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import useLocalStorage from "@/hooks/useLocalStorage";
 
 const SidebarItem = ({ item, pageName, setPageName }: any) => {
   const pathname = usePathname();
 
+  // Définir l'état initial : on peut l'ouvrir si la route active correspond à l'item ou à l'un de ses enfants.
+  const initialOpen =
+    item.children &&
+    (pageName === item.label.toLowerCase() ||
+      item.children.some((child: any) => child.route === pathname));
+
+  // Utilisation de useLocalStorage pour persister l'état du sous-menu
+  const [isOpen, setIsOpen] = useLocalStorage(
+    `sidebar-${item.label}`,
+    initialOpen || false,
+  );
+
   const handleClick = () => {
-    const updatedPageName =
-      pageName !== item.label.toLowerCase() ? item.label.toLowerCase() : "";
-    setPageName(updatedPageName);
+    if (item.children) {
+      setIsOpen(!isOpen);
+    } else {
+      const updatedPageName =
+        pageName !== item.label.toLowerCase() ? item.label.toLowerCase() : "";
+      setPageName(updatedPageName);
+    }
   };
 
+  // Fonction récursive pour vérifier si l'item ou l'un de ses enfants correspond à la route active
   const isActive = (item: any) => {
     if (item.route === pathname) return true;
     if (item.children) {
@@ -37,11 +55,10 @@ const SidebarItem = ({ item, pageName, setPageName }: any) => {
         ) : (
           <span className="flex-grow">{item.label}</span>
         )}
-
         {item.children && (
           <svg
             className={`transition-transform duration-200 ${
-              pageName === item.label.toLowerCase() ? "rotate-180" : ""
+              isOpen ? "rotate-180" : ""
             }`}
             width="20"
             height="20"
@@ -61,9 +78,7 @@ const SidebarItem = ({ item, pageName, setPageName }: any) => {
       {item.children && (
         <ul
           className={`overflow-hidden transition-[max-height] duration-300 ${
-            pageName === item.label.toLowerCase()
-              ? "max-h-96"
-              : "hidden max-h-0"
+            isOpen ? "max-h-96" : "hidden max-h-0"
           }`}
         >
           {item.children.map((child: any, index: number) => (

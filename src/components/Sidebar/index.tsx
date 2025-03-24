@@ -10,12 +10,16 @@ import useLocalStorage from "@/hooks/useLocalStorage";
 
 import {
   FiHome,
-  FiCalendar,
   FiClipboard,
-  FiZap,
   FiBox,
   FiClock,
   FiGrid,
+  FiBell,
+  FiAlertTriangle, // Intervention et rapport d'incident
+  FiSettings, // Intervention et rapport sur applicatif
+  FiFileText, // Rapport menu principal
+  FiUsers, // Liste des utilisateurs
+  FiUserPlus, // Ajouter utilisateur
 } from "react-icons/fi";
 import { FaUserGraduate, FaBuilding } from "react-icons/fa";
 
@@ -35,19 +39,20 @@ const menuGroups = [
         icon: <FiHome size={18} className="text-current" />,
       },
       {
-        label: "Calendrier",
-        route: "/calendar",
-        icon: <FiCalendar size={18} className="text-current" />,
-      },
-      {
-        label: "Formulaires",
-        route: "/forms",
-        icon: <FiClipboard size={18} className="text-current" />,
-      },
-      {
         label: "Intervention",
-        route: "/intervention",
-        icon: <FiZap size={18} className="text-current" />,
+        icon: <FiAlertTriangle size={18} className="text-current" />,
+        children: [
+          {
+            label: "Incident",
+            route: "/intervention/incident",
+            icon: <FiAlertTriangle size={18} className="text-current" />,
+          },
+          {
+            label: "Problème applicatif",
+            route: "/intervention/applicatif",
+            icon: <FiSettings size={18} className="text-current" />,
+          },
+        ],
       },
       {
         label: "Inventaire",
@@ -56,14 +61,19 @@ const menuGroups = [
           {
             label: "Ajouter Equipement",
             route: "/inventaire/equipement",
-            icon: <FiClipboard size={18} className="text-current" />, // ✅ Icône ajoutée
+            icon: <FiClipboard size={18} className="text-current" />,
           },
           {
             label: "Ajouter Placement",
             route: "/inventaire/placement",
-            icon: <FiGrid size={18} className="text-current" />, // ✅ Icône ajoutée
+            icon: <FiGrid size={18} className="text-current" />,
           },
         ],
+      },
+      {
+        label: "Notification",
+        route: "/notification",
+        icon: <FiBell size={18} className="text-current" />,
       },
       {
         label: "Planification",
@@ -71,9 +81,20 @@ const menuGroups = [
         icon: <FiClock size={18} className="text-current" />,
       },
       {
-        label: "Tables",
-        route: "/tables",
-        icon: <FiGrid size={18} className="text-current" />,
+        label: "Rapport",
+        icon: <FiFileText size={18} className="text-current" />,
+        children: [
+          {
+            label: "Rapport d'incident",
+            route: "/rapport/incident",
+            icon: <FiAlertTriangle size={18} className="text-current" />,
+          },
+          {
+            label: "Rapport sur applicatif",
+            route: "/rapport/applicatif",
+            icon: <FiSettings size={18} className="text-current" />,
+          },
+        ],
       },
     ],
   },
@@ -89,6 +110,36 @@ const menuGroups = [
         label: "Bureaux",
         route: "/bureaux",
         icon: <FaBuilding size={18} className="text-current" />,
+      },
+    ],
+  },
+  {
+    name: "DÉPÔT",
+    menuItems: [
+      {
+        label: "Gestion de stock",
+        route: "/depot",
+        icon: <FiBox size={18} className="text-current" />,
+      },
+    ],
+  },
+  {
+    name: "GESTION",
+    menuItems: [
+      {
+        label: "Liste des équipements",
+        route: "/equipements",
+        icon: <FiBox size={18} className="text-current" />,
+      },
+      {
+        label: "Liste des utilisateurs",
+        route: "/utilisateurs",
+        icon: <FiUsers size={18} className="text-current" />,
+      },
+      {
+        label: "Ajouter utilisateur",
+        route: "/utilisateurs/ajouter",
+        icon: <FiUserPlus size={18} className="text-current" />,
       },
     ],
   },
