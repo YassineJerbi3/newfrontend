@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useLocalStorage from "@/hooks/useLocalStorage";
@@ -6,15 +7,15 @@ import useLocalStorage from "@/hooks/useLocalStorage";
 const SidebarItem = ({ item, pageName, setPageName }: any) => {
   const pathname = usePathname();
 
-  // Définir l'état initial : on peut l'ouvrir si la route active correspond à l'item ou à l'un de ses enfants.
+  // Calculate initial open state based on current pathname or pageName
   const initialOpen =
     item.children &&
     (pageName === item.label.toLowerCase() ||
       item.children.some((child: any) => child.route === pathname));
 
-  // Utilisation de useLocalStorage pour persister l'état du sous-menu
+  // Use persistent localStorage state for items with children
   const [isOpen, setIsOpen] = useLocalStorage(
-    `sidebar-${item.label}`,
+    `sidebar-${item.label.toLowerCase()}-open`,
     initialOpen || false,
   );
 
@@ -28,7 +29,7 @@ const SidebarItem = ({ item, pageName, setPageName }: any) => {
     }
   };
 
-  // Fonction récursive pour vérifier si l'item ou l'un de ses enfants correspond à la route active
+  // Recursive function to check if the item or one of its children is active
   const isActive = (item: any) => {
     if (item.route === pathname) return true;
     if (item.children) {
@@ -77,12 +78,12 @@ const SidebarItem = ({ item, pageName, setPageName }: any) => {
 
       {item.children && (
         <ul
-          className={`overflow-hidden transition-[max-height] duration-300 ${
-            isOpen ? "max-h-96" : "hidden max-h-0"
+          className={`overflow-hidden pl-8 transition-all duration-300 ease-in-out ${
+            isOpen ? "max-h-96 py-2 opacity-100" : "max-h-0 py-0 opacity-0"
           }`}
         >
           {item.children.map((child: any, index: number) => (
-            <li key={index} className="flex items-center py-2 pl-8">
+            <li key={index} className="flex items-center py-2">
               {child.icon && <span className="mr-2">{child.icon}</span>}
               <Link
                 href={child.route}

@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -19,6 +19,8 @@ import {
   FiFileText,
   FiUsers,
   FiUserPlus,
+  FiDownload,
+  FiUpload,
 } from "react-icons/fi";
 import { FaUserGraduate, FaBuilding } from "react-icons/fa";
 
@@ -27,7 +29,6 @@ interface SidebarProps {
   setSidebarOpen: (arg: boolean) => void;
 }
 
-// 📌 Menu configuration with allowed roles updated to uppercase
 const menuGroups = [
   {
     name: "MENU",
@@ -52,6 +53,11 @@ const menuGroups = [
             label: "Problème applicatif",
             route: "/intervention/applicatif",
             icon: <FiSettings size={18} className="text-current" />,
+          },
+          {
+            label: "Demande de publication",
+            route: "/intervention/demande",
+            icon: <FiUpload size={18} className="text-current" />,
           },
         ],
       },
@@ -199,6 +205,24 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       .filter((group) => group.menuItems.length > 0);
   }, [userRole]);
 
+  // Reference to the scrollable sidebar container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Restore sidebar scroll position on mount
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const storedScroll = localStorage.getItem("sidebarScroll");
+      if (storedScroll) {
+        scrollContainerRef.current.scrollTop = parseInt(storedScroll, 10);
+      }
+    }
+  }, []);
+
+  // Save scroll position on scroll
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    localStorage.setItem("sidebarScroll", e.currentTarget.scrollTop.toString());
+  };
+
   return (
     <ClickOutside onClick={() => setSidebarOpen(false)}>
       <aside
@@ -240,7 +264,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         {/* End of Sidebar Header */}
 
         {/* Sidebar Menu */}
-        <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
+        >
           <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
             {filteredMenuGroups.map((group, groupIndex) => (
               <div key={groupIndex}>

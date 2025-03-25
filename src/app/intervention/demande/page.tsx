@@ -2,33 +2,27 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import React, { useState } from "react";
 
-export default function RapportApplicatifForm() {
-  // Initial state for the form fields – adjust these keys to match your form image's fields.
+export default function DemandePublicationForm() {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
-    subject: "",
-    description: "",
-    reportDate: "",
-    reportTime: "",
-    issueType: "", // e.g. Bug, Feature Request, General Inquiry (radio buttons)
-    options: [], // e.g. Include Screenshot, Request Callback, Subscribe to Newsletter (checkboxes)
-    additionalComments: "",
+    faculty: "escs", // Faculty remains as is
+    publicationTitle: "",
+    publicationDescription: "",
+    publicationDate: "",
+    publicationTime: "",
+    publicationType: "", // e.g. Article, Annonce, Événement (radio buttons)
+    options: [], // e.g. Inclure image, Recevoir notification (checkboxes)
+    remarks: "",
   });
 
   // Options for radio buttons and checkboxes
-  const issueTypeOptions = ["Bug", "Feature Request", "General Inquiry"];
-  const optionOptions = [
-    "Include Screenshot",
-    "Request Callback",
-    "Subscribe to Newsletter",
-  ];
+  const publicationTypeOptions = ["Article", "Annonce", "Événement"];
+  const optionOptions = ["Inclure image", "Recevoir notification"];
 
-  // Generic change handler for text, date, time, etc.
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === "options") {
-      // Manage checkboxes for options
       if (checked) {
         setFormData((prev) => ({
           ...prev,
@@ -37,7 +31,7 @@ export default function RapportApplicatifForm() {
       } else {
         setFormData((prev) => ({
           ...prev,
-          options: prev.options.filter((item) => item !== value),
+          options: prev.options.filter((opt) => opt !== value),
         }));
       }
     } else {
@@ -48,7 +42,6 @@ export default function RapportApplicatifForm() {
     }
   };
 
-  // Handler for radio button changes
   const handleRadioChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -59,19 +52,20 @@ export default function RapportApplicatifForm() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Insert your submission logic here (e.g. API call using fetch or axios)
-    console.log("Submitted form data:", formData);
-    // Optionally reset the form fields
+    // Insert submission logic here (ex: API call)
+    console.log("Demande de publication soumise :", formData);
+    // Reset form (faculty remains "escs")
     setFormData({
       fullName: "",
       email: "",
-      subject: "",
-      description: "",
-      reportDate: "",
-      reportTime: "",
-      issueType: "",
+      faculty: "escs",
+      publicationTitle: "",
+      publicationDescription: "",
+      publicationDate: "",
+      publicationTime: "",
+      publicationType: "",
       options: [],
-      additionalComments: "",
+      remarks: "",
     });
   };
 
@@ -79,10 +73,10 @@ export default function RapportApplicatifForm() {
     <DefaultLayout>
       <div className="mx-auto max-w-3xl rounded-md bg-white p-6 shadow-lg">
         <h1 className="mb-6 text-center text-3xl font-bold">
-          Rapport Applicatif
+          Demande de Publication
         </h1>
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Full Name */}
+          {/* Nom complet */}
           <div>
             <label
               htmlFor="fullName"
@@ -122,60 +116,78 @@ export default function RapportApplicatifForm() {
             />
           </div>
 
-          {/* Subject */}
+          {/* Faculté (pré-rempli) */}
           <div>
             <label
-              htmlFor="subject"
+              htmlFor="faculty"
               className="block text-sm font-medium text-gray-700"
             >
-              Sujet
+              Faculté
             </label>
             <input
               type="text"
-              id="subject"
-              name="subject"
-              value={formData.subject}
+              id="faculty"
+              name="faculty"
+              value={formData.faculty}
+              readOnly
+              className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Titre de la publication */}
+          <div>
+            <label
+              htmlFor="publicationTitle"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Titre de la publication
+            </label>
+            <input
+              type="text"
+              id="publicationTitle"
+              name="publicationTitle"
+              value={formData.publicationTitle}
               onChange={handleChange}
-              placeholder="Entrez le sujet"
+              placeholder="Entrez le titre de la publication"
               required
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
 
-          {/* Description */}
+          {/* Description de la publication */}
           <div>
             <label
-              htmlFor="description"
+              htmlFor="publicationDescription"
               className="block text-sm font-medium text-gray-700"
             >
-              Description
+              Description de la publication
             </label>
             <textarea
-              id="description"
-              name="description"
-              value={formData.description}
+              id="publicationDescription"
+              name="publicationDescription"
+              value={formData.publicationDescription}
               onChange={handleChange}
-              placeholder="Décrivez le problème en détail"
+              placeholder="Décrivez le contenu de la publication"
               rows="4"
               required
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             ></textarea>
           </div>
 
-          {/* Date and Time */}
+          {/* Date et Heure de publication */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label
-                htmlFor="reportDate"
+                htmlFor="publicationDate"
                 className="block text-sm font-medium text-gray-700"
               >
-                Date
+                Date de publication
               </label>
               <input
                 type="date"
-                id="reportDate"
-                name="reportDate"
-                value={formData.reportDate}
+                id="publicationDate"
+                name="publicationDate"
+                value={formData.publicationDate}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -183,16 +195,16 @@ export default function RapportApplicatifForm() {
             </div>
             <div>
               <label
-                htmlFor="reportTime"
+                htmlFor="publicationTime"
                 className="block text-sm font-medium text-gray-700"
               >
-                Heure
+                Heure de publication
               </label>
               <input
                 type="time"
-                id="reportTime"
-                name="reportTime"
-                value={formData.reportTime}
+                id="publicationTime"
+                name="publicationTime"
+                value={formData.publicationTime}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -200,19 +212,19 @@ export default function RapportApplicatifForm() {
             </div>
           </div>
 
-          {/* Issue Type (Radio Buttons) */}
+          {/* Type de publication (Radio Buttons) */}
           <div>
             <p className="block text-sm font-medium text-gray-700">
-              Type de problème
+              Type de publication
             </p>
             <div className="mt-2 flex space-x-4">
-              {issueTypeOptions.map((option, index) => (
+              {publicationTypeOptions.map((option, index) => (
                 <label key={index} className="inline-flex items-center">
                   <input
                     type="radio"
-                    name="issueType"
+                    name="publicationType"
                     value={option}
-                    checked={formData.issueType === option}
+                    checked={formData.publicationType === option}
                     onChange={handleRadioChange}
                     required
                     className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -223,7 +235,7 @@ export default function RapportApplicatifForm() {
             </div>
           </div>
 
-          {/* Options (Checkboxes) */}
+          {/* Options supplémentaires (Checkboxes) */}
           <div>
             <p className="block text-sm font-medium text-gray-700">
               Options supplémentaires
@@ -245,20 +257,20 @@ export default function RapportApplicatifForm() {
             </div>
           </div>
 
-          {/* Additional Comments */}
+          {/* Remarques */}
           <div>
             <label
-              htmlFor="additionalComments"
+              htmlFor="remarks"
               className="block text-sm font-medium text-gray-700"
             >
-              Commentaires supplémentaires
+              Remarques
             </label>
             <textarea
-              id="additionalComments"
-              name="additionalComments"
-              value={formData.additionalComments}
+              id="remarks"
+              name="remarks"
+              value={formData.remarks}
               onChange={handleChange}
-              placeholder="Saisissez ici des commentaires additionnels"
+              placeholder="Entrez vos remarques (optionnel)"
               rows="3"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             ></textarea>
@@ -269,7 +281,7 @@ export default function RapportApplicatifForm() {
               type="submit"
               className="rounded-md bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
             >
-              Envoyer le rapport
+              Envoyer la demande
             </button>
           </div>
         </form>
