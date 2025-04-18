@@ -75,7 +75,7 @@ export default function AddPlacementPage() {
 
           <button
             type="submit"
-            className="w-full rounded bg-green-600 p-2 text-white hover:bg-green-700"
+            className="w-full rounded bg-blue-600 p-2 text-white hover:bg-green-700"
           >
             Ajouter
           </button>

@@ -3,23 +3,21 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import React, { useState } from "react";
 
 export default function DemandePublicationForm() {
-  const [formData, setFormData] = useState({
-    nom: "",
-    prenom: "",
-    fonction: "",
-    direction: "",
-    publicationTitle: "",
-    publicationType: "",
+  // Données préremplies en mode lecture
+  const [formData] = useState({
+    nom: "Dupont",
+    prenom: "Jean",
+    fonction: "admin",
+    direction: "informatique",
+    publicationTitle: "Titre de publication",
+    publicationType: "article", // Possibles: "article", "annonce", "actualite", "autre"
     typeOther: "",
-    resume: "",
-    file: [], // multiple files
-    applicationWeb: [],
-    pageCible: "",
-    publicationDateSouhaitee: "",
+    resume: "Ceci est le résumé de la publication.",
+    file: [], // Aucun fichier prérempli
+    applicationWeb: ["site web de l'ESCS", "Edupage"],
+    pageCible: "Page ou section cible exemple",
+    publicationDateSouhaitee: "2025-06-15",
   });
-
-  // State to hold simulated upload progress per file name.
-  const [uploadProgress, setUploadProgress] = useState({});
 
   const fonctionOptions = ["professor", "admin", "technicien", "responsable"];
   const directionOptions = ["informatique", "gestion", "economie"];
@@ -31,68 +29,12 @@ export default function DemandePublicationForm() {
     "chaine youtube ESCS",
   ];
 
-  // Simulated upload progress for a file.
-  const simulateUpload = (file) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      setUploadProgress((prev) => ({ ...prev, [file.name]: progress }));
-    }, 300);
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked, files } = e.target;
-    if (name === "file") {
-      // Convert the FileList to an array and merge with existing files.
-      const newFiles = Array.from(files);
-      newFiles.forEach((file) => {
-        simulateUpload(file);
-      });
-      setFormData((prev) => ({
-        ...prev,
-        file: [...prev.file, ...newFiles],
-      }));
-    } else if (name === "applicationWeb") {
-      if (checked) {
-        setFormData((prev) => ({
-          ...prev,
-          applicationWeb: [...prev.applicationWeb, value],
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          applicationWeb: prev.applicationWeb.filter((app) => app !== value),
-        }));
-      }
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
-  };
-
-  // Handle radio buttons.
-  const handleRadioChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-      ...(name === "publicationType" && value !== "autre" && { typeOther: "" }),
-    }));
-  };
-
-  // Helper function to get file extension in lowercase.
+  // Cette fonction est utilisée pour afficher une icône pour les fichiers non-images (si besoin)
   const getFileExtension = (file) => {
     const parts = file.name.split(".");
     return parts[parts.length - 1].toLowerCase();
   };
 
-  // Return a JSX element for non-image file icon display.
   const renderFileIcon = (file) => {
     const ext = getFileExtension(file);
     let label = "Fichier";
@@ -106,38 +48,16 @@ export default function DemandePublicationForm() {
     );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Demande de publication soumise :", formData);
-    setFormData({
-      nom: "",
-      prenom: "",
-      fonction: "",
-      direction: "",
-      publicationTitle: "",
-      publicationType: "",
-      typeOther: "",
-      resume: "",
-      file: [],
-      applicationWeb: [],
-      pageCible: "",
-      publicationDateSouhaitee: "",
-    });
-    setUploadProgress({});
-  };
-
   return (
     <DefaultLayout>
-      <div className="mx-auto max-w-3xl p-6">
-        <h1 className="mb-8 text-center text-3xl font-bold">
+      <div className="mx-auto max-w-3xl rounded-md bg-white p-6 shadow-lg">
+        <h1 className="mb-6 text-center text-3xl font-bold">
           Demande de Publication
         </h1>
-        {/* Overall form container */}
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-8 rounded-md border border-gray-300 bg-white p-6 shadow-sm"
-        >
-          {/* Section: Identification du demandeur */}
+
+        {/* Formulaire en mode lecture */}
+        <form className="space-y-8">
+          {/* Section : Identification du demandeur */}
           <div>
             <h2 className="mb-4 border-b border-gray-200 pb-2 text-2xl font-bold text-gray-800">
               Identification du demandeur
@@ -154,10 +74,9 @@ export default function DemandePublicationForm() {
                 id="nom"
                 name="nom"
                 value={formData.nom}
-                onChange={handleChange}
-                placeholder="Entrez votre nom"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                readOnly
+                disabled
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               />
             </div>
             <div className="mb-4">
@@ -172,10 +91,9 @@ export default function DemandePublicationForm() {
                 id="prenom"
                 name="prenom"
                 value={formData.prenom}
-                onChange={handleChange}
-                placeholder="Entrez votre prénom"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                readOnly
+                disabled
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               />
             </div>
             <div className="mb-4">
@@ -189,11 +107,10 @@ export default function DemandePublicationForm() {
                 id="fonction"
                 name="fonction"
                 value={formData.fonction}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                disabled
+                readOnly
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               >
-                <option value="">Sélectionnez votre fonction</option>
                 {fonctionOptions.map((option, index) => (
                   <option key={index} value={option}>
                     {option}
@@ -212,11 +129,10 @@ export default function DemandePublicationForm() {
                 id="direction"
                 name="direction"
                 value={formData.direction}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                disabled
+                readOnly
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               >
-                <option value="">Sélectionnez votre direction</option>
                 {directionOptions.map((option, index) => (
                   <option key={index} value={option}>
                     {option}
@@ -226,7 +142,7 @@ export default function DemandePublicationForm() {
             </div>
           </div>
 
-          {/* Section: Informations sur la publication */}
+          {/* Section : Informations sur la publication */}
           <div>
             <h2 className="mb-4 border-b border-gray-200 pb-2 text-2xl font-bold text-gray-800">
               Informations sur la publication
@@ -243,10 +159,9 @@ export default function DemandePublicationForm() {
                 id="publicationTitle"
                 name="publicationTitle"
                 value={formData.publicationTitle}
-                onChange={handleChange}
-                placeholder="Entrez le titre de la publication"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                readOnly
+                disabled
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               />
             </div>
             <div className="mb-4">
@@ -261,9 +176,9 @@ export default function DemandePublicationForm() {
                       name="publicationType"
                       value={option}
                       checked={formData.publicationType === option}
-                      onChange={handleRadioChange}
-                      required
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled
+                      readOnly
+                      className="h-4 w-4 border-gray-300 text-blue-600"
                     />
                     <span className="ml-2 capitalize">{option}</span>
                   </label>
@@ -282,10 +197,9 @@ export default function DemandePublicationForm() {
                     id="typeOther"
                     name="typeOther"
                     value={formData.typeOther}
-                    onChange={handleChange}
-                    placeholder="Indiquez le type de publication"
-                    required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    readOnly
+                    disabled
+                    className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
                   />
                 </div>
               )}
@@ -301,11 +215,10 @@ export default function DemandePublicationForm() {
                 id="resume"
                 name="resume"
                 value={formData.resume}
-                onChange={handleChange}
-                placeholder="Entrez le résumé de la publication..."
+                readOnly
+                disabled
                 rows="6"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               ></textarea>
             </div>
 
@@ -339,9 +252,10 @@ export default function DemandePublicationForm() {
                   id="file"
                   name="file"
                   type="file"
-                  onChange={handleChange}
                   multiple
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  disabled
+                  readOnly
+                  className="absolute inset-0 h-full w-full cursor-not-allowed opacity-0"
                 />
               </div>
               {formData.file.length > 0 && (
@@ -360,19 +274,6 @@ export default function DemandePublicationForm() {
                       <p className="mt-2 break-all text-center text-xs text-gray-700">
                         {file.name}
                       </p>
-                      {uploadProgress[file.name] != null && (
-                        <div className="mt-1 w-full">
-                          <div className="h-1 w-full rounded bg-gray-300">
-                            <div
-                              className="h-1 rounded bg-blue-600"
-                              style={{ width: `${uploadProgress[file.name]}%` }}
-                            ></div>
-                          </div>
-                          <p className="mt-1 text-center text-xs text-gray-600">
-                            {uploadProgress[file.name]}%
-                          </p>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -392,33 +293,14 @@ export default function DemandePublicationForm() {
                       name="applicationWeb"
                       value={option}
                       checked={formData.applicationWeb.includes(option)}
-                      onChange={handleChange}
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled
+                      readOnly
+                      className="h-4 w-4 border-gray-300 text-blue-600"
                     />
                     <span className="ml-2">{option}</span>
                   </label>
                 ))}
               </div>
-            </div>
-
-            {/* Page ou section cible */}
-            <div className="mb-4">
-              <label
-                htmlFor="pageCible"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Page ou section cible
-              </label>
-              <input
-                type="text"
-                id="pageCible"
-                name="pageCible"
-                value={formData.pageCible}
-                onChange={handleChange}
-                placeholder="Indiquez la page ou section cible"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
             </div>
 
             {/* Date de publication souhaitée */}
@@ -434,18 +316,19 @@ export default function DemandePublicationForm() {
                 id="publicationDateSouhaitee"
                 name="publicationDateSouhaitee"
                 value={formData.publicationDateSouhaitee}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                readOnly
+                disabled
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm"
               />
             </div>
           </div>
 
-          {/* Bouton d'envoi */}
+          {/* Bouton d'envoi, désactivé en lecture */}
           <div className="text-center">
             <button
-              type="submit"
-              className="rounded-md bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-md bg-blue-600 px-6 py-3 text-white opacity-50"
             >
               Envoyer
             </button>

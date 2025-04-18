@@ -8,20 +8,27 @@ import ClickOutside from "@/components/ClickOutside";
 import useLocalStorage from "@/hooks/useLocalStorage";
 
 import {
-  FiHome,
-  FiClipboard,
+  FiLayout,
+  FiSend,
   FiBox,
   FiClock,
   FiGrid,
   FiBell,
   FiAlertTriangle,
   FiSettings,
-  FiFileText,
   FiUsers,
   FiUserPlus,
-  FiDownload,
-  FiUpload,
+  FiFileText,
+  FiFileMinus,
+  FiTool,
+  FiPackage,
+  FiList,
+  FiTrendingUp,
+  FiPlusCircle,
+  FiMapPin,
+  FiXCircle,
 } from "react-icons/fi";
+import { BiDesktop } from "react-icons/bi";
 import { FaUserGraduate, FaBuilding } from "react-icons/fa";
 
 interface SidebarProps {
@@ -33,12 +40,14 @@ const menuGroups = [
   {
     name: "MENU",
     menuItems: [
+      // Responsable SI uniquement (Tableau de bord avec icône mixte)
       {
         label: "Tableau de bord",
         route: "/",
-        icon: <FiHome size={18} className="text-current" />,
+        icon: <FiLayout size={18} className="text-current" />,
         roles: ["RESPONSABLE SI"],
       },
+      // Intervention pour PROFESSOR, ADMINISTRATIF et RESPONSABLE SI (pas pour TECHNICIEN)
       {
         label: "Intervention",
         icon: <FiAlertTriangle size={18} className="text-current" />,
@@ -47,7 +56,7 @@ const menuGroups = [
           {
             label: "Incident",
             route: "/intervention/incident",
-            icon: <FiAlertTriangle size={18} className="text-current" />,
+            icon: <FiXCircle size={18} className="text-current" />,
           },
           {
             label: "Problème applicatif",
@@ -57,10 +66,11 @@ const menuGroups = [
           {
             label: "Demande de publication",
             route: "/intervention/demande",
-            icon: <FiUpload size={18} className="text-current" />,
+            icon: <FiSend size={18} className="text-current" />,
           },
         ],
       },
+      // Inventaire pour le Responsable SI uniquement
       {
         label: "Inventaire",
         icon: <FiBox size={18} className="text-current" />,
@@ -69,43 +79,47 @@ const menuGroups = [
           {
             label: "Ajouter Equipement",
             route: "/inventaire/equipement",
-            icon: <FiClipboard size={18} className="text-current" />,
+            icon: <FiPlusCircle size={18} className="text-current" />,
           },
           {
             label: "Ajouter Placement",
             route: "/inventaire/placement",
-            icon: <FiGrid size={18} className="text-current" />,
+            icon: <FiMapPin size={18} className="text-current" />,
           },
         ],
       },
+      // Notifications séparées
       {
         label: "Notification",
-        route: "/notification",
+        route: "/notification/not-user",
+        icon: <FiBell size={18} className="text-current" />,
+        roles: ["PROFESSOR", "ADMINISTRATIF"],
+      },
+      {
+        label: "Notification",
+        route: "/notification/not-technicien",
+        icon: <FiBell size={18} className="text-current" />,
+        roles: ["TECHNICIEN"],
+      },
+      {
+        label: "Notification",
+        route: "/notification/not-responsablesi",
         icon: <FiBell size={18} className="text-current" />,
         roles: ["RESPONSABLE SI"],
       },
+      // Planification pour Responsable SI et Technicien
       {
         label: "Planification",
         route: "/planification",
         icon: <FiClock size={18} className="text-current" />,
-        roles: ["RESPONSABLE SI"],
-      },
-      {
-        label: "Rapport",
-        icon: <FiFileText size={18} className="text-current" />,
         roles: ["RESPONSABLE SI", "TECHNICIEN"],
-        children: [
-          {
-            label: "Rapport d'incident",
-            route: "/rapport/incident",
-            icon: <FiAlertTriangle size={18} className="text-current" />,
-          },
-          {
-            label: "Rapport sur applicatif",
-            route: "/rapport/applicatif",
-            icon: <FiSettings size={18} className="text-current" />,
-          },
-        ],
+      },
+      // Suivi (anciennement "Suivre l’avancement de l’intervention")
+      {
+        label: "Suivi",
+        route: "/suivre-intervention",
+        icon: <FiTrendingUp size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF", "TECHNICIEN"],
       },
     ],
   },
@@ -116,13 +130,19 @@ const menuGroups = [
         label: "Classes",
         route: "/classes",
         icon: <FaUserGraduate size={18} className="text-current" />,
-        roles: ["RESPONSABLE SI", "TECHNICIEN", "PROFESSOR", "ADMINISTRATIF"],
+        roles: ["PROFESSOR", "RESPONSABLE SI"],
+      },
+      {
+        label: "Votre bureau",
+        route: "/votre-bureau",
+        icon: <BiDesktop size={18} className="text-current" />,
+        roles: ["PROFESSOR", "ADMINISTRATIF", "TECHNICIEN"],
       },
       {
         label: "Bureaux",
         route: "/bureaux",
         icon: <FaBuilding size={18} className="text-current" />,
-        roles: ["RESPONSABLE SI", "TECHNICIEN", "PROFESSOR", "ADMINISTRATIF"],
+        roles: ["RESPONSABLE SI"],
       },
     ],
   },
@@ -131,9 +151,25 @@ const menuGroups = [
     menuItems: [
       {
         label: "Gestion de stock",
-        route: "/depot",
-        icon: <FiBox size={18} className="text-current" />,
+        icon: <FiPackage size={18} className="text-current" />,
         roles: ["RESPONSABLE SI"],
+        children: [
+          {
+            label: "Liste du stock",
+            route: "/depot",
+            icon: <FiList size={18} className="text-current" />,
+          },
+          {
+            label: "Bon d'entrée",
+            route: "/depot/entree",
+            icon: <FiFileText size={18} className="text-current" />,
+          },
+          {
+            label: "Bon de sortie",
+            route: "/depot/sortie",
+            icon: <FiFileMinus size={18} className="text-current" />,
+          },
+        ],
       },
     ],
   },
@@ -160,13 +196,24 @@ const menuGroups = [
       },
     ],
   },
+  {
+    name: "MAINTENANCE",
+    menuItems: [
+      {
+        label: "Maintenance Préventive",
+        route: "/maintenance",
+        icon: <FiTool size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
+      },
+    ],
+  },
 ];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const pathname = usePathname();
   const [pageName, setPageName] = useLocalStorage("selectedMenu", "dashboard");
 
-  // Retrieve user from localStorage only once
+  // Récupérer l'utilisateur depuis localStorage une seule fois
   const userRole = useMemo(() => {
     if (typeof window !== "undefined") {
       const userData = localStorage.getItem("user");
@@ -179,10 +226,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         }
       }
     }
-    return "PROFESSOR"; // default if not found
+    return "PROFESSOR"; // valeur par défaut
   }, []);
 
-  // Memoize the filtered menu groups so they only recalc when userRole changes
+  // Filtrer les items du menu selon le rôle de l'utilisateur
   const filteredMenuGroups = useMemo(() => {
     const filterMenuItems = (menuItems: any[]) => {
       return menuItems.filter((item) => {
@@ -205,10 +252,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       .filter((group) => group.menuItems.length > 0);
   }, [userRole]);
 
-  // Reference to the scrollable sidebar container
+  // Référence pour la zone scrollable de la sidebar
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Restore sidebar scroll position on mount
+  // Restaurer la position du scroll lors du montage
   useEffect(() => {
     if (scrollContainerRef.current) {
       const storedScroll = localStorage.getItem("sidebarScroll");
@@ -218,7 +265,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     }
   }, []);
 
-  // Save scroll position on scroll
+  // Sauvegarder la position du scroll lors du scroll
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     localStorage.setItem("sidebarScroll", e.currentTarget.scrollTop.toString());
   };
@@ -230,7 +277,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Header of the Sidebar */}
+        {/* En-tête de la Sidebar */}
         <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
           <Link href="/">
             <Image
@@ -261,9 +308,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             </svg>
           </button>
         </div>
-        {/* End of Sidebar Header */}
+        {/* Fin de l'en-tête */}
 
-        {/* Sidebar Menu */}
+        {/* Menu de la Sidebar */}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
@@ -289,7 +336,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             ))}
           </nav>
         </div>
-        {/* End of Sidebar Menu */}
+        {/* Fin du Menu de la Sidebar */}
       </aside>
     </ClickOutside>
   );

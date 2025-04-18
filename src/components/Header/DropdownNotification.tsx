@@ -100,9 +100,11 @@ const DropdownNotification = () => {
             </ul>
 
             {/* "Voir tout" Button in black */}
-            <button className="border-t border-stroke px-4.5 py-3 text-center text-sm font-medium text-black hover:bg-gray-2 dark:border-strokedark dark:hover:bg-meta-4">
-              Voir tout
-            </button>
+            <Link href="/notification/not-responsablesi">
+              <button className="border-t border-stroke px-4.5 py-3 text-center text-sm font-medium text-black hover:bg-gray-2 dark:border-strokedark dark:hover:bg-meta-4">
+                Voir tout
+              </button>
+            </Link>
           </div>
         )}
       </li>
