@@ -51,7 +51,7 @@ const menuGroups = [
       {
         label: "Intervention",
         icon: <FiAlertTriangle size={18} className="text-current" />,
-        roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
+        roles: ["responsable si", "PROFESSOR", "ADMINISTRATIF"],
         children: [
           {
             label: "Incident",
