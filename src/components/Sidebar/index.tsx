@@ -1,3 +1,4 @@
+// src/components/Sidebar/index.tsx
 "use client";
 
 import React, { useEffect, useRef, useMemo } from "react";
@@ -7,7 +8,6 @@ import Image from "next/image";
 import SidebarItem from "@/components/Sidebar/SidebarItem";
 import ClickOutside from "@/components/ClickOutside";
 import useLocalStorage from "@/hooks/useLocalStorage";
-import { useAuth } from "@/hooks/AuthProvider";
 
 import {
   FiLayout,
@@ -34,7 +34,7 @@ import { FaUserGraduate, FaBuilding } from "react-icons/fa";
 
 interface SidebarProps {
   sidebarOpen: boolean;
-  setSidebarOpen: (arg: boolean) => void;
+  setSidebarOpen: (open: boolean) => void;
 }
 
 const menuGroups = [
@@ -212,22 +212,14 @@ const menuGroups = [
   },
 ];
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
+const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const pathname = usePathname();
-  const [pageName, setPageName] = useLocalStorage("selectedMenu", "dashboard");
-  const { user, isLoggedIn } = useAuth();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [pageName, setPageName] = useLocalStorage<string>(
+    "selectedMenu",
+    "dashboard",
+  );
+  const [userRole] = useLocalStorage<string>("role", "RESPONSABLE SI");
 
-  // Immediately bail if not logged in (no flash)
-  if (!isLoggedIn) {
-    if (typeof window !== "undefined") window.location.href = "/";
-    return null;
-  }
-
-  // derive uppercase role
-  const userRole = useMemo(() => user!.roles.toString().toUpperCase(), [user]);
-
-  // filter menu by role
   const filteredMenuGroups = useMemo(() => {
     const filterItems = (items: any[]): any[] =>
       items
@@ -235,7 +227,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         .filter((item) => {
           const allowed = item.roles
             .map((r: string) => r.toUpperCase())
-            .includes(userRole);
+            .includes(userRole.toUpperCase());
           if (!allowed) return false;
           if (item.children) {
             item.children = filterItems(item.children);
@@ -249,16 +241,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       .filter((g) => g.menuItems.length > 0);
   }, [userRole]);
 
-  // restore scroll pos
+  const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const stored = localStorage.getItem("sidebarScroll");
-    if (scrollContainerRef.current && stored) {
-      scrollContainerRef.current.scrollTop = parseInt(stored, 10);
-    }
+    const stored =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("sidebarScroll")
+        : null;
+    if (scrollRef.current && stored)
+      scrollRef.current.scrollTop = parseInt(stored, 10);
   }, []);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    localStorage.setItem("sidebarScroll", e.currentTarget.scrollTop.toString());
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    window.localStorage.setItem(
+      "sidebarScroll",
+      String(e.currentTarget.scrollTop),
+    );
   };
 
   return (
@@ -268,51 +264,45 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
+        <div className="flex items-center justify-between px-6 py-5 lg:py-6">
           <Link href="/acceuil">
             <Image
+              src="/images/logo/logo_escs_top_header.svg"
+              alt="Logo"
               width={176}
               height={32}
-              src={"/images/logo/logo_escs_top_header.svg"}
-              alt="Logo"
               priority
             />
           </Link>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-controls="sidebar"
             className="block lg:hidden"
           >
             ×
           </button>
         </div>
-
-        {/* Menu */}
         <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="no-scrollbar flex-1 overflow-y-auto px-4 py-4"
         >
-          <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
-            {filteredMenuGroups.map((group, gi) => (
-              <div key={gi}>
-                <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">
-                  {group.name}
-                </h3>
-                <ul className="mb-6 flex flex-col gap-1.5">
-                  {group.menuItems.map((mi, i) => (
-                    <SidebarItem
-                      key={i}
-                      item={mi}
-                      pageName={pageName}
-                      setPageName={setPageName}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </nav>
+          {filteredMenuGroups.map((group, gi) => (
+            <div key={gi} className="mb-6">
+              <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">
+                {group.name}
+              </h3>
+              <ul className="flex flex-col gap-1.5">
+                {group.menuItems.map((mi: any, i: number) => (
+                  <SidebarItem
+                    key={i}
+                    item={mi}
+                    pageName={pageName}
+                    setPageName={setPageName}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </aside>
     </ClickOutside>
