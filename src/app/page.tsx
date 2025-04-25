@@ -1,6 +1,5 @@
 // src/app/page.tsx
 "use client";
-
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/AuthProvider";
@@ -8,7 +7,6 @@ import { useAuth } from "@/hooks/AuthProvider";
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,32 +15,26 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
-    // 1) Hit login endpoint, cookie will be set
     const res = await fetch("http://localhost:2000/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email, password }),
     });
-
     if (!res.ok) {
       const { message } = await res.json();
       return setError(message || "Login failed");
     }
 
-    // 2) Immediately fetch the logged-in user
-    const meRes = await fetch("http://localhost:2000/auth/me", {
+    // fetch current user
+    const me = await fetch("http://localhost:2000/auth/me", {
       credentials: "include",
     });
-    if (!meRes.ok) {
-      return setError("Could not fetch user after login");
+    if (!me.ok) {
+      return setError("Could not fetch user");
     }
-    const user = await meRes.json();
-
-    // 3) Tell AuthProvider about the user
+    const user = await me.json();
     login(user);
-
-    // 4) Navigate into the protected area
     router.push("/acceuil");
   };
 

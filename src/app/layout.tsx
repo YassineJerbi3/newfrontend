@@ -1,6 +1,5 @@
 // src/app/layout.tsx
 "use client";
-
 import "jsvectormap/dist/jsvectormap.css";
 import "flatpickr/dist/flatpickr.min.css";
 import "@/css/satoshi.css";
@@ -16,7 +15,7 @@ export default function RootLayout({
 }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    setTimeout(() => setLoading(false), 1000);
+    setTimeout(() => setLoading(false), 500);
   }, []);
 
   return (

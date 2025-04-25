@@ -14,7 +14,6 @@ import {
   FiSend,
   FiBox,
   FiClock,
-  FiGrid,
   FiBell,
   FiAlertTriangle,
   FiSettings,
@@ -219,32 +218,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const { user, isLoggedIn } = useAuth();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!isLoggedIn) {
-      window.location.href = "/";
-    }
-  }, [isLoggedIn]);
-
-  if (!isLoggedIn) return null;
+  // Immediately bail if not logged in (no flash)
+  if (!isLoggedIn) {
+    if (typeof window !== "undefined") window.location.href = "/";
+    return null;
+  }
 
   // derive uppercase role
-  const userRole = useMemo(() => user!.roles.toUpperCase(), [user]);
+  const userRole = useMemo(() => user!.roles.toString().toUpperCase(), [user]);
 
   // filter menu by role
   const filteredMenuGroups = useMemo(() => {
-    const filterItems = (items: any[]) =>
-      items.filter((item) => {
-        const allowed = item.roles
-          .map((r: string) => r.toUpperCase())
-          .includes(userRole);
-        if (!allowed) return false;
-        if (item.children) {
-          item.children = filterItems(item.children);
-          return item.children.length > 0;
-        }
-        return true;
-      });
+    const filterItems = (items: any[]): any[] =>
+      items
+        .map((item) => ({ ...item }))
+        .filter((item) => {
+          const allowed = item.roles
+            .map((r: string) => r.toUpperCase())
+            .includes(userRole);
+          if (!allowed) return false;
+          if (item.children) {
+            item.children = filterItems(item.children);
+            return item.children.length > 0;
+          }
+          return true;
+        });
 
     return menuGroups
       .map((g) => ({ ...g, menuItems: filterItems(g.menuItems) }))
