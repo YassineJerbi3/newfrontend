@@ -8,6 +8,7 @@ import Image from "next/image";
 import SidebarItem from "@/components/Sidebar/SidebarItem";
 import ClickOutside from "@/components/ClickOutside";
 import useLocalStorage from "@/hooks/useLocalStorage";
+import { useAuth } from "@/hooks/AuthProvider";
 
 import {
   FiLayout,
@@ -218,16 +219,24 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     "selectedMenu",
     "dashboard",
   );
-  const [userRole] = useLocalStorage<string>("role", "RESPONSABLE SI");
+  const { user } = useAuth();
+
+  const userRole = useMemo(() => {
+    if (!user?.roles) return null;
+    return Array.isArray(user.roles)
+      ? user.roles[0].toString().toUpperCase()
+      : user.roles.toString().toUpperCase();
+  }, [user]);
 
   const filteredMenuGroups = useMemo(() => {
+    if (!userRole) return [];
     const filterItems = (items: any[]): any[] =>
       items
         .map((item) => ({ ...item }))
         .filter((item) => {
           const allowed = item.roles
             .map((r: string) => r.toUpperCase())
-            .includes(userRole.toUpperCase());
+            .includes(userRole);
           if (!allowed) return false;
           if (item.children) {
             item.children = filterItems(item.children);
