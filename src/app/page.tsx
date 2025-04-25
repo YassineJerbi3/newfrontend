@@ -1,52 +1,49 @@
+// src/app/page.tsx
 "use client";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { jwtDecode } from "jwt-decode"; // ✅ Updated here
-
-interface TokenPayload {
-  sub: string;
-  email: string;
-  roles: string;
-  iat: number;
-  exp: number;
-}
+import { useAuth } from "@/hooks/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    try {
-      const res = await fetch(`http://localhost:2000/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    // 1) Hit login endpoint, cookie will be set
+    const res = await fetch("http://localhost:2000/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
 
-      if (!res.ok) {
-        const msg = await res.json();
-        throw new Error(msg.message || "Login failed");
-      }
-
-      const { access_token } = await res.json();
-      localStorage.setItem("token", access_token);
-
-      const decoded = jwtDecode<TokenPayload>(access_token);
-      localStorage.setItem(
-        "user",
-        JSON.stringify({ email: decoded.email, role: decoded.roles }),
-      );
-
-      router.push("/acceuil");
-    } catch (err: any) {
-      setError(err.message);
+    if (!res.ok) {
+      const { message } = await res.json();
+      return setError(message || "Login failed");
     }
+
+    // 2) Immediately fetch the logged-in user
+    const meRes = await fetch("http://localhost:2000/auth/me", {
+      credentials: "include",
+    });
+    if (!meRes.ok) {
+      return setError("Could not fetch user after login");
+    }
+    const user = await meRes.json();
+
+    // 3) Tell AuthProvider about the user
+    login(user);
+
+    // 4) Navigate into the protected area
+    router.push("/acceuil");
   };
 
   return (
@@ -57,37 +54,26 @@ export default function LoginPage() {
       >
         <h2 className="mb-6 text-center text-2xl font-bold">Login</h2>
         {error && <p className="mb-4 text-red-500">{error}</p>}
-
-        <div className="mb-4">
-          <label htmlFor="email" className="mb-1 block">
-            Email
-          </label>
+        <label className="mb-4 block">
+          <span>Email</span>
           <input
-            id="email"
             type="email"
+            className="w-full rounded border px-3 py-2"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border px-3 py-2"
-            placeholder="you@example.com"
             required
           />
-        </div>
-
-        <div className="mb-6">
-          <label htmlFor="password" className="mb-1 block">
-            Password
-          </label>
+        </label>
+        <label className="mb-6 block">
+          <span>Password</span>
           <input
-            id="password"
             type="password"
+            className="w-full rounded border px-3 py-2"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border px-3 py-2"
-            placeholder="********"
             required
           />
-        </div>
-
+        </label>
         <button
           type="submit"
           className="w-full rounded bg-blue-500 py-2 text-white hover:bg-blue-600"

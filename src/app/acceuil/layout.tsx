@@ -1,8 +1,9 @@
-// app/acceuil/layout.tsx
+// src/app/acceuil/layout.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useAuth } from "@/hooks/AuthProvider";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
 export default function AccueilLayout({
@@ -10,14 +11,13 @@ export default function AccueilLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { isLoggedIn } = useAuth();
   const router = useRouter();
 
-  // Petit guard : si pas de user en localStorage, on renvoie au login
   useEffect(() => {
-    if (!localStorage.getItem("user")) {
-      router.replace("/");
-    }
-  }, [router]);
+    if (!isLoggedIn) router.replace("/");
+  }, [isLoggedIn, router]);
 
+  if (!isLoggedIn) return null;
   return <DefaultLayout>{children}</DefaultLayout>;
 }
