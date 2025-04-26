@@ -1,15 +1,27 @@
-// src/app/page.tsx
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { isLoggedIn, initialized, login } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect immediately if already authenticated
+  useEffect(() => {
+    if (initialized && isLoggedIn) {
+      router.replace("/acceuil");
+    }
+  }, [initialized, isLoggedIn, router]);
+
+  // Don’t render the login form until we know auth state
+  if (!initialized || isLoggedIn) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +38,6 @@ export default function LoginPage() {
       return setError(message || "Login failed");
     }
 
-    // fetch current user
     const me = await fetch("http://localhost:2000/auth/me", {
       credentials: "include",
     });

@@ -1,4 +1,3 @@
-// src/hooks/AuthProvider.tsx
 "use client";
 import {
   createContext,
@@ -9,7 +8,10 @@ import {
 } from "react";
 
 interface TokenPayload {
-  /* … */
+  id: string;
+  email: string;
+  roles: string[];
+  // …etc
 }
 
 interface AuthContextType {

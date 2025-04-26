@@ -8,59 +8,99 @@ interface NewUserForm {
   prenom: string;
   email: string;
   password: string;
-  role: string;
-  numeroBureaux?: string;
+  roles: string; // Role enum
+  fonction: string; // Fonction enum
+  direction: string; // Direction enum
 }
 
 export default function AddUserPage() {
-  // État du formulaire
   const [formData, setFormData] = useState<NewUserForm>({
     nom: "",
     prenom: "",
     email: "",
     password: "",
-    role: "",
-    numeroBureaux: "",
+    roles: "",
+    fonction: "",
+    direction: "",
   });
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
 
-  // Gérer le changement de valeur d'un champ
+  // ENUM OPTIONS
+  const roleOptions = [
+    "ADMINISTRATIF",
+    "PROFESSOR",
+    "RESPONSABLE_SI",
+    "TECHNICIAN",
+  ];
+  const fonctionOptions = ["MANAGER", "TECHNICIAN"];
+  const directionOptions = ["IT", "HR", "FINANCE"];
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Gérer la soumission du formulaire
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setSuccess(false);
 
-    // Vérifier si les champs obligatoires sont remplis
+    const { nom, prenom, email, password, roles, fonction, direction } =
+      formData;
     if (
-      !formData.nom ||
-      !formData.prenom ||
-      !formData.email ||
-      !formData.password ||
-      !formData.role
+      !nom ||
+      !prenom ||
+      !email ||
+      !password ||
+      !roles ||
+      !fonction ||
+      !direction
     ) {
-      alert("Veuillez remplir tous les champs obligatoires.");
+      setError("Veuillez remplir tous les champs obligatoires.");
       return;
     }
 
-    // Ici, vous pouvez envoyer les données à votre API ou backend
-    console.log("Nouveau Utilisateur:", formData);
+    try {
+      const res = await fetch("http://localhost:2000/users/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
 
-    // Réinitialiser le formulaire (facultatif)
-    setFormData({
-      nom: "",
-      prenom: "",
-      email: "",
-      password: "",
-      role: "",
-      numeroBureaux: "",
-    });
+      // Duplicate email
+      if (res.status === 409) {
+        const err = await res.json();
+        throw new Error(err.message || "Email déjà utilisé");
+      }
+
+      const contentType = res.headers.get("content-type");
+      if (!res.ok) {
+        let errorMsg = "Erreur serveur";
+        if (contentType?.includes("application/json")) {
+          const errJson = await res.json();
+          errorMsg = errJson.message || errorMsg;
+        } else {
+          const errText = await res.text();
+          console.error("Non-JSON error response:", errText);
+        }
+        throw new Error(errorMsg);
+      }
+
+      setSuccess(true);
+      setFormData({
+        nom: "",
+        prenom: "",
+        email: "",
+        password: "",
+        roles: "",
+        fonction: "",
+        direction: "",
+      });
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -69,15 +109,16 @@ export default function AddUserPage() {
         <h1 className="mb-4 text-xl font-bold">
           Ajouter un Nouvel Utilisateur
         </h1>
+        {error && <p className="mb-4 text-red-600">{error}</p>}
+        {success && <p className="mb-4 text-green-600">Utilisateur créé !</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nom (obligatoire) */}
+          {/* Nom */}
           <div>
             <label htmlFor="nom" className="block font-semibold">
               Nom *
             </label>
             <input
-              type="text"
               id="nom"
               name="nom"
               value={formData.nom}
@@ -88,13 +129,12 @@ export default function AddUserPage() {
             />
           </div>
 
-          {/* Prénom (obligatoire) */}
+          {/* Prénom */}
           <div>
             <label htmlFor="prenom" className="block font-semibold">
               Prénom *
             </label>
             <input
-              type="text"
               id="prenom"
               name="prenom"
               value={formData.prenom}
@@ -105,7 +145,7 @@ export default function AddUserPage() {
             />
           </div>
 
-          {/* Email (obligatoire) */}
+          {/* Email */}
           <div>
             <label htmlFor="email" className="block font-semibold">
               Email *
@@ -122,7 +162,7 @@ export default function AddUserPage() {
             />
           </div>
 
-          {/* Mot de passe (obligatoire) */}
+          {/* Mot de passe */}
           <div>
             <label htmlFor="password" className="block font-semibold">
               Mot de passe *
@@ -139,43 +179,72 @@ export default function AddUserPage() {
             />
           </div>
 
-          {/* Rôle (liste déroulante) */}
+          {/* Rôle */}
           <div>
-            <label htmlFor="role" className="block font-semibold">
+            <label htmlFor="roles" className="block font-semibold">
               Rôle *
             </label>
             <select
-              id="role"
-              name="role"
-              value={formData.role}
+              id="roles"
+              name="roles"
+              value={formData.roles}
               onChange={handleChange}
               className="w-full rounded border p-2"
               required
             >
               <option value="">Sélectionnez un rôle</option>
-              <option value="Technicien">Technicien</option>
-              <option value="Professor">Professor</option>
-              <option value="Administratif">Administratif</option>
+              {roleOptions.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* Numéro de bureaux (optionnel) */}
+          {/* Fonction */}
           <div>
-            <label htmlFor="numeroBureaux" className="block font-semibold">
-              Numéro de Bureau (optionnel)
+            <label htmlFor="fonction" className="block font-semibold">
+              Fonction *
             </label>
-            <input
-              type="text"
-              id="numeroBureaux"
-              name="numeroBureaux"
-              value={formData.numeroBureaux}
+            <select
+              id="fonction"
+              name="fonction"
+              value={formData.fonction}
               onChange={handleChange}
               className="w-full rounded border p-2"
-              placeholder="Exemple : B-12"
-            />
+              required
+            >
+              <option value="">Sélectionnez une fonction</option>
+              {fonctionOptions.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Bouton de soumission */}
+          {/* Direction */}
+          <div>
+            <label htmlFor="direction" className="block font-semibold">
+              Direction *
+            </label>
+            <select
+              id="direction"
+              name="direction"
+              value={formData.direction}
+              onChange={handleChange}
+              className="w-full rounded border p-2"
+              required
+            >
+              <option value="">Sélectionnez une direction</option>
+              {directionOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             type="submit"
             className="w-full rounded bg-blue-600 p-2 text-white hover:bg-blue-700"
