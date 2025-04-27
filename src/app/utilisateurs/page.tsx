@@ -1,111 +1,102 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
 interface User {
-  id: number;
+  id: string;
   nom: string;
   prenom: string;
   email: string;
-  password: string;
-  role: string;
-  numeroBureaux?: string;
+  fonction: string;
+  direction: string;
+  roles: string;
 }
 
 export default function UsersListPage() {
-  // Données d'exemple
-  const initialUsers: User[] = [
-    {
-      id: 1,
-      nom: "Dupont",
-      prenom: "Jean",
-      email: "jean.dupont@example.com",
-      password: "secret",
-      role: "Technicien",
-      numeroBureaux: "B-101",
-    },
-    {
-      id: 2,
-      nom: "Martin",
-      prenom: "Claire",
-      email: "claire.martin@example.com",
-      password: "secret",
-      role: "Professor",
-      numeroBureaux: "",
-    },
-    {
-      id: 3,
-      nom: "Durand",
-      prenom: "Paul",
-      email: "paul.durand@example.com",
-      password: "secret",
-      role: "Administratif",
-      numeroBureaux: "B-202",
-    },
-  ];
+  // 1️⃣ Data and loading state
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // État de la liste et des filtres
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  // 2️⃣ Filters for each column
   const [filters, setFilters] = useState({
     nom: "",
     prenom: "",
     email: "",
-    role: "",
+    fonction: "",
+    direction: "",
+    roles: "",
   });
 
-  // États pour le modal d'édition et de confirmation
+  // 3️⃣ Edit‐modal state
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [editedUserData, setEditedUserData] = useState<User | null>(null);
+  const [editedUserData, setEditedUserData] = useState<Partial<User>>({});
   const [showEditModal, setShowEditModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Gestion des filtres
+  // Fetch users on mount
+  useEffect(() => {
+    fetch("http://localhost:2000/users", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Unauthorized or server error");
+        return res.json();
+      })
+      .then((data: User[]) => setUsers(data))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Handler for filter inputs/selects
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
-  const filteredUsers = users.filter((user) => {
+  // Apply all six filters
+  const filteredUsers = users.filter((u) => {
     return (
-      user.nom.toLowerCase().includes(filters.nom.toLowerCase()) &&
-      user.prenom.toLowerCase().includes(filters.prenom.toLowerCase()) &&
-      user.email.toLowerCase().includes(filters.email.toLowerCase()) &&
-      user.role.toLowerCase().includes(filters.role.toLowerCase())
+      u.nom.toLowerCase().includes(filters.nom.toLowerCase()) &&
+      u.prenom.toLowerCase().includes(filters.prenom.toLowerCase()) &&
+      u.email.toLowerCase().includes(filters.email.toLowerCase()) &&
+      u.fonction.toLowerCase().includes(filters.fonction.toLowerCase()) &&
+      u.direction.toLowerCase().includes(filters.direction.toLowerCase()) &&
+      u.roles.toLowerCase().includes(filters.roles.toLowerCase())
     );
   });
 
-  // Ouvrir le modal d'édition
+  // Open edit modal
   const openEditModal = (user: User) => {
     setEditUser(user);
-    setEditedUserData(user);
+    setEditedUserData({ ...user });
     setShowEditModal(true);
   };
-
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditUser(null);
-    setEditedUserData(null);
+    setEditedUserData({});
   };
 
-  // Gestion des changements dans le formulaire d'édition
+  // Track edits
   const handleEditChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    if (!editedUserData) return;
-    setEditedUserData({ ...editedUserData, [e.target.name]: e.target.value });
+    setEditedUserData({
+      ...editedUserData,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  // Sauvegarder => ouvrir le modal de confirmation
+  // On save click: validate then show confirm
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (
-      !editedUserData?.nom ||
-      !editedUserData?.prenom ||
-      !editedUserData?.email ||
-      !editedUserData?.password ||
-      !editedUserData?.role
+      !editedUserData.nom ||
+      !editedUserData.prenom ||
+      !editedUserData.email ||
+      !editedUserData.fonction ||
+      !editedUserData.direction ||
+      !editedUserData.roles
     ) {
       alert("Veuillez remplir tous les champs obligatoires.");
       return;
@@ -113,31 +104,52 @@ export default function UsersListPage() {
     setShowConfirmModal(true);
   };
 
-  // Confirmation de la modification
-  const confirmUpdate = () => {
-    if (!editedUserData) return;
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === editedUserData.id ? editedUserData : user,
-      ),
-    );
-    setShowConfirmModal(false);
-    closeEditModal();
+  // Confirm and call backend
+  const confirmUpdate = async () => {
+    if (!editedUserData.id) return;
+    try {
+      // Only send allowed fields
+      const body = {
+        nom: editedUserData.nom,
+        prenom: editedUserData.prenom,
+        email: editedUserData.email,
+        fonction: editedUserData.fonction,
+        direction: editedUserData.direction,
+        roles: editedUserData.roles,
+      };
+      const res = await fetch(
+        `http://localhost:2000/users/${editedUserData.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        },
+      );
+      if (!res.ok) throw new Error("Update failed");
+      // Update local state
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === editedUserData.id ? ({ ...u, ...body } as User) : u,
+        ),
+      );
+      setShowConfirmModal(false);
+      closeEditModal();
+    } catch (err: any) {
+      alert("Erreur lors de la mise à jour : " + err.message);
+    }
   };
 
-  const cancelUpdate = () => {
-    setShowConfirmModal(false);
-  };
+  if (loading) return <DefaultLayout>Chargement…</DefaultLayout>;
 
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-7xl px-4 py-6">
         <h1 className="mb-4 text-2xl font-bold">Liste des Utilisateurs</h1>
 
-        {/* Filtres */}
-        <div className="mb-4 grid grid-cols-4 gap-4">
+        {/* ── Filters per column ── */}
+        <div className="mb-4 grid grid-cols-6 gap-4">
           <input
-            type="text"
             name="nom"
             value={filters.nom}
             onChange={handleFilterChange}
@@ -145,7 +157,6 @@ export default function UsersListPage() {
             className="rounded border p-2"
           />
           <input
-            type="text"
             name="prenom"
             value={filters.prenom}
             onChange={handleFilterChange}
@@ -153,7 +164,6 @@ export default function UsersListPage() {
             className="rounded border p-2"
           />
           <input
-            type="text"
             name="email"
             value={filters.email}
             onChange={handleFilterChange}
@@ -161,19 +171,41 @@ export default function UsersListPage() {
             className="rounded border p-2"
           />
           <select
-            name="role"
-            value={filters.role}
+            name="fonction"
+            value={filters.fonction}
             onChange={handleFilterChange}
             className="rounded border p-2"
           >
-            <option value="">Tous les rôles</option>
-            <option value="Technicien">Technicien</option>
-            <option value="Professor">Professor</option>
-            <option value="Administratif">Administratif</option>
+            <option value="">Toutes Fonctions</option>
+            <option value="MANAGER">Manager</option>
+            <option value="TECHNICIAN">Technician</option>
+          </select>
+          <select
+            name="direction"
+            value={filters.direction}
+            onChange={handleFilterChange}
+            className="rounded border p-2"
+          >
+            <option value="">Toutes Directions</option>
+            <option value="IT">IT</option>
+            <option value="HR">HR</option>
+            <option value="FINANCE">Finance</option>
+          </select>
+          <select
+            name="roles"
+            value={filters.roles}
+            onChange={handleFilterChange}
+            className="rounded border p-2"
+          >
+            <option value="">Tous les Rôles</option>
+            <option value="ADMINISTRATIF">Administratif</option>
+            <option value="PROFESSOR">Professor</option>
+            <option value="RESPONSABLE SI">Responsable SI</option>
+            <option value="TECHNICIEN">Technicien</option>
           </select>
         </div>
 
-        {/* Tableau des utilisateurs */}
+        {/* ── Table ── */}
         <div className="overflow-x-auto rounded-lg bg-white shadow">
           <table className="w-full border-collapse text-left">
             <thead className="bg-blue-100">
@@ -181,25 +213,27 @@ export default function UsersListPage() {
                 <th className="px-4 py-2">Nom</th>
                 <th className="px-4 py-2">Prénom</th>
                 <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Fonction</th>
+                <th className="px-4 py-2">Direction</th>
                 <th className="px-4 py-2">Rôle</th>
-                <th className="px-4 py-2">N° de Bureau</th>
                 <th className="px-4 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
+              {filteredUsers.map((u) => (
                 <tr
-                  key={user.id}
+                  key={u.id}
                   className="border-b odd:bg-white even:bg-gray-50"
                 >
-                  <td className="px-4 py-2">{user.nom}</td>
-                  <td className="px-4 py-2">{user.prenom}</td>
-                  <td className="px-4 py-2">{user.email}</td>
-                  <td className="px-4 py-2">{user.role}</td>
-                  <td className="px-4 py-2">{user.numeroBureaux || "-"}</td>
+                  <td className="px-4 py-2">{u.nom}</td>
+                  <td className="px-4 py-2">{u.prenom}</td>
+                  <td className="px-4 py-2">{u.email}</td>
+                  <td className="px-4 py-2">{u.fonction}</td>
+                  <td className="px-4 py-2">{u.direction}</td>
+                  <td className="px-4 py-2">{u.roles}</td>
                   <td className="px-4 py-2">
                     <button
-                      onClick={() => openEditModal(user)}
+                      onClick={() => openEditModal(u)}
                       className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-800"
                     >
                       Modifier
@@ -210,7 +244,7 @@ export default function UsersListPage() {
               {filteredUsers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-4 text-center text-gray-500"
                   >
                     Aucun utilisateur trouvé.
@@ -221,102 +255,75 @@ export default function UsersListPage() {
           </table>
         </div>
 
-        {/* Modal d'édition */}
-        {showEditModal && editedUserData && (
+        {/* ── Edit Modal ── */}
+        {showEditModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-md rounded bg-white p-6 shadow-lg">
-              <h2 className="mb-4 text-xl font-bold">Modifier lutilisateur</h2>
+            <div className="w-full max-w-lg rounded bg-white p-6 shadow-lg">
+              <h2 className="mb-4 text-xl font-bold">Modifier l’utilisateur</h2>
               <form onSubmit={handleSave} className="space-y-4">
-                <div>
-                  <label htmlFor="nom" className="block font-semibold">
-                    Nom *
-                  </label>
-                  <input
-                    type="text"
-                    id="nom"
-                    name="nom"
-                    value={editedUserData.nom}
-                    onChange={handleEditChange}
-                    className="w-full rounded border p-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="prenom" className="block font-semibold">
-                    Prénom *
-                  </label>
-                  <input
-                    type="text"
-                    id="prenom"
-                    name="prenom"
-                    value={editedUserData.prenom}
-                    onChange={handleEditChange}
-                    className="w-full rounded border p-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="email" className="block font-semibold">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={editedUserData.email}
-                    onChange={handleEditChange}
-                    className="w-full rounded border p-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="password" className="block font-semibold">
-                    Mot de passe *
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={editedUserData.password}
-                    onChange={handleEditChange}
-                    className="w-full rounded border p-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="role" className="block font-semibold">
-                    Rôle *
-                  </label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={editedUserData.role}
-                    onChange={handleEditChange}
-                    className="w-full rounded border p-2"
-                    required
-                  >
-                    <option value="">Sélectionnez un rôle</option>
-                    <option value="Technicien">Technicien</option>
-                    <option value="Professor">Professor</option>
-                    <option value="Administratif">Administratif</option>
-                  </select>
-                </div>
-                <div>
-                  <label
-                    htmlFor="numeroBureaux"
-                    className="block font-semibold"
-                  >
-                    Numéro de Bureau (optionnel)
-                  </label>
-                  <input
-                    type="text"
-                    id="numeroBureaux"
-                    name="numeroBureaux"
-                    value={editedUserData.numeroBureaux || ""}
-                    onChange={handleEditChange}
-                    className="w-full rounded border p-2"
-                  />
-                </div>
+                {/* inputs for each editable field */}
+                {(
+                  [
+                    "nom",
+                    "prenom",
+                    "email",
+                    "fonction",
+                    "direction",
+                    "roles",
+                  ] as (keyof User)[]
+                ).map((field) => (
+                  <div key={field}>
+                    <label className="block font-semibold">
+                      {field.charAt(0).toUpperCase() + field.slice(1)} *
+                    </label>
+                    {field === "fonction" ||
+                    field === "direction" ||
+                    field === "roles" ? (
+                      <select
+                        name={field}
+                        value={(editedUserData as any)[field] || ""}
+                        onChange={handleEditChange}
+                        className="w-full rounded border p-2"
+                        required
+                      >
+                        <option value="">Sélectionnez</option>
+                        {field === "fonction" && (
+                          <>
+                            <option value="MANAGER">Manager</option>
+                            <option value="TECHNICIAN">Technician</option>
+                          </>
+                        )}
+                        {field === "direction" && (
+                          <>
+                            <option value="IT">IT</option>
+                            <option value="HR">HR</option>
+                            <option value="FINANCE">Finance</option>
+                          </>
+                        )}
+                        {field === "roles" && (
+                          <>
+                            <option value="ADMINISTRATIF">Administratif</option>
+                            <option value="PROFESSOR">Professor</option>
+                            <option value="RESPONSABLE SI">
+                              Responsable SI
+                            </option>
+                            <option value="TECHNICIEN">Technicien</option>
+                          </>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        type={field === "email" ? "email" : "text"}
+                        name={field}
+                        value={(editedUserData as any)[field] || ""}
+                        onChange={handleEditChange}
+                        className="w-full rounded border p-2"
+                        required
+                      />
+                    )}
+                  </div>
+                ))}
+
                 <div className="flex justify-end space-x-4">
                   <button
                     type="button"
@@ -337,16 +344,16 @@ export default function UsersListPage() {
           </div>
         )}
 
-        {/* Modal de confirmation */}
+        {/* ── Confirmation Modal ── */}
         {showConfirmModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="w-full max-w-sm rounded bg-white p-6 shadow-lg">
               <h2 className="mb-4 text-xl font-bold">
-                Êtes-vous sûr de vouloir effectuer cette modification ?
+                Êtes-vous sûr de vouloir appliquer ces modifications ?
               </h2>
               <div className="flex justify-end space-x-4">
                 <button
-                  onClick={cancelUpdate}
+                  onClick={() => setShowConfirmModal(false)}
                   className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
                 >
                   Annuler

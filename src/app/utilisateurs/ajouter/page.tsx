@@ -30,8 +30,8 @@ export default function AddUserPage() {
   const roleOptions = [
     "ADMINISTRATIF",
     "PROFESSOR",
-    "RESPONSABLE_SI",
-    "TECHNICIAN",
+    "RESPONSABLE SI",
+    "TECHNICIEN",
   ];
   const fonctionOptions = ["MANAGER", "TECHNICIAN"];
   const directionOptions = ["IT", "HR", "FINANCE"];
