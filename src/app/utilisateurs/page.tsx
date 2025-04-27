@@ -14,11 +14,8 @@ interface User {
 }
 
 export default function UsersListPage() {
-  // 1️⃣ Data and loading state
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // 2️⃣ Filters for each column
   const [filters, setFilters] = useState({
     nom: "",
     prenom: "",
@@ -27,14 +24,11 @@ export default function UsersListPage() {
     direction: "",
     roles: "",
   });
-
-  // 3️⃣ Edit‐modal state
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editedUserData, setEditedUserData] = useState<Partial<User>>({});
   const [showEditModal, setShowEditModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Fetch users on mount
   useEffect(() => {
     fetch("http://localhost:2000/users", { credentials: "include" })
       .then((res) => {
@@ -46,14 +40,12 @@ export default function UsersListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Handler for filter inputs/selects
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
-  // Apply all six filters
   const filteredUsers = users.filter((u) => {
     return (
       u.nom.toLowerCase().includes(filters.nom.toLowerCase()) &&
@@ -65,7 +57,6 @@ export default function UsersListPage() {
     );
   });
 
-  // Open edit modal
   const openEditModal = (user: User) => {
     setEditUser(user);
     setEditedUserData({ ...user });
@@ -77,7 +68,6 @@ export default function UsersListPage() {
     setEditedUserData({});
   };
 
-  // Track edits
   const handleEditChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -87,7 +77,6 @@ export default function UsersListPage() {
     });
   };
 
-  // On save click: validate then show confirm
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (
@@ -104,11 +93,9 @@ export default function UsersListPage() {
     setShowConfirmModal(true);
   };
 
-  // Confirm and call backend
   const confirmUpdate = async () => {
     if (!editedUserData.id) return;
     try {
-      // Only send allowed fields
       const body = {
         nom: editedUserData.nom,
         prenom: editedUserData.prenom,
@@ -127,7 +114,6 @@ export default function UsersListPage() {
         },
       );
       if (!res.ok) throw new Error("Update failed");
-      // Update local state
       setUsers((prev) =>
         prev.map((u) =>
           u.id === editedUserData.id ? ({ ...u, ...body } as User) : u,
@@ -147,67 +133,17 @@ export default function UsersListPage() {
       <div className="mx-auto max-w-7xl px-4 py-6">
         <h1 className="mb-4 text-2xl font-bold">Liste des Utilisateurs</h1>
 
-        {/* ── Filters per column ── */}
-        <div className="mb-4 grid grid-cols-6 gap-4">
-          <input
-            name="nom"
-            value={filters.nom}
-            onChange={handleFilterChange}
-            placeholder="Filtrer par Nom"
-            className="rounded border p-2"
-          />
-          <input
-            name="prenom"
-            value={filters.prenom}
-            onChange={handleFilterChange}
-            placeholder="Filtrer par Prénom"
-            className="rounded border p-2"
-          />
-          <input
-            name="email"
-            value={filters.email}
-            onChange={handleFilterChange}
-            placeholder="Filtrer par Email"
-            className="rounded border p-2"
-          />
-          <select
-            name="fonction"
-            value={filters.fonction}
-            onChange={handleFilterChange}
-            className="rounded border p-2"
-          >
-            <option value="">Toutes Fonctions</option>
-            <option value="MANAGER">Manager</option>
-            <option value="TECHNICIAN">Technician</option>
-          </select>
-          <select
-            name="direction"
-            value={filters.direction}
-            onChange={handleFilterChange}
-            className="rounded border p-2"
-          >
-            <option value="">Toutes Directions</option>
-            <option value="IT">IT</option>
-            <option value="HR">HR</option>
-            <option value="FINANCE">Finance</option>
-          </select>
-          <select
-            name="roles"
-            value={filters.roles}
-            onChange={handleFilterChange}
-            className="rounded border p-2"
-          >
-            <option value="">Tous les Rôles</option>
-            <option value="ADMINISTRATIF">Administratif</option>
-            <option value="PROFESSOR">Professor</option>
-            <option value="RESPONSABLE SI">Responsable SI</option>
-            <option value="TECHNICIEN">Technicien</option>
-          </select>
-        </div>
-
-        {/* ── Table ── */}
         <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="w-full border-collapse text-left">
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "12%" }} />
+            </colgroup>
             <thead className="bg-blue-100">
               <tr>
                 <th className="px-4 py-2">Nom</th>
@@ -218,6 +154,75 @@ export default function UsersListPage() {
                 <th className="px-4 py-2">Rôle</th>
                 <th className="px-4 py-2">Actions</th>
               </tr>
+              <tr className="bg-blue-50">
+                <th className="p-2">
+                  <input
+                    name="nom"
+                    value={filters.nom}
+                    onChange={handleFilterChange}
+                    placeholder="Filtrer..."
+                    className="w-full rounded border p-1"
+                  />
+                </th>
+                <th className="p-2">
+                  <input
+                    name="prenom"
+                    value={filters.prenom}
+                    onChange={handleFilterChange}
+                    placeholder="Filtrer..."
+                    className="w-full rounded border p-1"
+                  />
+                </th>
+                <th className="p-2">
+                  <input
+                    name="email"
+                    value={filters.email}
+                    onChange={handleFilterChange}
+                    placeholder="Filtrer..."
+                    className="w-full rounded border p-1"
+                  />
+                </th>
+                <th className="p-2">
+                  <select
+                    name="fonction"
+                    value={filters.fonction}
+                    onChange={handleFilterChange}
+                    className="w-full rounded border p-1"
+                  >
+                    <option value="">Toutes</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="TECHNICIAN">Technician</option>
+                  </select>
+                </th>
+                <th className="p-2">
+                  <select
+                    name="direction"
+                    value={filters.direction}
+                    onChange={handleFilterChange}
+                    className="w-full rounded border p-1"
+                  >
+                    <option value="">Toutes</option>
+                    <option value="IT">IT</option>
+                    <option value="HR">HR</option>
+                    <option value="FINANCE">Finance</option>
+                  </select>
+                </th>
+                <th className="p-2">
+                  <select
+                    name="roles"
+                    value={filters.roles}
+                    onChange={handleFilterChange}
+                    className="w-full rounded border p-1"
+                  >
+                    <option value="">Tous</option>
+                    <option value="ADMINISTRATIF">Administratif</option>
+                    <option value="PROFESSOR">Professor</option>
+                    <option value="RESPONSABLE SI">Responsable SI</option>
+                    <option value="TECHNICIEN">Technicien</option>
+                  </select>
+                </th>
+                <th className="p-2"></th>
+              </tr>
             </thead>
             <tbody>
               {filteredUsers.map((u) => (
@@ -227,7 +232,9 @@ export default function UsersListPage() {
                 >
                   <td className="px-4 py-2">{u.nom}</td>
                   <td className="px-4 py-2">{u.prenom}</td>
-                  <td className="px-4 py-2">{u.email}</td>
+                  <td className="whitespace-normal break-all px-4 py-2">
+                    {u.email}
+                  </td>
                   <td className="px-4 py-2">{u.fonction}</td>
                   <td className="px-4 py-2">{u.direction}</td>
                   <td className="px-4 py-2">{u.roles}</td>
@@ -255,13 +262,11 @@ export default function UsersListPage() {
           </table>
         </div>
 
-        {/* ── Edit Modal ── */}
         {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-lg rounded bg-white p-6 shadow-lg">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 pt-20">
+            <div className="mx-4 w-full max-w-md rounded bg-white p-6 shadow-lg">
               <h2 className="mb-4 text-xl font-bold">Modifier l’utilisateur</h2>
               <form onSubmit={handleSave} className="space-y-4">
-                {/* inputs for each editable field */}
                 {(
                   [
                     "nom",
@@ -273,12 +278,10 @@ export default function UsersListPage() {
                   ] as (keyof User)[]
                 ).map((field) => (
                   <div key={field}>
-                    <label className="block font-semibold">
+                    <label className="mb-1 block font-semibold">
                       {field.charAt(0).toUpperCase() + field.slice(1)} *
                     </label>
-                    {field === "fonction" ||
-                    field === "direction" ||
-                    field === "roles" ? (
+                    {["fonction", "direction", "roles"].includes(field) ? (
                       <select
                         name={field}
                         value={(editedUserData as any)[field] || ""}
@@ -344,10 +347,9 @@ export default function UsersListPage() {
           </div>
         )}
 
-        {/* ── Confirmation Modal ── */}
         {showConfirmModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-sm rounded bg-white p-6 shadow-lg">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 pt-20">
+            <div className="mx-4 w-full max-w-sm rounded bg-white p-6 shadow-lg">
               <h2 className="mb-4 text-xl font-bold">
                 Êtes-vous sûr de vouloir appliquer ces modifications ?
               </h2>
