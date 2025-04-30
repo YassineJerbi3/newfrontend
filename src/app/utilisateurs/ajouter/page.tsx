@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { BureauDropdown } from "@/components/BureauDropdown"; // adjust path
 
 interface NewUserForm {
   nom: string;
   prenom: string;
   email: string;
   password: string;
-  roles: string; // Role enum
-  fonction: string; // Fonction enum
-  direction: string; // Direction enum
+  roles: string;
+  fonction: string;
+  direction: string;
+  bureauNom?: string;
 }
 
 export default function AddUserPage() {
@@ -22,19 +24,39 @@ export default function AddUserPage() {
     roles: "",
     fonction: "",
     direction: "",
+    bureauNom: "",
   });
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
+  const [success, setSuccess] = useState(false);
 
-  // ENUM OPTIONS
-  const roleOptions = [
-    "ADMINISTRATIF",
-    "PROFESSOR",
-    "RESPONSABLE SI",
-    "TECHNICIEN",
-  ];
+  const roleOptions = ["ADMIN", "PROFESSOR", "RESPONSABLE SI", "TECHNICIAN"];
   const fonctionOptions = ["MANAGER", "TECHNICIAN"];
   const directionOptions = ["IT", "HR", "FINANCE"];
+
+  const [bureaux, setBureaux] = useState<string[]>([]);
+  const [loadingBureaux, setLoadingBureaux] = useState(true);
+
+  useEffect(() => {
+    fetch("http://localhost:2000/emplacements")
+      .then((res) => res.json())
+      .then((list: { nom: string; type: string }[]) => {
+        const names = list.filter((e) => e.type === "BUREAU").map((e) => e.nom);
+        setBureaux(names);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingBureaux(false));
+  }, []);
+
+  // group and sort bureaux
+  const grouped = bureaux
+    .slice()
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    .reduce((acc: Record<string, string[]>, name) => {
+      const L = name[0].toUpperCase();
+      if (!acc[L]) acc[L] = [];
+      acc[L].push(name);
+      return acc;
+    }, {});
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -69,23 +91,18 @@ export default function AddUserPage() {
         body: JSON.stringify(formData),
       });
 
-      // Duplicate email
       if (res.status === 409) {
         const err = await res.json();
         throw new Error(err.message || "Email déjà utilisé");
       }
-
-      const contentType = res.headers.get("content-type");
       if (!res.ok) {
-        let errorMsg = "Erreur serveur";
-        if (contentType?.includes("application/json")) {
-          const errJson = await res.json();
-          errorMsg = errJson.message || errorMsg;
-        } else {
-          const errText = await res.text();
-          console.error("Non-JSON error response:", errText);
+        let msg = "Erreur serveur";
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+          const j = await res.json();
+          msg = j.message || msg;
         }
-        throw new Error(errorMsg);
+        throw new Error(msg);
       }
 
       setSuccess(true);
@@ -97,6 +114,7 @@ export default function AddUserPage() {
         roles: "",
         fonction: "",
         direction: "",
+        bureauNom: "",
       });
     } catch (err: any) {
       setError(err.message);
@@ -124,7 +142,6 @@ export default function AddUserPage() {
               value={formData.nom}
               onChange={handleChange}
               className="w-full rounded border p-2"
-              placeholder="Entrez le nom"
               required
             />
           </div>
@@ -140,7 +157,6 @@ export default function AddUserPage() {
               value={formData.prenom}
               onChange={handleChange}
               className="w-full rounded border p-2"
-              placeholder="Entrez le prénom"
               required
             />
           </div>
@@ -157,7 +173,6 @@ export default function AddUserPage() {
               value={formData.email}
               onChange={handleChange}
               className="w-full rounded border p-2"
-              placeholder="exemple@domain.com"
               required
             />
           </div>
@@ -174,7 +189,6 @@ export default function AddUserPage() {
               value={formData.password}
               onChange={handleChange}
               className="w-full rounded border p-2"
-              placeholder="Entrez un mot de passe"
               required
             />
           </div>
@@ -243,6 +257,21 @@ export default function AddUserPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Bureau (optionnel, 5 visible, grouped) */}
+          <div>
+            <label htmlFor="bureauNom" className="block font-semibold">
+              Bureau (optionnel)
+            </label>
+            <BureauDropdown
+              options={bureaux}
+              value={formData.bureauNom}
+              onChange={(v) => setFormData((f) => ({ ...f, bureauNom: v }))}
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Cliquez pour dérouler et scrollez pour voir tous les bureaux.
+            </p>
           </div>
 
           <button
