@@ -1,18 +1,19 @@
-// components/BureauDropdown.tsx
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface BureauDropdownProps {
   options: string[];
   value?: string;
   onChange: (val: string) => void;
+  placeholder?: string;
 }
 
 export function BureauDropdown({
   options,
   value,
   onChange,
+  placeholder,
 }: BureauDropdownProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -29,9 +30,15 @@ export function BureauDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // filter only strings
+  const filtered = options.filter(
+    (name) =>
+      typeof name === "string" &&
+      name.toLowerCase().includes(filter.toLowerCase()),
+  );
+
   // group & sort filtered options
-  const grouped = options
-    .filter((name) => name.toLowerCase().includes(filter.toLowerCase()))
+  const grouped = filtered
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .reduce((acc: Record<string, string[]>, name) => {
       const L = name[0].toUpperCase();
@@ -47,7 +54,7 @@ export function BureauDropdown({
         onClick={() => setOpen((o) => !o)}
         className="w-full rounded border bg-white px-3 py-2 text-left hover:bg-gray-50"
       >
-        {value || "Sélectionner un bureau (optionnel)"}
+        {value || placeholder || "Sélectionner un bureau (optionnel)"}
       </button>
 
       {open && (

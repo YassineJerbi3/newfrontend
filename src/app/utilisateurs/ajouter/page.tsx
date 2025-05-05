@@ -15,6 +15,8 @@ interface NewUserForm {
   bureauNom?: string;
 }
 
+type Emplacement = { id: string; nom: string; type: string };
+
 export default function AddUserPage() {
   const [formData, setFormData] = useState<NewUserForm>({
     nom: "",
@@ -29,7 +31,13 @@ export default function AddUserPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const roleOptions = ["ADMIN", "PROFESSOR", "RESPONSABLE SI", "TECHNICIAN"];
+  // Must match back-end Role enum values exactly:
+  const roleOptions = [
+    "ADMINISTRATIF",
+    "PROFESSOR",
+    "RESPONSABLE SI",
+    "TECHNICIEN",
+  ];
   const fonctionOptions = ["MANAGER", "TECHNICIAN"];
   const directionOptions = ["IT", "HR", "FINANCE"];
 
@@ -37,17 +45,18 @@ export default function AddUserPage() {
   const [loadingBureaux, setLoadingBureaux] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:2000/emplacements")
+    fetch("http://localhost:2000/emplacements/bureaux", {
+      credentials: "include",
+    })
       .then((res) => res.json())
-      .then((list: { nom: string; type: string }[]) => {
-        const names = list.filter((e) => e.type === "BUREAU").map((e) => e.nom);
-        setBureaux(names);
+      .then((bureauxList: Emplacement[]) => {
+        setBureaux(bureauxList.map((e) => e.nom));
       })
       .catch(console.error)
       .finally(() => setLoadingBureaux(false));
   }, []);
 
-  // group and sort bureaux
+  // group & sort bureaux by first letter, numeric-aware
   const grouped = bureaux
     .slice()
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -88,6 +97,7 @@ export default function AddUserPage() {
       const res = await fetch("http://localhost:2000/users/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // ← include cookie
         body: JSON.stringify(formData),
       });
 
@@ -250,7 +260,7 @@ export default function AddUserPage() {
               className="w-full rounded border p-2"
               required
             >
-              <option value="">Sélectionnez une direction</option>
+              <option value="">Sélectionnez une direcion</option>
               {directionOptions.map((d) => (
                 <option key={d} value={d}>
                   {d}
@@ -259,7 +269,7 @@ export default function AddUserPage() {
             </select>
           </div>
 
-          {/* Bureau (optionnel, 5 visible, grouped) */}
+          {/* Bureau (optionnel) */}
           <div>
             <label htmlFor="bureauNom" className="block font-semibold">
               Bureau (optionnel)

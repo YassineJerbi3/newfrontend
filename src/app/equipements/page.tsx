@@ -1,365 +1,341 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { Edit2, Trash2 } from "lucide-react";
+
+interface Emplacement {
+  id: string;
+  nom: string;
+  type: string;
+}
+
+type MaintenanceType =
+  | "HEBDOMADAIRE"
+  | "MENSUELLE"
+  | "TRIMESTRIELLE"
+  | "SEMESTRIELLE"
+  | "ANNUELLE";
+
+interface MaintenanceRecord {
+  id: string;
+  type: MaintenanceType;
+  description: string;
+}
 
 interface Equipement {
+  id: string;
   familleMI: string;
-  delegation: string;
+  designation: string;
   code: string;
   numeroSerie: string;
   codeInventaire: string;
-  dateMiseEnService: string;
-  emplacement: string;
+  dateMiseService: string;
+  emplacement: Emplacement | null;
   utilisateur: string;
   etat: string;
+  maintenanceRecords: MaintenanceRecord[];
 }
 
 export default function TableEquipementsPage() {
-  // Données d’exemple (vous pouvez les récupérer depuis une API/BDD)
-  const initialData: Equipement[] = [
-    {
-      familleMI: "Unité Centrale",
-      delegation: "UC Acer",
-      code: "ucahmed",
-      numeroSerie: "SN12345",
-      codeInventaire: "Inv-UC-001",
-      dateMiseEnService: "2022-05-12",
-      emplacement: "Salle 101",
-      utilisateur: "Ahmed",
-      etat: "Neuf",
-    },
-    {
-      familleMI: "Écran",
-      delegation: "Ecran Dell",
-      code: "ec-lab1",
-      numeroSerie: "SN98765",
-      codeInventaire: "Inv-ECR-002",
-      dateMiseEnService: "2023-01-10",
-      emplacement: "Laboratoire 1",
-      utilisateur: "Enseignant Lab1",
-      etat: "Occasion",
-    },
-    {
-      familleMI: "Serveur",
-      delegation: "Serveur HP",
-      code: "srv-bureau1",
-      numeroSerie: "SN55555",
-      codeInventaire: "Inv-SRV-003",
-      dateMiseEnService: "2021-11-05",
-      emplacement: "Bureau Informatique",
-      utilisateur: "AdminSys",
-      etat: "Neuf",
-    },
-    {
-      familleMI: "Datashow",
-      delegation: "Projecteur Epson",
-      code: "data-amphi1",
-      numeroSerie: "SN44444",
-      codeInventaire: "Inv-DATA-004",
-      dateMiseEnService: "2022-09-01",
-      emplacement: "Amphithéâtre 1",
-      utilisateur: "Service Audiovisuel",
-      etat: "En Panne",
-    },
-    {
-      familleMI: "Photocopieuse",
-      delegation: "Canon",
-      code: "photo-secretariat",
-      numeroSerie: "SN11111",
-      codeInventaire: "Inv-PHOTO-005",
-      dateMiseEnService: "2020-03-15",
-      emplacement: "Secrétariat",
-      utilisateur: "Secrétaire",
-      etat: "Occasion",
-    },
-    {
-      familleMI: "Caméra de Surveillance",
-      delegation: "Caméra Dahua",
-      code: "cam-couloir1",
-      numeroSerie: "SN22222",
-      codeInventaire: "Inv-CAM-006",
-      dateMiseEnService: "2023-02-20",
-      emplacement: "Couloir Principal",
-      utilisateur: "Service Sécurité",
-      etat: "Neuf",
-    },
-  ];
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 
-  // État local pour les filtres
-  const [filters, setFilters] = useState({
+  const [equipements, setEquipements] = useState<Equipement[]>([]);
+  const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
+  const [showAdd, setShowAdd] = useState<boolean>(false);
+  const [pendingDelete, setPendingDelete] = useState<MaintenanceRecord | null>(
+    null,
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<MaintenanceType>("HEBDOMADAIRE");
+  const [editDesc, setEditDesc] = useState<string>("");
+
+  const [filters, setFilters] = useState<Record<string, string>>({
     familleMI: "",
-    delegation: "",
+    designation: "",
     code: "",
     numeroSerie: "",
     codeInventaire: "",
-    dateMiseEnService: "",
+    dateMiseService: "",
     emplacement: "",
     utilisateur: "",
     etat: "",
   });
+  const [selectedEquip, setSelectedEquip] = useState<Equipement | null>(null);
 
-  // Gère la modification d’un champ de filtre
-  const handleFilterChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    setFilters({
-      ...filters,
-      [e.target.name]: e.target.value,
-    });
+  // Charge la liste principale
+  useEffect(() => {
+    fetch(`${API}/equipements`)
+      .then((r) => r.json())
+      .then((d) => setEquipements(d.items))
+      .catch(console.error);
+
+    fetch(`${API}/emplacements`)
+      .then((r) => r.json())
+      .then((d) => setEmplacements(d.items))
+      .catch(console.error);
+  }, [API]);
+
+  // Ouvre le modal en rechargeant l'équipement complet
+  const openModal = async (id: string) => {
+    try {
+      const res = await fetch(`${API}/equipements/${id}`);
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const data: Equipement = await res.json();
+      setSelectedEquip(data);
+    } catch (err) {
+      console.error("Impossible de charger le détail :", err);
+    }
   };
 
-  // Filtrer les données en fonction de tous les champs
-  const filteredData = initialData.filter((item) => {
-    // Filtre pour familleMI (si non vide et différent, on exclut l’élément)
-    if (
-      filters.familleMI &&
-      item.familleMI.toLowerCase() !== filters.familleMI.toLowerCase()
-    ) {
-      return false;
-    }
+  const handleFilterChange = (e: React.ChangeEvent<any>) =>
+    setFilters({ ...filters, [e.target.name]: e.target.value });
 
-    // Filtre pour delegation (on fait un includes pour un champ texte)
-    if (
-      filters.delegation &&
-      !item.delegation.toLowerCase().includes(filters.delegation.toLowerCase())
-    ) {
-      return false;
-    }
+  const filteredData = equipements.filter((eq) =>
+    Object.entries(filters).every(([key, val]) => {
+      if (!val) return true;
+      const field =
+        key === "emplacement"
+          ? (eq.emplacement?.nom ?? "")
+          : ((eq as any)[key] ?? "");
+      return field.toLowerCase().includes(val.toLowerCase());
+    }),
+  );
 
-    // Filtre pour code
-    if (
-      filters.code &&
-      !item.code.toLowerCase().includes(filters.code.toLowerCase())
-    ) {
-      return false;
-    }
+  // Sauvegarde de l'équipement modifié
+  const saveEquip = async () => {
+    if (!selectedEquip) return;
+    const { id, emplacement, maintenanceRecords, ...body } = selectedEquip;
+    await fetch(`${API}/equipements/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...body,
+        emplacementId: emplacement?.id,
+      }),
+    });
+    // Rafraîchir la liste principale
+    const updated = await (await fetch(`${API}/equipements`)).json();
+    setEquipements(updated.items);
+    setSelectedEquip(null);
+  };
 
-    // Filtre pour numeroSerie
-    if (
-      filters.numeroSerie &&
-      !item.numeroSerie
-        .toLowerCase()
-        .includes(filters.numeroSerie.toLowerCase())
-    ) {
-      return false;
-    }
+  // Suppression de l'équipement
+  const deleteEquip = async () => {
+    if (!selectedEquip) return;
+    await fetch(`${API}/equipements/${selectedEquip.id}`, {
+      method: "DELETE",
+    });
+    setEquipements((prev) => prev.filter((e) => e.id !== selectedEquip.id));
+    setSelectedEquip(null);
+  };
 
-    // Filtre pour codeInventaire
-    if (
-      filters.codeInventaire &&
-      !item.codeInventaire
-        .toLowerCase()
-        .includes(filters.codeInventaire.toLowerCase())
-    ) {
-      return false;
-    }
+  // CRUD maintenance
+  const addMaintenance = async (rec: Omit<MaintenanceRecord, "id">) => {
+    if (!selectedEquip) return;
+    const res = await fetch(
+      `${API}/equipements/${selectedEquip.id}/maintenance`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rec),
+      },
+    );
+    const newRec = await res.json();
+    setSelectedEquip((eq) =>
+      eq
+        ? { ...eq, maintenanceRecords: [...eq.maintenanceRecords, newRec] }
+        : eq,
+    );
+  };
 
-    // Filtre pour dateMiseEnService (ex: 2022-05-12)
-    // Ici on fait un includes, mais vous pouvez faire un filtrage plus élaboré (par intervalle de dates, etc.)
-    if (
-      filters.dateMiseEnService &&
-      !item.dateMiseEnService
-        .toLowerCase()
-        .includes(filters.dateMiseEnService.toLowerCase())
-    ) {
-      return false;
-    }
+  const updateMaintenance = async (rec: MaintenanceRecord) => {
+    await fetch(`${API}/equipements/maintenance/${rec.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: rec.type,
+        description: rec.description,
+      }),
+    });
+    setSelectedEquip((eq) =>
+      eq
+        ? {
+            ...eq,
+            maintenanceRecords: eq.maintenanceRecords.map((r) =>
+              r.id === rec.id ? rec : r,
+            ),
+          }
+        : eq,
+    );
+  };
 
-    // Filtre pour emplacement
-    if (
-      filters.emplacement &&
-      !item.emplacement
-        .toLowerCase()
-        .includes(filters.emplacement.toLowerCase())
-    ) {
-      return false;
-    }
-
-    // Filtre pour utilisateur
-    if (
-      filters.utilisateur &&
-      !item.utilisateur
-        .toLowerCase()
-        .includes(filters.utilisateur.toLowerCase())
-    ) {
-      return false;
-    }
-
-    // Filtre pour état (si non vide et différent, on exclut l’élément)
-    if (
-      filters.etat &&
-      item.etat.toLowerCase() !== filters.etat.toLowerCase()
-    ) {
-      return false;
-    }
-
-    return true;
-  });
+  const deleteMaintenance = async (recId: string) => {
+    await fetch(`${API}/equipements/maintenance/${recId}`, {
+      method: "DELETE",
+    });
+    setSelectedEquip((eq) =>
+      eq
+        ? {
+            ...eq,
+            maintenanceRecords: eq.maintenanceRecords.filter(
+              (r) => r.id !== recId,
+            ),
+          }
+        : eq,
+    );
+  };
 
   return (
     <DefaultLayout>
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <h1 className="mb-4 text-2xl font-bold">Liste des Équipements</h1>
+      <div className="mx-auto max-w-full px-4 py-6">
+        <h1 className="mb-4 text-2xl font-bold text-blue-700">
+          Liste des équipements
+        </h1>
 
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="w-full border-collapse text-left">
+        <div className="overflow-x-auto rounded-lg border border-blue-200 bg-white shadow-sm">
+          <table className="w-full table-fixed border-collapse text-left">
             <thead className="bg-blue-100">
-              {/* Ligne des titres */}
               <tr>
-                <th className="px-4 py-2">Famille MI</th>
-                <th className="px-4 py-2">Délégation</th>
-                <th className="px-4 py-2">Code</th>
-                <th className="px-4 py-2">N° de Série</th>
-                <th className="px-4 py-2">Code Inventaire</th>
-                <th className="px-4 py-2">Date de mise en service</th>
-                <th className="px-4 py-2">Emplacement</th>
-                <th className="px-4 py-2">Utilisateur</th>
-                <th className="px-4 py-2">État</th>
+                {[
+                  "Famille MI",
+                  "Désignation",
+                  "Code",
+                  "N° de série",
+                  "Code inv.",
+                  "Date de mise",
+                  "Emplacement",
+                  "Utilisateur",
+                  "État",
+                ].map((h) => (
+                  <th key={h} className="px-4 py-2">
+                    {h}
+                  </th>
+                ))}
               </tr>
-              {/* Ligne des filtres */}
               <tr>
-                {/* Famille MI (select) */}
                 <th className="px-4 py-2">
                   <select
                     name="familleMI"
                     value={filters.familleMI}
                     onChange={handleFilterChange}
-                    className="w-full rounded border p-1"
+                    className="w-full rounded border-blue-200 p-1"
                   >
                     <option value="">Toutes</option>
-                    <option value="Unité Centrale">Unité Centrale</option>
-                    <option value="Écran">Écran</option>
-                    <option value="Écran Interactif">Écran Interactif</option>
-                    <option value="Datashow">Datashow</option>
-                    <option value="Imprimante">Imprimante</option>
-                    <option value="Serveur">Serveur</option>
-                    <option value="Caméra de Surveillance">
-                      Caméra de Surveillance
-                    </option>
-                    <option value="Photocopieuse">Photocopieuse</option>
-                    <option value="TV">TV</option>
+                    {[...new Set(equipements.map((e) => e.familleMI))].map(
+                      (v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </th>
-
-                {/* Délégation (texte) */}
                 <th className="px-4 py-2">
                   <input
-                    type="text"
-                    name="delegation"
-                    value={filters.delegation}
+                    name="designation"
+                    value={filters.designation}
                     onChange={handleFilterChange}
-                    placeholder="Filtrer Délégation"
-                    className="w-full rounded border p-1"
+                    placeholder="Filtrer…"
+                    className="w-full rounded border-blue-200 p-1"
                   />
                 </th>
-
-                {/* Code (texte) */}
                 <th className="px-4 py-2">
                   <input
-                    type="text"
                     name="code"
                     value={filters.code}
                     onChange={handleFilterChange}
-                    placeholder="Filtrer Code"
-                    className="w-full rounded border p-1"
+                    placeholder="Filtrer…"
+                    className="w-full rounded border-blue-200 p-1"
                   />
                 </th>
-
-                {/* N° de Série (texte) */}
                 <th className="px-4 py-2">
                   <input
-                    type="text"
                     name="numeroSerie"
                     value={filters.numeroSerie}
                     onChange={handleFilterChange}
-                    placeholder="Filtrer N° Série"
-                    className="w-full rounded border p-1"
+                    placeholder="Filtrer…"
+                    className="w-full rounded border-blue-200 p-1"
                   />
                 </th>
-
-                {/* Code Inventaire (texte) */}
                 <th className="px-4 py-2">
                   <input
-                    type="text"
                     name="codeInventaire"
                     value={filters.codeInventaire}
                     onChange={handleFilterChange}
-                    placeholder="Filtrer Inventaire"
-                    className="w-full rounded border p-1"
+                    placeholder="Filtrer…"
+                    className="w-full rounded border-blue-200 p-1"
                   />
                 </th>
-
-                {/* Date mise en service (texte ou date) */}
                 <th className="px-4 py-2">
                   <input
-                    type="text"
-                    name="dateMiseEnService"
-                    value={filters.dateMiseEnService}
+                    type="date"
+                    name="dateMiseService"
+                    value={filters.dateMiseService}
                     onChange={handleFilterChange}
-                    placeholder="aaaa-mm-jj"
-                    className="w-full rounded border p-1"
+                    className="w-full rounded border-blue-200 p-1"
                   />
                 </th>
-
-                {/* Emplacement (texte) */}
                 <th className="px-4 py-2">
-                  <input
-                    type="text"
+                  <select
                     name="emplacement"
                     value={filters.emplacement}
                     onChange={handleFilterChange}
-                    placeholder="Filtrer Emplacement"
-                    className="w-full rounded border p-1"
-                  />
+                    className="w-full rounded border-blue-200 p-1"
+                  >
+                    <option value="">Tous</option>
+                    {emplacements.map((e) => (
+                      <option key={e.id} value={e.nom}>
+                        {e.nom}
+                      </option>
+                    ))}
+                  </select>
                 </th>
-
-                {/* Utilisateur (texte) */}
                 <th className="px-4 py-2">
                   <input
-                    type="text"
                     name="utilisateur"
                     value={filters.utilisateur}
                     onChange={handleFilterChange}
-                    placeholder="Filtrer Utilisateur"
-                    className="w-full rounded border p-1"
+                    placeholder="Filtrer…"
+                    className="w-full rounded border-blue-200 p-1"
                   />
                 </th>
-
-                {/* État (select) */}
                 <th className="px-4 py-2">
                   <select
                     name="etat"
                     value={filters.etat}
                     onChange={handleFilterChange}
-                    className="w-full rounded border p-1"
+                    className="w-full rounded border-blue-200 p-1"
                   >
                     <option value="">Tous</option>
-                    <option value="Neuf">Neuf</option>
-                    <option value="Occasion">Occasion</option>
-                    <option value="En Panne">En Panne</option>
+                    {[...new Set(equipements.map((e) => e.etat))].map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
                   </select>
                 </th>
               </tr>
             </thead>
+
             <tbody>
-              {filteredData.map((equip, index) => (
+              {filteredData.map((eq) => (
                 <tr
-                  key={index}
-                  className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                  key={eq.id}
+                  className="cursor-pointer even:bg-gray-50 hover:bg-blue-50"
+                  onClick={() => openModal(eq.id)}
                 >
-                  <td className="px-4 py-2">{equip.familleMI}</td>
-                  <td className="px-4 py-2">{equip.delegation}</td>
-                  <td className="px-4 py-2">{equip.code}</td>
-                  <td className="px-4 py-2">{equip.numeroSerie}</td>
-                  <td className="px-4 py-2">{equip.codeInventaire}</td>
-                  <td className="px-4 py-2">{equip.dateMiseEnService}</td>
-                  <td className="px-4 py-2">{equip.emplacement}</td>
-                  <td className="px-4 py-2">{equip.utilisateur}</td>
-                  <td className="px-4 py-2">{equip.etat}</td>
+                  <td className="px-4 py-2">{eq.familleMI}</td>
+                  <td className="px-4 py-2">{eq.designation}</td>
+                  <td className="px-4 py-2">{eq.code}</td>
+                  <td className="px-4 py-2">{eq.numeroSerie}</td>
+                  <td className="px-4 py-2">{eq.codeInventaire}</td>
+                  <td className="px-4 py-2">{eq.dateMiseService}</td>
+                  <td className="px-4 py-2">{eq.emplacement?.nom}</td>
+                  <td className="px-4 py-2">{eq.utilisateur}</td>
+                  <td className="px-4 py-2">{eq.etat}</td>
                 </tr>
               ))}
-
               {filteredData.length === 0 && (
                 <tr>
                   <td
@@ -373,6 +349,312 @@ export default function TableEquipementsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Modal éditable */}
+        {/* Only the modal JSX - drop this into your component */}
+        {/* Modal JSX with icon buttons and confirmation dialogs */}
+        {selectedEquip && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="max-h-[70vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
+              <h2 className="mb-4 text-xl font-bold text-blue-700">
+                Détails de l’équipement
+              </h2>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Read‑only fields */}
+                {[
+                  ["Famille MI", selectedEquip.familleMI],
+                  ["Désignation", selectedEquip.designation],
+                  ["Code", selectedEquip.code],
+                  ["N° de série", selectedEquip.numeroSerie],
+                  ["Code inv.", selectedEquip.codeInventaire],
+                  ["Date service", selectedEquip.dateMiseService],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-600">
+                      {label}
+                    </span>
+                    <input
+                      readOnly
+                      value={val}
+                      className="mt-1 w-full rounded border border-gray-300 bg-gray-100 p-2 text-sm"
+                    />
+                  </div>
+                ))}
+
+                {/* Editable fields */}
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-600">
+                    Utilisateur *
+                  </span>
+                  <select
+                    value={selectedEquip.utilisateur}
+                    onChange={(e) =>
+                      setSelectedEquip({
+                        ...selectedEquip,
+                        utilisateur: e.target.value,
+                      })
+                    }
+                    className="mt-1 rounded border border-gray-300 p-2 text-sm"
+                  >
+                    <option>ENSEIGNANT</option>
+                    <option>ETUDIANT</option>
+                    <option>ADMINISTRATIF</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-600">
+                    État *
+                  </span>
+                  <select
+                    value={selectedEquip.etat}
+                    onChange={(e) =>
+                      setSelectedEquip({
+                        ...selectedEquip,
+                        etat: e.target.value,
+                      })
+                    }
+                    className="mt-1 rounded border border-gray-300 p-2 text-sm"
+                  >
+                    <option>FONCTIONNEL</option>
+                    <option>EN_PANNE</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2 flex flex-col">
+                  <span className="text-sm font-medium text-gray-600">
+                    Emplacement *
+                  </span>
+                  <select
+                    value={selectedEquip.emplacement?.id || ""}
+                    onChange={(e) => {
+                      const emp =
+                        emplacements.find((x) => x.id === e.target.value) ||
+                        null;
+                      setSelectedEquip({ ...selectedEquip, emplacement: emp });
+                    }}
+                    className="mt-1 rounded border border-gray-300 p-2 text-sm"
+                  >
+                    <option value="">Aucun</option>
+                    {emplacements.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Preventive maintenance list with inline edit */}
+                <div className="col-span-2">
+                  <h3 className="mb-2 text-sm font-medium text-gray-700">
+                    Maintenance préventive existante
+                  </h3>
+
+                  {/* track which record is being edited */}
+                  {/* add at top of component: 
+              const [editingId, setEditingId] = useState<string | null>(null);
+              const [editType, setEditType] = useState<MaintenanceType>("HEBDOMADAIRE");
+              const [editDesc, setEditDesc] = useState<string>("");
+          */}
+
+                  <ul className="space-y-2">
+                    {selectedEquip.maintenanceRecords.map((rec) => {
+                      const isEditing = rec.id === editingId;
+                      return (
+                        <li
+                          key={rec.id}
+                          className="flex items-center space-x-2 text-sm"
+                        >
+                          {isEditing ? (
+                            <>
+                              {/* editable type */}
+                              <select
+                                value={editType}
+                                onChange={(e) =>
+                                  setEditType(e.target.value as MaintenanceType)
+                                }
+                                className="w-32 rounded border border-gray-300 p-1 text-sm"
+                              >
+                                {[
+                                  "HEBDOMADAIRE",
+                                  "MENSUELLE",
+                                  "TRIMESTRIELLE",
+                                  "SEMESTRIELLE",
+                                  "ANNUELLE",
+                                ].map((t) => (
+                                  <option key={t} value={t}>
+                                    {t}
+                                  </option>
+                                ))}
+                              </select>
+                              {/* editable description */}
+                              <input
+                                value={editDesc}
+                                onChange={(e) => setEditDesc(e.target.value)}
+                                className="flex-1 rounded border border-gray-300 p-2 text-sm"
+                              />
+                              {/* Save */}
+                              <button
+                                onClick={() => {
+                                  updateMaintenance({
+                                    id: rec.id,
+                                    type: editType,
+                                    description: editDesc,
+                                  });
+                                  setEditingId(null);
+                                }}
+                                className="rounded bg-green-600 px-2 py-1 text-xs text-white"
+                              >
+                                Save
+                              </button>
+                              {/* Cancel */}
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="rounded border px-2 py-1 text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-32">{rec.type}</span>
+                              <span className="flex-1">{rec.description}</span>
+                              {/* Edit button enters edit mode */}
+                              <button
+                                onClick={() => {
+                                  setEditingId(rec.id);
+                                  setEditType(rec.type);
+                                  setEditDesc(rec.description);
+                                }}
+                                className="rounded p-2 hover:bg-blue-100"
+                                title="Modifier"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              {/* Delete */}
+                              <button
+                                onClick={() => setPendingDelete(rec)}
+                                className="rounded p-2 hover:bg-red-100"
+                                title="Supprimer"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {/* Confirmation Modal */}
+                  {pendingDelete && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+                        <h3 className="mb-4 text-lg font-bold text-red-600">
+                          Supprimer la maintenance ?
+                        </h3>
+                        <p className="mb-6">
+                          Êtes‑vous sûr de vouloir supprimer la maintenance “
+                          {pendingDelete.type}” ?
+                        </p>
+                        <div className="flex justify-end space-x-3">
+                          <button
+                            onClick={() => setPendingDelete(null)}
+                            className="rounded border px-4 py-2"
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            onClick={() => {
+                              deleteMaintenance(pendingDelete.id);
+                              setPendingDelete(null);
+                            }}
+                            className="rounded bg-red-600 px-4 py-2 text-white"
+                          >
+                            Confirmer
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add new maintenance */}
+                  <div className="mt-3 flex items-center space-x-2">
+                    <select
+                      id="newType"
+                      className="rounded border border-gray-300 p-2 text-sm"
+                    >
+                      {[
+                        "HEBDOMADAIRE",
+                        "MENSUELLE",
+                        "TRIMESTRIELLE",
+                        "SEMESTRIELLE",
+                        "ANNUELLE",
+                      ].map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      id="newDesc"
+                      placeholder="Description*"
+                      className="flex-1 rounded border border-gray-300 p-2 text-sm"
+                    />
+                    <button
+                      onClick={() => {
+                        const type = (
+                          document.getElementById(
+                            "newType",
+                          ) as HTMLSelectElement
+                        ).value;
+                        const desc = (
+                          document.getElementById("newDesc") as HTMLInputElement
+                        ).value;
+                        if (!desc)
+                          return alert(
+                            "Le champ de description est obligatoire",
+                          );
+                        addMaintenance({ type, description: desc });
+                      }}
+                      className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer actions */}
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm("Tu es sûr de supprimer cet équipement ?")
+                    )
+                      deleteEquip();
+                  }}
+                  className="rounded bg-red-600 px-4 py-2 text-sm text-white"
+                >
+                  Supprimer
+                </button>
+                <button
+                  onClick={saveEquip}
+                  className="rounded bg-blue-600 px-4 py-2 text-sm text-white"
+                >
+                  Enregistrer
+                </button>
+                <button
+                  onClick={() => setSelectedEquip(null)}
+                  className="rounded border px-4 py-2 text-sm"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DefaultLayout>
   );

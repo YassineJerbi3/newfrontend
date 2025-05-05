@@ -3,75 +3,168 @@
 import React, { useState } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
-export default function AddPlacementPage() {
+// Local enum matching backend CreateEmplacementDto
+const EmplacementType = {
+  BUREAU: "BUREAU",
+  CLASSE: "CLASSE",
+};
+
+// Local enum for equipment types matching backend EquipmentType
+const EquipmentType = {
+  IMPRIMANTE: "IMPRIMANTE",
+  PHOTOCOPIEUSE: "PHOTOCOPIEUSE",
+  ECRAN: "ECRAN",
+  ECRAN_INTERACTIF: "ECRAN_INTERACTIF",
+  UNITE_CENTRALE: "UNITE_CENTRALE",
+  POSTE: "POSTE",
+  SERVEUR: "SERVEUR",
+  CAMERA_DE_SURVEILLANCE: "CAMERA_DE_SURVEILLANCE",
+  TV: "TV",
+};
+
+export default function AddEmplacementPage() {
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
+
   const [formData, setFormData] = useState({
-    emplacement: "",
-    poste: "",
-    equipement: "",
+    nom: "",
+    type: EmplacementType.BUREAU,
+    equipmentCounts: [{ equipmentType: EquipmentType.IMPRIMANTE, quantity: 1 }],
   });
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    index?: number,
+    field?: "equipmentType" | "quantity",
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (field != null && index != null) {
+      const newCounts = [...formData.equipmentCounts];
+      newCounts[index] = {
+        ...newCounts[index],
+        [field]:
+          field === "quantity" ? parseInt(e.target.value) : e.target.value,
+      };
+      setFormData({ ...formData, equipmentCounts: newCounts });
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Placement Data:", formData);
+  const addCountRow = () => {
+    setFormData({
+      ...formData,
+      equipmentCounts: [
+        ...formData.equipmentCounts,
+        { equipmentType: EquipmentType.IMPRIMANTE, quantity: 1 },
+      ],
+    });
   };
+
+  const removeCountRow = (index: number) => {
+    const newCounts = formData.equipmentCounts.filter((_, i) => i !== index);
+    setFormData({ ...formData, equipmentCounts: newCounts });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const res = await fetch(`${API}/emplacements`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Erreur serveur");
+      console.log("Emplacement créé", result);
+      setFormData({
+        nom: "",
+        type: EmplacementType.BUREAU,
+        equipmentCounts: [],
+      });
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message);
+    }
+  };
+
+  const isBureau = formData.type === EmplacementType.BUREAU;
 
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-xl rounded bg-white p-6 shadow-lg">
-        <h1 className="mb-4 text-xl font-bold">Ajouter Placement Équipement</h1>
+        <h1 className="mb-4 text-xl font-bold">Ajouter Emplacement</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <select
-            name="emplacement"
-            value={formData.emplacement}
-            onChange={handleChange}
-            required
-            className="w-full rounded border p-2"
-          >
-            <option value="">Sélectionner un emplacement</option>
-            <option value="Bureau">Bureau</option>
-            <option value="Classe 1">Classe 1</option>
-            <option value="Classe 2">Classe 2</option>
-            <option value="Classe 3">Classe 3</option>
-            <option value="Classe 4">Classe 4</option>
-            <option value="Classe 5">Classe 5</option>
-            <option value="Classe 6">Classe 6</option>
-          </select>
+          <label className="block">
+            Nom
+            <input
+              name="nom"
+              type="text"
+              value={formData.nom}
+              onChange={handleChange}
+              required
+              className="w-full rounded border p-2"
+            />
+          </label>
 
-          <input
-            type="text"
-            name="poste"
-            value={formData.poste}
-            onChange={handleChange}
-            placeholder="Numéro de poste (pour les classes)"
-            className="w-full rounded border p-2"
-          />
+          <label className="block">
+            Type
+            <select
+              name="type"
+              value={formData.type}
+              onChange={handleChange}
+              required
+              className="w-full rounded border p-2"
+            >
+              <option value={EmplacementType.BUREAU}>Bureau</option>
+              <option value={EmplacementType.CLASSE}>Classe</option>
+            </select>
+          </label>
 
-          <select
-            name="equipement"
-            value={formData.equipement}
-            onChange={handleChange}
-            required
-            className="w-full rounded border p-2"
-          >
-            <option value="">Sélectionner un équipement</option>
-            <option value="Unité Centrale">Unité Centrale</option>
-            <option value="Écran">Écran</option>
-            <option value="Écran Interactif">Écran Interactif</option>
-            <option value="Datashow">Datashow</option>
-            <option value="Imprimante">Imprimante</option>
-            <option value="Serveur">Serveur</option>
-            <option value="Caméra de Surveillance">
-              Caméra de Surveillance
-            </option>
-            <option value="Photocopieuse">Photocopieuse</option>
-            <option value="TV">TV</option>
-          </select>
+          {isBureau && (
+            <div className="space-y-2">
+              <h2 className="font-semibold">Quantités d'équipements</h2>
+              {formData.equipmentCounts.map((row, idx) => (
+                <div key={idx} className="flex space-x-2">
+                  <select
+                    value={row.equipmentType}
+                    onChange={(e) => handleChange(e, idx, "equipmentType")}
+                    className="flex-1 rounded border p-2"
+                  >
+                    {Object.values(EquipmentType).map((val) => (
+                      <option key={val} value={val}>
+                        {val}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={row.quantity}
+                    onChange={(e) => handleChange(e, idx, "quantity")}
+                    className="w-24 rounded border p-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCountRow(idx)}
+                    className="px-2"
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addCountRow}
+                className="text-blue-600"
+              >
+                + Ajouter un type
+              </button>
+            </div>
+          )}
+
+          {error && <div className="text-red-600">{error}</div>}
 
           <button
             type="submit"
