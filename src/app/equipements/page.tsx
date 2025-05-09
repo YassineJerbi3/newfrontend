@@ -1,6 +1,7 @@
+// src/app/inventaire/equipement/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { Edit2, Trash2 } from "lucide-react";
 
@@ -42,14 +43,13 @@ export default function TableEquipementsPage() {
 
   const [equipements, setEquipements] = useState<Equipement[]>([]);
   const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
-  const [showAdd, setShowAdd] = useState<boolean>(false);
+  const [showModal, setShowModal] = useState<boolean>(false);
   const [pendingDelete, setPendingDelete] = useState<MaintenanceRecord | null>(
     null,
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editType, setEditType] = useState<MaintenanceType>("HEBDOMADAIRE");
   const [editDesc, setEditDesc] = useState<string>("");
-
   const [filters, setFilters] = useState<Record<string, string>>({
     familleMI: "",
     designation: "",
@@ -83,6 +83,7 @@ export default function TableEquipementsPage() {
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data: Equipement = await res.json();
       setSelectedEquip(data);
+      setShowModal(true);
     } catch (err) {
       console.error("Impossible de charger le détail :", err);
     }
@@ -117,6 +118,7 @@ export default function TableEquipementsPage() {
     // Rafraîchir la liste principale
     const updated = await (await fetch(`${API}/equipements`)).json();
     setEquipements(updated.items);
+    setShowModal(false);
     setSelectedEquip(null);
   };
 
@@ -127,6 +129,7 @@ export default function TableEquipementsPage() {
       method: "DELETE",
     });
     setEquipements((prev) => prev.filter((e) => e.id !== selectedEquip.id));
+    setShowModal(false);
     setSelectedEquip(null);
   };
 
@@ -351,9 +354,7 @@ export default function TableEquipementsPage() {
         </div>
 
         {/* Modal éditable */}
-        {/* Only the modal JSX - drop this into your component */}
-        {/* Modal JSX with icon buttons and confirmation dialogs */}
-        {selectedEquip && (
+        {showModal && selectedEquip && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
             <div className="max-h-[70vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
               <h2 className="mb-4 text-xl font-bold text-blue-700">
@@ -445,19 +446,11 @@ export default function TableEquipementsPage() {
                   </select>
                 </div>
 
-                {/* Preventive maintenance list with inline edit */}
+                {/* Maintenance préventive */}
                 <div className="col-span-2">
                   <h3 className="mb-2 text-sm font-medium text-gray-700">
                     Maintenance préventive existante
                   </h3>
-
-                  {/* track which record is being edited */}
-                  {/* add at top of component: 
-              const [editingId, setEditingId] = useState<string | null>(null);
-              const [editType, setEditType] = useState<MaintenanceType>("HEBDOMADAIRE");
-              const [editDesc, setEditDesc] = useState<string>("");
-          */}
-
                   <ul className="space-y-2">
                     {selectedEquip.maintenanceRecords.map((rec) => {
                       const isEditing = rec.id === editingId;
@@ -468,7 +461,6 @@ export default function TableEquipementsPage() {
                         >
                           {isEditing ? (
                             <>
-                              {/* editable type */}
                               <select
                                 value={editType}
                                 onChange={(e) =>
@@ -488,13 +480,11 @@ export default function TableEquipementsPage() {
                                   </option>
                                 ))}
                               </select>
-                              {/* editable description */}
                               <input
                                 value={editDesc}
                                 onChange={(e) => setEditDesc(e.target.value)}
                                 className="flex-1 rounded border border-gray-300 p-2 text-sm"
                               />
-                              {/* Save */}
                               <button
                                 onClick={() => {
                                   updateMaintenance({
@@ -508,7 +498,6 @@ export default function TableEquipementsPage() {
                               >
                                 Save
                               </button>
-                              {/* Cancel */}
                               <button
                                 onClick={() => setEditingId(null)}
                                 className="rounded border px-2 py-1 text-xs"
@@ -520,7 +509,6 @@ export default function TableEquipementsPage() {
                             <>
                               <span className="w-32">{rec.type}</span>
                               <span className="flex-1">{rec.description}</span>
-                              {/* Edit button enters edit mode */}
                               <button
                                 onClick={() => {
                                   setEditingId(rec.id);
@@ -532,7 +520,6 @@ export default function TableEquipementsPage() {
                               >
                                 <Edit2 size={16} />
                               </button>
-                              {/* Delete */}
                               <button
                                 onClick={() => setPendingDelete(rec)}
                                 className="rounded p-2 hover:bg-red-100"
@@ -547,7 +534,6 @@ export default function TableEquipementsPage() {
                     })}
                   </ul>
 
-                  {/* Confirmation Modal */}
                   {pendingDelete && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
@@ -579,12 +565,8 @@ export default function TableEquipementsPage() {
                     </div>
                   )}
 
-                  {/* Add new maintenance */}
                   <div className="mt-3 flex items-center space-x-2">
-                    <select
-                      id="newType"
-                      className="rounded border border-gray-300 p-2 text-sm"
-                    >
+                    <select id="newType" className="rounded border p-2 text-sm">
                       {[
                         "HEBDOMADAIRE",
                         "MENSUELLE",
@@ -600,7 +582,7 @@ export default function TableEquipementsPage() {
                     <input
                       id="newDesc"
                       placeholder="Description*"
-                      className="flex-1 rounded border border-gray-300 p-2 text-sm"
+                      className="flex-1 rounded border p-2 text-sm"
                     />
                     <button
                       onClick={() => {
@@ -646,10 +628,10 @@ export default function TableEquipementsPage() {
                   Enregistrer
                 </button>
                 <button
-                  onClick={() => setSelectedEquip(null)}
+                  onClick={() => setShowModal(false)}
                   className="rounded border px-4 py-2 text-sm"
                 >
-                  Annuler
+                  Fermer
                 </button>
               </div>
             </div>

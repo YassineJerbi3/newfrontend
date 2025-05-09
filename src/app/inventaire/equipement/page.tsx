@@ -1,18 +1,18 @@
+// src/app/inventaire/equipement/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
-// Mirror your backend enums
 const UtilisateurType = {
   ENSEIGNANT: "ENSEIGNANT",
   ETUDIANT: "ETUDIANT",
-  ADMINISTRATIF: "ADMINISTRATIF",
-};
+} as const;
+
 const EquipementEtat = {
   FONCTIONNEL: "FONCTIONNEL",
   EN_PANNE: "EN_PANNE",
-};
+} as const;
 
 const MaintenanceType = {
   MENSUELLE: "MENSUELLE",
@@ -20,71 +20,130 @@ const MaintenanceType = {
   HEBDOMADAIRE: "HEBDOMADAIRE",
   SEMESTRIELLE: "SEMESTRIELLE",
   TRIMESTRIELLE: "TRIMESTRIELLE",
-};
+} as const;
+
+const EquipmentType = {
+  IMPRIMANTE: "IMPRIMANTE",
+  PHOTOCOPIEUSE: "PHOTOCOPIEUSE",
+  ECRAN: "ECRAN",
+  ECRAN_INTERACTIF: "ECRAN INTERACTIF",
+  UNITE_CENTRALE: "UNITE CENTRALE",
+  SERVEUR: "SERVEUR",
+  CAMERA_DE_SURVEILLANCE: "CAMERA DE SURVEILLANCE",
+  TV: "TV",
+} as const;
+
+type Emplacement = { id: string; nom: string; type: string };
+type User = { id: string; nom: string; prenom: string };
 
 export default function AddEquipementPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 
-  const [emplacements, setEmplacements] = useState<
-    { id: string; nom: string; type: string }[]
-  >([]);
+  const [bureaux, setBureaux] = useState<Emplacement[]>([]);
+  const [classesList, setClassesList] = useState<Emplacement[]>([]);
+  const [filterType, setFilterType] = useState<"" | "BUREAU" | "CLASSE">("");
+  const [bureauUsers, setBureauUsers] = useState<User[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     familleMI: "",
     designation: "",
     code: "",
     numeroSerie: "",
     codeInventaire: "",
+    equipmentType: EquipmentType.IMPRIMANTE,
     emplacementId: "",
     utilisateur: UtilisateurType.ENSEIGNANT,
+    userId: "",
     etat: EquipementEtat.FONCTIONNEL,
-    dateMiseService: new Date().toISOString().substr(0, 10), // YYYY-MM-DD
-    maintenanceRecords: [
-      { type: MaintenanceType.MENSUELLE, description: "" },
-    ] as { type: string; description: string }[],
+    dateMiseService: new Date().toISOString().slice(0, 10),
+    maintenanceRecords: [] as { type: string; description: string }[],
   });
-  const [error, setError] = useState<string | null>(null);
 
-  // Load emplacements for the select dropdown
+  // 1) Charger les emplacements
   useEffect(() => {
-    fetch(`${API}/emplacements`)
-      .then((res) => res.json())
-      .then((data) => setEmplacements(data.items || []))
-      .catch((err) => console.error("Failed to load emplacements", err));
-  }, []);
+    fetch(`${API}/emplacements/bureaux`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setBureaux(Array.isArray(data) ? data : []))
+      .catch(() => setBureaux([]));
+    fetch(`${API}/emplacements/classes`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setClassesList(Array.isArray(data) ? data : []))
+      .catch(() => setClassesList([]));
+  }, [API]);
 
+  // 2) Quand je choisis un BUREAU, je récupère ses users
+  useEffect(() => {
+    if (filterType === "BUREAU" && formData.emplacementId) {
+      fetch(`${API}/users?emplacementId=${formData.emplacementId}`)
+        .then((r) => r.json())
+        .then((list: any[]) =>
+          setBureauUsers(
+            list.map((u) => ({ id: u.id, nom: u.nom, prenom: u.prenom })),
+          ),
+        )
+        .catch(() => setBureauUsers([]));
+    } else {
+      setBureauUsers([]);
+    }
+  }, [filterType, formData.emplacementId, API]);
+
+  // 3) Filtrer / grouper les emplacements
+  const options = useMemo(() => {
+    if (filterType === "BUREAU") return bureaux;
+    if (filterType === "CLASSE") return classesList;
+    return [...bureaux, ...classesList];
+  }, [bureaux, classesList, filterType]);
+
+  const grouped = useMemo(() => {
+    return options
+      .sort((a, b) => a.nom.localeCompare(b.nom, undefined, { numeric: true }))
+      .reduce((acc: Record<string, Emplacement[]>, e) => {
+        const L = e.nom[0].toUpperCase();
+        (acc[L] ||= []).push(e);
+        return acc;
+      }, {});
+  }, [options]);
+
+  // handlers
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((fd) => ({ ...fd, [name]: value }));
   };
-
   const handleMaintenanceChange = (
     idx: number,
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const mr = [...formData.maintenanceRecords];
     mr[idx] = { ...mr[idx], [e.target.name]: e.target.value };
-    setFormData({ ...formData, maintenanceRecords: mr });
+    setFormData((fd) => ({ ...fd, maintenanceRecords: mr }));
   };
-
-  const addMaintenanceRow = () => {
-    setFormData({
-      ...formData,
+  const addMaintenanceRow = () =>
+    setFormData((fd) => ({
+      ...fd,
       maintenanceRecords: [
-        ...formData.maintenanceRecords,
+        ...fd.maintenanceRecords,
         { type: MaintenanceType.MENSUELLE, description: "" },
       ],
-    });
-  };
+    }));
+  const removeMaintenanceRow = (idx: number) =>
+    setFormData((fd) => ({
+      ...fd,
+      maintenanceRecords: fd.maintenanceRecords.filter((_, i) => i !== idx),
+    }));
 
-  const removeMaintenanceRow = (idx: number) => {
-    const mr = formData.maintenanceRecords.filter((_, i) => i !== idx);
-    setFormData({ ...formData, maintenanceRecords: mr });
-  };
-
+  // 4) Soumission : on refuse si pas d’emplacement
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!formData.emplacementId) {
+      setError("Veuillez sélectionner un emplacement.");
+      return;
+    }
+
     try {
       const res = await fetch(`${API}/equipements`, {
         method: "POST",
@@ -93,7 +152,6 @@ export default function AddEquipementPage() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || "Erreur serveur");
-      console.log("Created equipment:", result);
       // reset
       setFormData({
         familleMI: "",
@@ -101,16 +159,15 @@ export default function AddEquipementPage() {
         code: "",
         numeroSerie: "",
         codeInventaire: "",
+        equipmentType: EquipmentType.IMPRIMANTE,
         emplacementId: "",
         utilisateur: UtilisateurType.ENSEIGNANT,
+        userId: "",
         etat: EquipementEtat.FONCTIONNEL,
-        dateMiseService: new Date().toISOString().substr(0, 10),
-        maintenanceRecords: [
-          { type: MaintenanceType.MENSUELLE, description: "" },
-        ],
+        dateMiseService: new Date().toISOString().slice(0, 10),
+        maintenanceRecords: [],
       });
     } catch (err: any) {
-      console.error(err);
       setError(err.message);
     }
   };
@@ -120,102 +177,137 @@ export default function AddEquipementPage() {
       <div className="mx-auto max-w-xl rounded bg-white p-6 shadow-lg">
         <h1 className="mb-4 text-xl font-bold">Ajouter Nouvel Équipement</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/** Emplacement */}
+          {/* Champs texte */}
+          {[
+            { label: "Famille MI", name: "familleMI" },
+            { label: "Désignation", name: "designation" },
+            { label: "Code", name: "code" },
+            { label: "Numéro de série", name: "numeroSerie" },
+            { label: "Code inventaire", name: "codeInventaire" },
+          ].map(({ label, name }) => (
+            <label className="block" key={name}>
+              {label}
+              <input
+                name={name}
+                type="text"
+                value={(formData as any)[name]}
+                onChange={handleChange}
+                required
+                className="w-full rounded border p-2"
+              />
+            </label>
+          ))}
+
+          {/* Type d’équipement */}
           <label className="block">
-            Emplacement
+            Type de l’équipement
             <select
-              name="emplacementId"
-              value={formData.emplacementId}
+              name="equipmentType"
+              value={formData.equipmentType}
               onChange={handleChange}
-              required
               className="w-full rounded border p-2"
+              required
             >
-              <option value="">Sélectionner un emplacement</option>
-              {emplacements.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nom} ({e.type})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/** Equipment fields */}
-          <label className="block">
-            Famille MI
-            <input
-              name="familleMI"
-              type="text"
-              value={formData.familleMI}
-              onChange={handleChange}
-              required
-              className="w-full rounded border p-2"
-            />
-          </label>
-
-          <label className="block">
-            Désignation
-            <input
-              name="designation"
-              type="text"
-              value={formData.designation}
-              onChange={handleChange}
-              required
-              className="w-full rounded border p-2"
-            />
-          </label>
-
-          <label className="block">
-            Code
-            <input
-              name="code"
-              type="text"
-              value={formData.code}
-              onChange={handleChange}
-              required
-              className="w-full rounded border p-2"
-            />
-          </label>
-
-          <label className="block">
-            Numéro de série
-            <input
-              name="numeroSerie"
-              type="text"
-              value={formData.numeroSerie}
-              onChange={handleChange}
-              required
-              className="w-full rounded border p-2"
-            />
-          </label>
-
-          <label className="block">
-            Code inventaire
-            <input
-              name="codeInventaire"
-              type="text"
-              value={formData.codeInventaire}
-              onChange={handleChange}
-              required
-              className="w-full rounded border p-2"
-            />
-          </label>
-
-          <label className="block">
-            Utilisateur
-            <select
-              name="utilisateur"
-              value={formData.utilisateur}
-              onChange={handleChange}
-              className="w-full rounded border p-2"
-            >
-              {Object.entries(UtilisateurType).map(([k, v]) => (
-                <option key={k} value={v}>
+              {Object.values(EquipmentType).map((v) => (
+                <option key={v} value={v}>
                   {v}
                 </option>
               ))}
             </select>
           </label>
 
+          {/* Filtre BUREAU / CLASSE */}
+          <div className="space-y-2 border-t pt-4">
+            <span className="block font-medium">Type d’emplacement</span>
+            <div className="flex items-center space-x-4">
+              {["", "BUREAU", "CLASSE"].map((val) => (
+                <label key={val} className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name="filterType"
+                    value={val}
+                    checked={filterType === val}
+                    onChange={() => setFilterType(val as any)}
+                    className="mr-1"
+                  />
+                  {val === "" ? "Tous" : val}
+                </label>
+              ))}
+            </div>
+
+            {/* Sélecteur d’emplacement */}
+            <label className="block">
+              Choisir un emplacement
+              <div className="max-h-48 overflow-y-auto rounded border">
+                <select
+                  name="emplacementId"
+                  value={formData.emplacementId}
+                  onChange={handleChange}
+                  size={6}
+                  className="w-full bg-white"
+                  required
+                >
+                  {/* <- placeholder */}
+                  <option value="" disabled>
+                    — Sélectionnez un emplacement —
+                  </option>
+                  {Object.entries(grouped).map(([letter, list]) => (
+                    <optgroup
+                      key={letter}
+                      label={letter}
+                      className="bg-gray-100"
+                    >
+                      {list.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.nom}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            </label>
+          </div>
+
+          {/* Utilisateur */}
+          {filterType === "BUREAU" ? (
+            <label className="block">
+              Utilisateur (réel)
+              <select
+                name="userId"
+                value={formData.userId}
+                onChange={handleChange}
+                className="w-full rounded border p-2"
+                required
+              >
+                <option value="">Sélectionnez un utilisateur</option>
+                {bureauUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nom} {u.prenom}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label className="block">
+              Utilisateur (type)
+              <select
+                name="utilisateur"
+                value={formData.utilisateur}
+                onChange={handleChange}
+                className="w-full rounded border p-2"
+                required
+              >
+                {Object.values(UtilisateurType).map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {/* État */}
           <label className="block">
             État
             <select
@@ -223,15 +315,17 @@ export default function AddEquipementPage() {
               value={formData.etat}
               onChange={handleChange}
               className="w-full rounded border p-2"
+              required
             >
-              {Object.entries(EquipementEtat).map(([k, v]) => (
-                <option key={k} value={v}>
+              {Object.values(EquipementEtat).map((v) => (
+                <option key={v} value={v}>
                   {v}
                 </option>
               ))}
             </select>
           </label>
 
+          {/* Date mise en service */}
           <label className="block">
             Date de mise en service
             <input
@@ -244,7 +338,7 @@ export default function AddEquipementPage() {
             />
           </label>
 
-          {/** Maintenance preventive section */}
+          {/* Maintenance */}
           <div className="space-y-2 border-t pt-4">
             <h2 className="text-lg font-semibold">Maintenance Préventive</h2>
             {formData.maintenanceRecords.map((m, i) => (
@@ -254,9 +348,10 @@ export default function AddEquipementPage() {
                   value={m.type}
                   onChange={(e) => handleMaintenanceChange(i, e)}
                   className="flex-1 rounded border p-2"
+                  required
                 >
-                  {Object.entries(MaintenanceType).map(([k, v]) => (
-                    <option key={k} value={v}>
+                  {Object.values(MaintenanceType).map((v) => (
+                    <option key={v} value={v}>
                       {v}
                     </option>
                   ))}
@@ -267,6 +362,7 @@ export default function AddEquipementPage() {
                   onChange={(e) => handleMaintenanceChange(i, e)}
                   placeholder="Description"
                   className="flex-2 rounded border p-2"
+                  required
                 />
                 <button
                   type="button"
