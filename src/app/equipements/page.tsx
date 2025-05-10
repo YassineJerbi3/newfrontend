@@ -8,7 +8,13 @@ import { Edit2, Trash2 } from "lucide-react";
 interface Emplacement {
   id: string;
   nom: string;
-  type: string;
+  type: "BUREAU" | "CLASSE";
+}
+
+interface User {
+  id: string;
+  nom: string;
+  prenom: string;
 }
 
 type MaintenanceType =
@@ -33,7 +39,8 @@ interface Equipement {
   codeInventaire: string;
   dateMiseService: string;
   emplacement: Emplacement | null;
-  utilisateur: string;
+  utilisateur: string | null;
+  user: User | null;
   etat: string;
   maintenanceRecords: MaintenanceRecord[];
 }
@@ -43,13 +50,9 @@ export default function TableEquipementsPage() {
 
   const [equipements, setEquipements] = useState<Equipement[]>([]);
   const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [pendingDelete, setPendingDelete] = useState<MaintenanceRecord | null>(
-    null,
-  );
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editType, setEditType] = useState<MaintenanceType>("HEBDOMADAIRE");
-  const [editDesc, setEditDesc] = useState<string>("");
+  const [bureauUsers, setBureauUsers] = useState<User[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedEquip, setSelectedEquip] = useState<Equipement | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({
     familleMI: "",
     designation: "",
@@ -61,9 +64,14 @@ export default function TableEquipementsPage() {
     utilisateur: "",
     etat: "",
   });
-  const [selectedEquip, setSelectedEquip] = useState<Equipement | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<MaintenanceType>("HEBDOMADAIRE");
+  const [editDesc, setEditDesc] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<MaintenanceRecord | null>(
+    null,
+  );
 
-  // Charge la liste principale
+  // 1) Charger la liste
   useEffect(() => {
     fetch(`${API}/equipements`)
       .then((r) => r.json())
@@ -76,7 +84,7 @@ export default function TableEquipementsPage() {
       .catch(console.error);
   }, [API]);
 
-  // Ouvre le modal en rechargeant l'équipement complet
+  // 2) Ouvre modal & charge détail
   const openModal = async (id: string) => {
     try {
       const res = await fetch(`${API}/equipements/${id}`);
@@ -89,46 +97,70 @@ export default function TableEquipementsPage() {
     }
   };
 
-  const handleFilterChange = (e: React.ChangeEvent<any>) =>
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+  // 3) Quand modal ouverte et BUREAU, charger ses users
+  useEffect(() => {
+    if (selectedEquip?.emplacement?.type === "BUREAU") {
+      fetch(`${API}/users?emplacementId=${selectedEquip.emplacement.id}`)
+        .then((r) => r.json())
+        .then((list: User[]) => setBureauUsers(list))
+        .catch(() => setBureauUsers([]));
+    } else {
+      setBureauUsers([]);
+    }
+  }, [selectedEquip, API]);
 
-  const filteredData = equipements.filter((eq) =>
-    Object.entries(filters).every(([key, val]) => {
-      if (!val) return true;
-      const field =
-        key === "emplacement"
-          ? (eq.emplacement?.nom ?? "")
-          : ((eq as any)[key] ?? "");
-      return field.toLowerCase().includes(val.toLowerCase());
-    }),
+  const handleFilterChange = (e: React.ChangeEvent<any>) =>
+    setFilters((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+  const filteredData = useMemo(
+    () =>
+      equipements.filter((eq) =>
+        Object.entries(filters).every(([key, val]) => {
+          if (!val) return true;
+          const field =
+            key === "emplacement"
+              ? (eq.emplacement?.nom ?? "")
+              : key === "utilisateur"
+                ? eq.user
+                  ? `${eq.user.nom} ${eq.user.prenom}`
+                  : (eq.utilisateur ?? "")
+                : ((eq as any)[key] ?? "");
+          return field.toLowerCase().includes(val.toLowerCase());
+        }),
+      ),
+    [equipements, filters],
   );
 
-  // Sauvegarde de l'équipement modifié
+  // Sauvegarde PATCH
   const saveEquip = async () => {
     if (!selectedEquip) return;
-    const { id, emplacement, maintenanceRecords, ...body } = selectedEquip;
+    const { id, emplacement, maintenanceRecords, user, utilisateur, ...rest } =
+      selectedEquip;
+
+    const payload: any = {
+      ...rest,
+      emplacementId: emplacement?.id,
+    };
+    if (emplacement?.type === "BUREAU") payload.userId = user?.id ?? null;
+    else payload.utilisateur = utilisateur;
+
     await fetch(`${API}/equipements/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...body,
-        emplacementId: emplacement?.id,
-      }),
+      body: JSON.stringify(payload),
     });
-    // Rafraîchir la liste principale
+    // reload
     const updated = await (await fetch(`${API}/equipements`)).json();
     setEquipements(updated.items);
     setShowModal(false);
     setSelectedEquip(null);
   };
 
-  // Suppression de l'équipement
+  // Suppression équipement
   const deleteEquip = async () => {
     if (!selectedEquip) return;
-    await fetch(`${API}/equipements/${selectedEquip.id}`, {
-      method: "DELETE",
-    });
-    setEquipements((prev) => prev.filter((e) => e.id !== selectedEquip.id));
+    await fetch(`${API}/equipements/${selectedEquip.id}`, { method: "DELETE" });
+    setEquipements((eqs) => eqs.filter((e) => e.id !== selectedEquip.id));
     setShowModal(false);
     setSelectedEquip(null);
   };
@@ -151,15 +183,11 @@ export default function TableEquipementsPage() {
         : eq,
     );
   };
-
   const updateMaintenance = async (rec: MaintenanceRecord) => {
     await fetch(`${API}/equipements/maintenance/${rec.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: rec.type,
-        description: rec.description,
-      }),
+      body: JSON.stringify({ type: rec.type, description: rec.description }),
     });
     setSelectedEquip((eq) =>
       eq
@@ -172,8 +200,7 @@ export default function TableEquipementsPage() {
         : eq,
     );
   };
-
-  const deleteMaintenance = async (recId: string) => {
+  const deleteMaintenanceConfirmed = async (recId: string) => {
     await fetch(`${API}/equipements/maintenance/${recId}`, {
       method: "DELETE",
     });
@@ -187,6 +214,7 @@ export default function TableEquipementsPage() {
           }
         : eq,
     );
+    setPendingDelete(null);
   };
 
   return (
@@ -196,7 +224,8 @@ export default function TableEquipementsPage() {
           Liste des équipements
         </h1>
 
-        <div className="overflow-x-auto rounded-lg border border-blue-200 bg-white shadow-sm">
+        {/* tableau */}
+        <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
           <table className="w-full table-fixed border-collapse text-left">
             <thead className="bg-blue-100">
               <tr>
@@ -217,12 +246,13 @@ export default function TableEquipementsPage() {
                 ))}
               </tr>
               <tr>
+                {/* filtres */}
                 <th className="px-4 py-2">
                   <select
                     name="familleMI"
                     value={filters.familleMI}
                     onChange={handleFilterChange}
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   >
                     <option value="">Toutes</option>
                     {[...new Set(equipements.map((e) => e.familleMI))].map(
@@ -240,7 +270,7 @@ export default function TableEquipementsPage() {
                     value={filters.designation}
                     onChange={handleFilterChange}
                     placeholder="Filtrer…"
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   />
                 </th>
                 <th className="px-4 py-2">
@@ -249,7 +279,7 @@ export default function TableEquipementsPage() {
                     value={filters.code}
                     onChange={handleFilterChange}
                     placeholder="Filtrer…"
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   />
                 </th>
                 <th className="px-4 py-2">
@@ -258,7 +288,7 @@ export default function TableEquipementsPage() {
                     value={filters.numeroSerie}
                     onChange={handleFilterChange}
                     placeholder="Filtrer…"
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   />
                 </th>
                 <th className="px-4 py-2">
@@ -267,7 +297,7 @@ export default function TableEquipementsPage() {
                     value={filters.codeInventaire}
                     onChange={handleFilterChange}
                     placeholder="Filtrer…"
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   />
                 </th>
                 <th className="px-4 py-2">
@@ -276,7 +306,7 @@ export default function TableEquipementsPage() {
                     name="dateMiseService"
                     value={filters.dateMiseService}
                     onChange={handleFilterChange}
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   />
                 </th>
                 <th className="px-4 py-2">
@@ -284,7 +314,7 @@ export default function TableEquipementsPage() {
                     name="emplacement"
                     value={filters.emplacement}
                     onChange={handleFilterChange}
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   >
                     <option value="">Tous</option>
                     {emplacements.map((e) => (
@@ -300,7 +330,7 @@ export default function TableEquipementsPage() {
                     value={filters.utilisateur}
                     onChange={handleFilterChange}
                     placeholder="Filtrer…"
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   />
                 </th>
                 <th className="px-4 py-2">
@@ -308,7 +338,7 @@ export default function TableEquipementsPage() {
                     name="etat"
                     value={filters.etat}
                     onChange={handleFilterChange}
-                    className="w-full rounded border-blue-200 p-1"
+                    className="w-full rounded border p-1"
                   >
                     <option value="">Tous</option>
                     {[...new Set(equipements.map((e) => e.etat))].map((v) => (
@@ -320,7 +350,6 @@ export default function TableEquipementsPage() {
                 </th>
               </tr>
             </thead>
-
             <tbody>
               {filteredData.map((eq) => (
                 <tr
@@ -335,7 +364,11 @@ export default function TableEquipementsPage() {
                   <td className="px-4 py-2">{eq.codeInventaire}</td>
                   <td className="px-4 py-2">{eq.dateMiseService}</td>
                   <td className="px-4 py-2">{eq.emplacement?.nom}</td>
-                  <td className="px-4 py-2">{eq.utilisateur}</td>
+                  <td className="px-4 py-2">
+                    {eq.emplacement?.type === "BUREAU" && eq.user
+                      ? `${eq.user.nom} ${eq.user.prenom}`
+                      : eq.utilisateur}
+                  </td>
                   <td className="px-4 py-2">{eq.etat}</td>
                 </tr>
               ))}
@@ -353,16 +386,16 @@ export default function TableEquipementsPage() {
           </table>
         </div>
 
-        {/* Modal éditable */}
+        {/* Modal */}
         {showModal && selectedEquip && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="max-h-[70vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
+            <div className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
               <h2 className="mb-4 text-xl font-bold text-blue-700">
                 Détails de l’équipement
               </h2>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Read‑only fields */}
+                {/* readonly */}
                 {[
                   ["Famille MI", selectedEquip.familleMI],
                   ["Désignation", selectedEquip.designation],
@@ -378,32 +411,53 @@ export default function TableEquipementsPage() {
                     <input
                       readOnly
                       value={val}
-                      className="mt-1 w-full rounded border border-gray-300 bg-gray-100 p-2 text-sm"
+                      className="mt-1 w-full rounded border bg-gray-100 p-2 text-sm"
                     />
                   </div>
                 ))}
 
-                {/* Editable fields */}
-                <div className="flex flex-col">
+                {/* UTILISATEUR */}
+                <div className="col-span-2 flex flex-col">
                   <span className="text-sm font-medium text-gray-600">
                     Utilisateur *
                   </span>
-                  <select
-                    value={selectedEquip.utilisateur}
-                    onChange={(e) =>
-                      setSelectedEquip({
-                        ...selectedEquip,
-                        utilisateur: e.target.value,
-                      })
-                    }
-                    className="mt-1 rounded border border-gray-300 p-2 text-sm"
-                  >
-                    <option>ENSEIGNANT</option>
-                    <option>ETUDIANT</option>
-                    <option>ADMINISTRATIF</option>
-                  </select>
+
+                  {selectedEquip.emplacement?.type === "BUREAU" ? (
+                    <select
+                      value={selectedEquip.user?.id || ""}
+                      onChange={(e) => {
+                        const u =
+                          bureauUsers.find((u) => u.id === e.target.value) ||
+                          null;
+                        setSelectedEquip({ ...selectedEquip, user: u });
+                      }}
+                      className="mt-1 rounded border p-2 text-sm"
+                    >
+                      <option value="">Sélectionner un utilisateur</option>
+                      {bureauUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nom} {u.prenom}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      value={selectedEquip.utilisateur || ""}
+                      onChange={(e) =>
+                        setSelectedEquip({
+                          ...selectedEquip,
+                          utilisateur: e.target.value,
+                        })
+                      }
+                      className="mt-1 rounded border p-2 text-sm"
+                    >
+                      <option value="ENSEIGNANT">ENSEIGNANT</option>
+                      <option value="ETUDIANT">ETUDIANT</option>
+                    </select>
+                  )}
                 </div>
 
+                {/* ÉTAT */}
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-600">
                     État *
@@ -416,13 +470,14 @@ export default function TableEquipementsPage() {
                         etat: e.target.value,
                       })
                     }
-                    className="mt-1 rounded border border-gray-300 p-2 text-sm"
+                    className="mt-1 rounded border p-2 text-sm"
                   >
-                    <option>FONCTIONNEL</option>
-                    <option>EN_PANNE</option>
+                    <option value="FONCTIONNEL">FONCTIONNEL</option>
+                    <option value="EN_PANNE">EN_PANNE</option>
                   </select>
                 </div>
 
+                {/* Emplacement */}
                 <div className="col-span-2 flex flex-col">
                   <span className="text-sm font-medium text-gray-600">
                     Emplacement *
@@ -435,7 +490,7 @@ export default function TableEquipementsPage() {
                         null;
                       setSelectedEquip({ ...selectedEquip, emplacement: emp });
                     }}
-                    className="mt-1 rounded border border-gray-300 p-2 text-sm"
+                    className="mt-1 rounded border p-2 text-sm"
                   >
                     <option value="">Aucun</option>
                     {emplacements.map((emp) => (
@@ -445,178 +500,185 @@ export default function TableEquipementsPage() {
                     ))}
                   </select>
                 </div>
+              </div>
 
-                {/* Maintenance préventive */}
-                <div className="col-span-2">
-                  <h3 className="mb-2 text-sm font-medium text-gray-700">
-                    Maintenance préventive existante
-                  </h3>
-                  <ul className="space-y-2">
-                    {selectedEquip.maintenanceRecords.map((rec) => {
-                      const isEditing = rec.id === editingId;
-                      return (
-                        <li
-                          key={rec.id}
-                          className="flex items-center space-x-2 text-sm"
-                        >
-                          {isEditing ? (
-                            <>
-                              <select
-                                value={editType}
-                                onChange={(e) =>
-                                  setEditType(e.target.value as MaintenanceType)
-                                }
-                                className="w-32 rounded border border-gray-300 p-1 text-sm"
-                              >
-                                {[
-                                  "HEBDOMADAIRE",
-                                  "MENSUELLE",
-                                  "TRIMESTRIELLE",
-                                  "SEMESTRIELLE",
-                                  "ANNUELLE",
-                                ].map((t) => (
-                                  <option key={t} value={t}>
-                                    {t}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                value={editDesc}
-                                onChange={(e) => setEditDesc(e.target.value)}
-                                className="flex-1 rounded border border-gray-300 p-2 text-sm"
-                              />
-                              <button
-                                onClick={() => {
-                                  updateMaintenance({
-                                    id: rec.id,
-                                    type: editType,
-                                    description: editDesc,
-                                  });
-                                  setEditingId(null);
-                                }}
-                                className="rounded bg-green-600 px-2 py-1 text-xs text-white"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => setEditingId(null)}
-                                className="rounded border px-2 py-1 text-xs"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="w-32">{rec.type}</span>
-                              <span className="flex-1">{rec.description}</span>
-                              <button
-                                onClick={() => {
-                                  setEditingId(rec.id);
-                                  setEditType(rec.type);
-                                  setEditDesc(rec.description);
-                                }}
-                                className="rounded p-2 hover:bg-blue-100"
-                                title="Modifier"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => setPendingDelete(rec)}
-                                className="rounded p-2 hover:bg-red-100"
-                                title="Supprimer"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+              {/* séparation */}
+              <hr className="my-6 border-gray-300" />
 
-                  {pendingDelete && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-                        <h3 className="mb-4 text-lg font-bold text-red-600">
-                          Supprimer la maintenance ?
-                        </h3>
-                        <p className="mb-6">
-                          Êtes‑vous sûr de vouloir supprimer la maintenance “
-                          {pendingDelete.type}” ?
-                        </p>
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            onClick={() => setPendingDelete(null)}
-                            className="rounded border px-4 py-2"
-                          >
-                            Annuler
-                          </button>
-                          <button
-                            onClick={() => {
-                              deleteMaintenance(pendingDelete.id);
-                              setPendingDelete(null);
-                            }}
-                            className="rounded bg-red-600 px-4 py-2 text-white"
-                          >
-                            Confirmer
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-3 flex items-center space-x-2">
-                    <select id="newType" className="rounded border p-2 text-sm">
-                      {[
-                        "HEBDOMADAIRE",
-                        "MENSUELLE",
-                        "TRIMESTRIELLE",
-                        "SEMESTRIELLE",
-                        "ANNUELLE",
-                      ].map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      id="newDesc"
-                      placeholder="Description*"
-                      className="flex-1 rounded border p-2 text-sm"
-                    />
-                    <button
-                      onClick={() => {
-                        const type = (
-                          document.getElementById(
-                            "newType",
-                          ) as HTMLSelectElement
-                        ).value;
-                        const desc = (
-                          document.getElementById("newDesc") as HTMLInputElement
-                        ).value;
-                        if (!desc)
-                          return alert(
-                            "Le champ de description est obligatoire",
-                          );
-                        addMaintenance({ type, description: desc });
-                      }}
-                      className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
-                    >
-                      Ajouter
-                    </button>
-                  </div>
+              {/* Ajout maintenance préventive */}
+              <div className="mb-4">
+                <h3 className="mb-2 text-sm font-medium text-gray-700">
+                  Ajouter une maintenance préventive
+                </h3>
+                <div className="flex items-center space-x-2">
+                  <select
+                    id="newType"
+                    className="rounded border p-2 text-sm"
+                    defaultValue="MENSUELLE"
+                  >
+                    {[
+                      "HEBDOMADAIRE",
+                      "MENSUELLE",
+                      "TRIMESTRIELLE",
+                      "SEMESTRIELLE",
+                      "ANNUELLE",
+                    ].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    id="newDesc"
+                    placeholder="Description*"
+                    className="flex-1 rounded border p-2 text-sm"
+                  />
+                  <button
+                    onClick={() => {
+                      const type = (
+                        document.getElementById("newType") as HTMLSelectElement
+                      ).value as MaintenanceType;
+                      const desc = (
+                        document.getElementById("newDesc") as HTMLInputElement
+                      ).value;
+                      if (!desc) return alert("Description obligatoire");
+                      addMaintenance({ type, description: desc });
+                      (
+                        document.getElementById("newDesc") as HTMLInputElement
+                      ).value = "";
+                    }}
+                    className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+                  >
+                    + Ajouter
+                  </button>
                 </div>
               </div>
 
-              {/* Footer actions */}
+              {/* maintenance existante */}
+              <div className="max-h-48 overflow-y-auto">
+                <h3 className="mb-2 text-sm font-medium text-gray-700">
+                  Maintenance préventive existante
+                </h3>
+                <ul className="space-y-2">
+                  {selectedEquip.maintenanceRecords.map((rec) => {
+                    const isEd = rec.id === editingId;
+                    return (
+                      <li
+                        key={rec.id}
+                        className="flex items-center space-x-2 text-sm"
+                      >
+                        {isEd ? (
+                          <>
+                            <select
+                              value={editType}
+                              onChange={(e) =>
+                                setEditType(e.target.value as MaintenanceType)
+                              }
+                              className="w-32 rounded border p-1 text-sm"
+                            >
+                              {[
+                                "HEBDOMADAIRE",
+                                "MENSUELLE",
+                                "TRIMESTRIELLE",
+                                "SEMESTRIELLE",
+                                "ANNUELLE",
+                              ].map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              value={editDesc}
+                              onChange={(e) => setEditDesc(e.target.value)}
+                              className="flex-1 rounded border p-2 text-sm"
+                            />
+                            <button
+                              onClick={() => {
+                                updateMaintenance({
+                                  id: rec.id,
+                                  type: editType,
+                                  description: editDesc,
+                                });
+                                setEditingId(null);
+                              }}
+                              className="rounded bg-green-600 px-2 py-1 text-xs text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="rounded border px-2 py-1 text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-32">{rec.type}</span>
+                            <span className="flex-1">{rec.description}</span>
+                            <button
+                              onClick={() => {
+                                setEditingId(rec.id);
+                                setEditType(rec.type);
+                                setEditDesc(rec.description);
+                              }}
+                              className="rounded p-2 hover:bg-blue-100"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => setPendingDelete(rec)}
+                              className="rounded p-2 hover:bg-red-100"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              {/* confirmation suppression maintenance */}
+              {pendingDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                  <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+                    <h3 className="mb-4 text-lg font-bold text-red-600">
+                      Supprimer la maintenance ?
+                    </h3>
+                    <p className="mb-6">
+                      Êtes‑vous sûr de vouloir supprimer la maintenance “
+                      {pendingDelete.type}” ?
+                    </p>
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => setPendingDelete(null)}
+                        className="rounded border px-4 py-2"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={() =>
+                          deleteMaintenanceConfirmed(pendingDelete.id)
+                        }
+                        className="rounded bg-red-600 px-4 py-2 text-white"
+                      >
+                        Confirmer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* footer */}
               <div className="mt-6 flex justify-end space-x-3">
                 <button
-                  onClick={() => {
-                    if (
-                      window.confirm("Tu es sûr de supprimer cet équipement ?")
-                    )
-                      deleteEquip();
-                  }}
+                  onClick={() =>
+                    window.confirm("Supprimer cet équipement ?") &&
+                    deleteEquip()
+                  }
                   className="rounded bg-red-600 px-4 py-2 text-sm text-white"
                 >
                   Supprimer
