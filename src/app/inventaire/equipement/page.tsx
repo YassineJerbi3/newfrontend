@@ -35,6 +35,11 @@ const EquipmentType = {
 
 type Emplacement = { id: string; nom: string; type: string };
 type User = { id: string; nom: string; prenom: string };
+type Poste = {
+  id: string;
+  numero: number;
+  equipements: { equipmentType: string }[];
+};
 
 export default function AddEquipementPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
@@ -43,6 +48,8 @@ export default function AddEquipementPage() {
   const [classesList, setClassesList] = useState<Emplacement[]>([]);
   const [filterType, setFilterType] = useState<"" | "BUREAU" | "CLASSE">("");
   const [bureauUsers, setBureauUsers] = useState<User[]>([]);
+  const [postes, setPostes] = useState<Poste[]>([]);
+  const [postesDispo, setPostesDispo] = useState<Poste[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -53,6 +60,7 @@ export default function AddEquipementPage() {
     codeInventaire: "",
     equipmentType: EquipmentType.IMPRIMANTE,
     emplacementId: "",
+    posteId: "",
     utilisateur: UtilisateurType.ENSEIGNANT,
     userId: "",
     etat: EquipementEtat.FONCTIONNEL,
@@ -72,11 +80,11 @@ export default function AddEquipementPage() {
       .catch(() => setClassesList([]));
   }, [API]);
 
-  // 2) Quand je choisis un BUREAU, je récupère ses users
+  // 2) Récupérer les users si on est en BUREAU
   useEffect(() => {
     if (filterType === "BUREAU" && formData.emplacementId) {
       fetch(`${API}/users?emplacementId=${formData.emplacementId}`)
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : []))
         .then((list: any[]) =>
           setBureauUsers(
             list.map((u) => ({ id: u.id, nom: u.nom, prenom: u.prenom })),
@@ -88,7 +96,38 @@ export default function AddEquipementPage() {
     }
   }, [filterType, formData.emplacementId, API]);
 
-  // 3) Filtrer / grouper les emplacements
+  // 3) Dès qu’on choisit un emplacement, fetch tous les postes
+  useEffect(() => {
+    if (!formData.emplacementId) {
+      setPostes([]);
+      return;
+    }
+    fetch(`${API}/postes?emplacementId=${formData.emplacementId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: Poste[]) => setPostes(list))
+      .catch(() => setPostes([]));
+  }, [formData.emplacementId, API]);
+
+  // 4) Filtrer postes dispo **uniquement** pour ECRAN ou UNITE_CENTRALE
+  useEffect(() => {
+    const { equipmentType } = formData;
+    if (
+      equipmentType !== EquipmentType.ECRAN &&
+      equipmentType !== EquipmentType.UNITE_CENTRALE
+    ) {
+      setPostesDispo([]);
+      return;
+    }
+    setPostesDispo(
+      postes.filter(
+        (p) =>
+          // fallback à [] pour éviter undefined
+          !(p.equipements ?? []).some((e) => e.equipmentType === equipmentType),
+      ),
+    );
+  }, [formData.equipmentType, postes]);
+
+  // 5) Grouper emplacements pour l’affichage
   const options = useMemo(() => {
     if (filterType === "BUREAU") return bureaux;
     if (filterType === "CLASSE") return classesList;
@@ -134,16 +173,14 @@ export default function AddEquipementPage() {
       maintenanceRecords: fd.maintenanceRecords.filter((_, i) => i !== idx),
     }));
 
-  // 4) Soumission : on refuse si pas d’emplacement
+  // 6) Soumission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
     if (!formData.emplacementId) {
       setError("Veuillez sélectionner un emplacement.");
       return;
     }
-
     try {
       const res = await fetch(`${API}/equipements`, {
         method: "POST",
@@ -151,7 +188,15 @@ export default function AddEquipementPage() {
         body: JSON.stringify(formData),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "Erreur serveur");
+      if (!res.ok) {
+        if (res.status === 409) {
+          setError(
+            `Ce poste a déjà un équipement de type ${formData.equipmentType}`,
+          );
+          return;
+        }
+        throw new Error(result.message || "Erreur serveur");
+      }
       // reset
       setFormData({
         familleMI: "",
@@ -161,6 +206,7 @@ export default function AddEquipementPage() {
         codeInventaire: "",
         equipmentType: EquipmentType.IMPRIMANTE,
         emplacementId: "",
+        posteId: "",
         utilisateur: UtilisateurType.ENSEIGNANT,
         userId: "",
         etat: EquipementEtat.FONCTIONNEL,
@@ -234,8 +280,6 @@ export default function AddEquipementPage() {
                 </label>
               ))}
             </div>
-
-            {/* Sélecteur d’emplacement */}
             <label className="block">
               Choisir un emplacement
               <div className="max-h-48 overflow-y-auto rounded border">
@@ -247,7 +291,6 @@ export default function AddEquipementPage() {
                   className="w-full bg-white"
                   required
                 >
-                  {/* <- placeholder */}
                   <option value="" disabled>
                     — Sélectionnez un emplacement —
                   </option>
@@ -268,6 +311,28 @@ export default function AddEquipementPage() {
               </div>
             </label>
           </div>
+
+          {/* Sélecteur Poste : seulement pour ECRAN ou UNITE_CENTRALE */}
+          {(formData.equipmentType === EquipmentType.ECRAN ||
+            formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
+            formData.emplacementId && (
+              <label className="block">
+                Poste (optionnel)
+                <select
+                  name="posteId"
+                  value={formData.posteId}
+                  onChange={handleChange}
+                  className="w-full rounded border p-2"
+                >
+                  <option value="">Aucun poste</option>
+                  {postesDispo.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      Poste n°{p.numero}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
           {/* Utilisateur */}
           {filterType === "BUREAU" ? (

@@ -56,7 +56,7 @@ export default function ClasseSelectionPage() {
             classes.map((classe) => (
               <Link
                 key={classe.id}
-                href={`/classes/${classe.id}`}
+                href={`/classes-edit/${classe.id}`}
                 className="flex h-20 w-64 items-center justify-center bg-gray-200 shadow-md transition-colors duration-300 hover:bg-gray-300"
               >
                 <FaDesktop className="mr-4 text-gray-700" size={30} />

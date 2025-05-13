@@ -85,7 +85,7 @@ const menuGroups = [
             roles: ["RESPONSABLE SI"],
           },
           {
-            label: "Ajouter Placement",
+            label: "Ajouter Emplacement",
             route: "/inventaire/placement",
             icon: <FiMapPin size={18} className="text-current" />,
             roles: ["RESPONSABLE SI"],
@@ -129,9 +129,15 @@ const menuGroups = [
     menuItems: [
       {
         label: "Classes",
+        route: "/classes-edit",
+        icon: <FaUserGraduate size={18} className="text-current" />,
+        roles: ["RESPONSABLE SI"],
+      },
+      {
+        label: "Classes",
         route: "/classes",
         icon: <FaUserGraduate size={18} className="text-current" />,
-        roles: ["PROFESSOR", "RESPONSABLE SI"],
+        roles: ["PROFESSOR"],
       },
       {
         label: "Votre bureau",
