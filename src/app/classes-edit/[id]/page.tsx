@@ -499,9 +499,14 @@ export default function ClasseDetailPage() {
                           <td className="border px-2 py-1">{eq.familleMI}</td>
                           <td className="border px-2 py-1">{eq.etat}</td>
                           <td className="border px-2 py-1">
-                            {posteNumById[eq.posteId] != null
-                              ? `Poste ${posteNumById[eq.posteId]}`
-                              : "Aucun poste"}
+                            {(() => {
+                              const poste = emplacement!.postes.find(
+                                (p) => p.id === eq.posteId,
+                              );
+                              if (!poste) return "Aucun poste";
+                              if (poste.label) return poste.label;
+                              return `Poste ${poste.numero}`;
+                            })()}
                           </td>
                         </tr>
                       ))
@@ -641,21 +646,11 @@ export default function ClasseDetailPage() {
                   {equipmentList.length > 0 && (
                     <div className="mb-6">
                       <h3 className="mb-2 text-xl font-semibold">
-                        Utilisateurs
+                        Utilisateur
                       </h3>
-                      <ul className="list-inside list-disc text-gray-700">
-                        {Array.from(
-                          new Set(
-                            equipmentList.flatMap((eq) =>
-                              eq.utilisateurs.map(
-                                (u) => `${u.nom} ${u.prenom}`,
-                              ),
-                            ),
-                          ),
-                        ).map((fullName) => (
-                          <li key={fullName}>{fullName}</li>
-                        ))}
-                      </ul>
+                      <p className="text-gray-700">
+                        {selectedPoste?.label ? "ENSEIGNANT" : "ÉTUDIANT"}
+                      </p>
                     </div>
                   )}
 
@@ -768,9 +763,15 @@ export default function ClasseDetailPage() {
                     </div>
                     <div>
                       <strong>Poste :</strong>{" "}
-                      {posteNumById[selectedEquipment.posteId] != null
-                        ? `Poste ${posteNumById[selectedEquipment.posteId]}`
-                        : "Aucun poste"}
+                      {(() => {
+                        // On cherche le poste dans la liste (inclut le Poste Enseignant injecté)
+                        const poste = emplacement!.postes.find(
+                          (p) => p.id === selectedEquipment.posteId,
+                        );
+                        if (!poste) return "Aucun poste";
+                        // Si label (cas Poste Enseignant) : on l’affiche, sinon le numéro
+                        return poste.label ?? `Poste ${poste.numero}`;
+                      })()}
                     </div>
                     {(selectedEquipment.utilisateurs ?? []).length > 0 && (
                       <div>
@@ -845,7 +846,7 @@ export default function ClasseDetailPage() {
                         })
                         .map((p) => (
                           <option key={p.id} value={p.id}>
-                            Poste {p.numero}
+                            {p.label ?? `Poste ${p.numero}`}
                           </option>
                         ))}
                     </select>
