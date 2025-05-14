@@ -106,21 +106,27 @@ export default function ClasseDetailPage() {
         return res.json();
       })
       .then((data: EmplacementDetail) => {
-        // 1.a) Trie les postes par numéro (ignore le prof s'il n'a pas de numero)
+        // Tri des postes numérotés
         data.postes.sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
 
-        // 1.b) Injecte le Poste Professeur en tête
-        const profPoste: Poste = {
-          id: "professor", // ou l'UUID réel si tu l'as en base
-          label: "Poste Professeur",
-          // numero laissé undefined
-        };
-        const withProf = [profPoste, ...data.postes];
+        // Vérifie s'il y a déjà un poste enseignant (numero===null)
+        const hasProf = data.postes.some((p) => p.numero == null);
 
-        // 1.c) Mets à jour le state
+        // Si pas de professeur, on l'injecte, sinon on conserve la liste reçue
+        const postesAvecProf = hasProf
+          ? data.postes
+          : [
+              {
+                id: "professor", // ou l'UUID réel si tu l'as
+                label: "Poste Enseignant",
+                numero: undefined,
+              },
+              ...data.postes,
+            ];
+
         setEmplacement({
           ...data,
-          postes: withProf,
+          postes: postesAvecProf,
         });
       })
       .catch((err) => setError(err.message))
@@ -145,7 +151,6 @@ export default function ClasseDetailPage() {
       .catch(() => setAllEquipements([]))
       .finally(() => setLoading(false));
   };
-
   useEffect(fetchDetail, [id]);
 
   // Open Equipment Modal for a specific poste
