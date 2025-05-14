@@ -590,22 +590,26 @@ export default function ClasseDetailPage() {
                     Poste {selectedPoste.numero} — Détails
                   </h2>
 
-                  {/* Poste actions */}
+                  {/* Equipment Modal actions */}
                   <div className="mb-4 flex gap-2">
-                    <button
-                      onClick={handleDeletePoste}
-                      className="flex items-center rounded bg-red-600 px-3 py-1 text-white hover:bg-red-700"
-                    >
-                      <FaTrash className="mr-1" />
-                      Supprimer Poste
-                    </button>
-                    <button
-                      onClick={openEditPoste}
-                      className="flex items-center rounded bg-yellow-500 px-3 py-1 text-white hover:bg-yellow-600"
-                    >
-                      <FaEdit className="mr-1" />
-                      Modifier Poste
-                    </button>
+                    {selectedPoste.label !== "Poste Enseignant" && (
+                      <>
+                        <button
+                          onClick={handleDeletePoste}
+                          className="flex items-center rounded bg-red-600 px-3 py-1 text-white hover:bg-red-700"
+                        >
+                          <FaTrash className="mr-1" />
+                          Supprimer Poste
+                        </button>
+                        <button
+                          onClick={openEditPoste}
+                          className="flex items-center rounded bg-yellow-500 px-3 py-1 text-white hover:bg-yellow-600"
+                        >
+                          <FaEdit className="mr-1" />
+                          Modifier Poste
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* Edit poste modal */}
