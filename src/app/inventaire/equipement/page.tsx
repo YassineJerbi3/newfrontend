@@ -29,7 +29,7 @@ const EquipmentType = {
   ECRAN_INTERACTIF: "ECRAN INTERACTIF",
   UNITE_CENTRALE: "UNITE CENTRALE",
   SERVEUR: "SERVEUR",
-  CAMERA_DE_SURVEILLANCE: "CAMERA DE SURVEILLANCE",
+  CAMERA_DE_SURVEILLANCE: "CAMERA_DE_SURVEILLANCE",
   TV: "TV",
 } as const;
 
@@ -37,33 +37,41 @@ type Emplacement = { id: string; nom: string; type: string };
 type User = { id: string; nom: string; prenom: string };
 type Poste = {
   id: string;
-  numero: number;
-  equipements: { equipmentType: string }[];
+  numero: number | null;
+  equipements?: { equipmentType: string }[];
+};
+type EquipementMinimal = {
+  id: string;
+  posteId: string | null;
+  equipmentType: string;
 };
 
 export default function AddEquipementPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 
+  // emplacements, users, postes…
   const [bureaux, setBureaux] = useState<Emplacement[]>([]);
   const [classesList, setClassesList] = useState<Emplacement[]>([]);
   const [filterType, setFilterType] = useState<"" | "BUREAU" | "CLASSE">("");
   const [bureauUsers, setBureauUsers] = useState<User[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [postesDispo, setPostesDispo] = useState<Poste[]>([]);
+  const [allEquipements, setAllEquipements] = useState<EquipementMinimal[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // form data
   const [formData, setFormData] = useState({
     familleMI: "",
     designation: "",
     code: "",
     numeroSerie: "",
     codeInventaire: "",
-    equipmentType: EquipmentType.IMPRIMANTE,
+    equipmentType: EquipmentType.IMPRIMANTE as keyof typeof EquipmentType,
     emplacementId: "",
     posteId: "",
-    utilisateur: UtilisateurType.ENSEIGNANT,
+    utilisateur: UtilisateurType.ENSEIGNANT as keyof typeof UtilisateurType,
     userId: "",
-    etat: EquipementEtat.FONCTIONNEL,
+    etat: EquipementEtat.FONCTIONNEL as keyof typeof EquipementEtat,
     dateMiseService: new Date().toISOString().slice(0, 10),
     maintenanceRecords: [] as { type: string; description: string }[],
   });
@@ -80,7 +88,7 @@ export default function AddEquipementPage() {
       .catch(() => setClassesList([]));
   }, [API]);
 
-  // 2) Récupérer les users si on est en BUREAU
+  // 2) Charger les users de bureau si besoin
   useEffect(() => {
     if (filterType === "BUREAU" && formData.emplacementId) {
       fetch(`${API}/users?emplacementId=${formData.emplacementId}`)
@@ -96,7 +104,7 @@ export default function AddEquipementPage() {
     }
   }, [filterType, formData.emplacementId, API]);
 
-  // 3) Dès qu’on choisit un emplacement, fetch tous les postes
+  // 3) Charger les postes de l’emplacement choisi
   useEffect(() => {
     if (!formData.emplacementId) {
       setPostes([]);
@@ -106,11 +114,27 @@ export default function AddEquipementPage() {
       .then((r) => (r.ok ? r.json() : []))
       .then((list: Poste[]) => setPostes(list))
       .catch(() => setPostes([]));
+
+    // et en même temps on charge tous les équipements de cet emplacement
+    fetch(`${API}/equipements?emplacementId=${formData.emplacementId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: any[]) =>
+        setAllEquipements(
+          Array.isArray(list)
+            ? list.map((eq) => ({
+                id: eq.id,
+                posteId: eq.posteId,
+                equipmentType: eq.equipmentType,
+              }))
+            : [],
+        ),
+      )
+      .catch(() => setAllEquipements([]));
   }, [formData.emplacementId, API]);
 
-  // 4) Filtrer postes dispo **uniquement** pour ECRAN ou UNITE_CENTRALE
+  // 4) Filtrer les postes disponibles selon utilisateur et équipement
   useEffect(() => {
-    const { equipmentType } = formData;
+    const { equipmentType, utilisateur } = formData;
     if (
       equipmentType !== EquipmentType.ECRAN &&
       equipmentType !== EquipmentType.UNITE_CENTRALE
@@ -119,15 +143,24 @@ export default function AddEquipementPage() {
       return;
     }
     setPostesDispo(
-      postes.filter(
-        (p) =>
-          // fallback à [] pour éviter undefined
-          !(p.equipements ?? []).some((e) => e.equipmentType === equipmentType),
-      ),
+      postes
+        // 1️⃣ selon le type d’utilisateur
+        .filter((p) =>
+          utilisateur === UtilisateurType.ENSEIGNANT
+            ? p.numero === null
+            : p.numero !== null,
+        )
+        // 2️⃣ et s’ils n’ont pas déjà un équipement de ce type
+        .filter((p) => {
+          const types = allEquipements
+            .filter((e) => e.posteId === p.id)
+            .map((e) => e.equipmentType);
+          return !types.includes(equipmentType);
+        }),
     );
-  }, [formData.equipmentType, postes]);
+  }, [formData.equipmentType, formData.utilisateur, postes, allEquipements]);
 
-  // 5) Grouper emplacements pour l’affichage
+  // 5) Groupement des emplacements pour l’affichage
   const options = useMemo(() => {
     if (filterType === "BUREAU") return bureaux;
     if (filterType === "CLASSE") return classesList;
@@ -244,24 +277,6 @@ export default function AddEquipementPage() {
             </label>
           ))}
 
-          {/* Type d’équipement */}
-          <label className="block">
-            Type de l’équipement
-            <select
-              name="equipmentType"
-              value={formData.equipmentType}
-              onChange={handleChange}
-              className="w-full rounded border p-2"
-              required
-            >
-              {Object.values(EquipmentType).map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-
           {/* Filtre BUREAU / CLASSE */}
           <div className="space-y-2 border-t pt-4">
             <span className="block font-medium">Type d’emplacement</span>
@@ -312,28 +327,6 @@ export default function AddEquipementPage() {
             </label>
           </div>
 
-          {/* Sélecteur Poste : seulement pour ECRAN ou UNITE_CENTRALE */}
-          {(formData.equipmentType === EquipmentType.ECRAN ||
-            formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
-            formData.emplacementId && (
-              <label className="block">
-                Poste (optionnel)
-                <select
-                  name="posteId"
-                  value={formData.posteId}
-                  onChange={handleChange}
-                  className="w-full rounded border p-2"
-                >
-                  <option value="">Aucun poste</option>
-                  {postesDispo.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      Poste n°{p.numero}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
           {/* Utilisateur */}
           {filterType === "BUREAU" ? (
             <label className="block">
@@ -371,6 +364,48 @@ export default function AddEquipementPage() {
               </select>
             </label>
           )}
+
+          {/* Type de l’équipement (après utilisateur) */}
+          <label className="block">
+            Type de l’équipement
+            <select
+              name="equipmentType"
+              value={formData.equipmentType}
+              onChange={handleChange}
+              className="w-full rounded border p-2"
+              required
+            >
+              {Object.values(EquipmentType).map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Sélecteur Poste : uniquement pour ECRAN ou UNITE_CENTRALE */}
+          {(formData.equipmentType === EquipmentType.ECRAN ||
+            formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
+            formData.emplacementId && (
+              <label className="block">
+                Poste (optionnel)
+                <select
+                  name="posteId"
+                  value={formData.posteId}
+                  onChange={handleChange}
+                  className="w-full rounded border p-2"
+                >
+                  <option value="">Aucun poste</option>
+                  {postesDispo.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.numero === null
+                        ? "Poste Enseignant"
+                        : `Poste ${p.numero}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
           {/* État */}
           <label className="block">

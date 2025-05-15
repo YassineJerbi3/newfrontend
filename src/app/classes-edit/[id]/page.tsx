@@ -680,14 +680,21 @@ export default function ClasseDetailPage() {
                                 >
                                   <FaTrash />
                                 </button>
-                                <button
-                                  onClick={() => openReassignModal(eq)}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Réaffecter à un autre poste"
-                                >
-                                  <FaEdit />
-                                </button>
+                                {/*
+    N'afficher “Réaffecter” QUE si ce n'est pas le poste Enseignant
+    (sur un poste numéroté, i.e. selectedPoste.numero != null)
+  */}
+                                {selectedPoste?.numero != null && (
+                                  <button
+                                    onClick={() => openReassignModal(eq)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Réaffecter à un autre poste"
+                                  >
+                                    <FaEdit />
+                                  </button>
+                                )}
                               </div>
+
                               <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
                                 <div>
                                   <strong>Famille MI:</strong> {eq.familleMI}
