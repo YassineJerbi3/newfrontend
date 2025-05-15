@@ -428,12 +428,11 @@ export default function ClasseDetailPage() {
                   {emplacement.postes
                     .filter((p) => p.numero != null)
                     .map((poste) => {
-                      const eqTypes = equipmentList
-                        .filter((e) => e.posteId === poste.id)
-                        .map((e) => e.equipmentType);
-                      const missing =
-                        !eqTypes.includes("ECRAN") ||
-                        !eqTypes.includes("UNITE CENTRALE");
+                      // On récupère la liste des équipements affectés à ce poste
+                      const eqs = equipmentList.filter(
+                        (e) => e.posteId === poste.id,
+                      );
+
                       return (
                         <div
                           key={poste.id}
@@ -443,19 +442,14 @@ export default function ClasseDetailPage() {
                               : openEquipmentModal(poste)
                           }
                           className={`
-                relative flex flex-col items-center 
-                rounded-2xl bg-white p-6 shadow-md 
-                transition hover:scale-105
-                ${deleteMode ? "cursor-pointer" : ""}
-                ${TILE_WIDTH}
-              `}
+            relative flex flex-col items-center
+            rounded-2xl bg-white p-6 shadow-md
+            transition hover:scale-105
+            ${deleteMode ? "cursor-pointer" : ""}
+            ${TILE_WIDTH}
+          `}
                         >
-                          {missing && (
-                            <FaExclamationTriangle
-                              size={24}
-                              className="absolute right-3 top-3 text-yellow-500"
-                            />
-                          )}
+                          {/* Checkbox en mode suppression */}
                           {deleteMode && (
                             <input
                               type="checkbox"
@@ -464,7 +458,11 @@ export default function ClasseDetailPage() {
                               className="absolute left-4 top-4 h-5 w-5 text-red-600"
                             />
                           )}
+
+                          {/* Icône principale */}
                           <FaDesktop size={48} className="mb-4 text-gray-600" />
+
+                          {/* Libellé du poste */}
                           <span className="text-xl font-semibold text-gray-800">
                             Poste {poste.numero}
                           </span>
@@ -842,7 +840,14 @@ export default function ClasseDetailPage() {
                         -- sélectionnez un poste --
                       </option>
                       {emplacement!.postes
-                        .filter((p) => p.id !== reassignEquipment!.posteId)
+                        .filter((p) => p.id !== reassignEquipment!.id) // pas son propre poste
+                        // selon le type d’utilisateur de l’équipement :
+                        .filter((p) => {
+                          const isProf = p.numero == null;
+                          const userType = reassignEquipment!.utilisateur; // "ENSEIGNANT" ou "ETUDIANT"
+                          return userType === "ENSEIGNANT" ? isProf : !isProf;
+                        })
+                        // puis : ne proposer que ceux qui n’ont pas déjà ce type d’équipement
                         .filter((p) => {
                           const typesOnThatPoste = allEquipements
                             .filter((e) => e.posteId === p.id)
