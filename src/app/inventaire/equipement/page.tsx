@@ -144,11 +144,14 @@ export default function AddEquipementPage() {
     }
     setPostesDispo(
       postes
-        // 1️⃣ selon le type d’utilisateur
+        // 1️⃣ selon le contexte : si on est en BUREAU, on garde tous les postes,
+        //    sinon on applique le filtre enseignant/étudiant
         .filter((p) =>
-          utilisateur === UtilisateurType.ENSEIGNANT
-            ? p.numero === null
-            : p.numero !== null,
+          filterType === "BUREAU"
+            ? true
+            : utilisateur === UtilisateurType.ENSEIGNANT
+              ? p.numero === null
+              : p.numero !== null,
         )
         // 2️⃣ et s’ils n’ont pas déjà un équipement de ce type
         .filter((p) => {
@@ -158,7 +161,13 @@ export default function AddEquipementPage() {
           return !types.includes(equipmentType);
         }),
     );
-  }, [formData.equipmentType, formData.utilisateur, postes, allEquipements]);
+  }, [
+    formData.equipmentType,
+    formData.utilisateur,
+    filterType, // ← on ajoute filterType au deps
+    postes,
+    allEquipements,
+  ]);
 
   // 5) Groupement des emplacements pour l’affichage
   const options = useMemo(() => {
