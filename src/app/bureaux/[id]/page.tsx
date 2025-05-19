@@ -704,7 +704,67 @@ export default function BureauDetailPage() {
                   return p ? `Poste ${p.numero}` : "Aucun poste";
                 })()}
               </p>
+              {/* ════════ BOUTON RÉAFFECTER ════════ */}
+              {(selectedEquipment.type === "ECRAN" ||
+                selectedEquipment.type === "UNITE CENTRALE") && (
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => {
+                      closeEquipDetailModal();
+                      openReassignModal(selectedEquipment);
+                    }}
+                    className="flex items-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                  >
+                    <FaEdit className="mr-2" />
+                    Réaffecter
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+      {showReassignModal && reassignEquipment && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowReassignModal(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg">
+            <button
+              onClick={() => setShowReassignModal(false)}
+              className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
+            >
+              &times;
+            </button>
+            <h2 className="mb-4 text-2xl font-bold">Réaffecter l’équipement</h2>
+            <label className="mb-4 block">
+              Poste de destination
+              <select
+                className="mt-1 w-full rounded border p-2"
+                value={targetPosteId ?? ""}
+                onChange={(e) => setTargetPosteId(e.target.value)}
+              >
+                <option value="" disabled>
+                  -- Sélectionner un poste --
+                </option>
+                {emplacement!.postes
+                  // on ne propose pas le poste courant
+                  .filter((p) => p.id !== reassignEquipment.posteId)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      Poste {p.numero}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              onClick={handleConfirmReassign}
+              disabled={!targetPosteId}
+              className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              Confirmer
+            </button>
           </div>
         </div>
       )}
