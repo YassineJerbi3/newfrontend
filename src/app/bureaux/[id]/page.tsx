@@ -28,13 +28,14 @@ interface EmplacementDetail {
 
 interface Equipment {
   id: string;
-  type: string; // ECRAN | UNITE_CENTRALE …
-  famille: string;
+  type: string;
+  familleMI: string;
   designation: string;
   etat: string;
   codeInventaire: string;
   numeroSerie: string;
-  utilisateurs: { nom: string; prenom: string }[];
+  // Le user “propriétaire” de l’équipement (nullable)
+  user: { nom: string; prenom: string } | null;
   posteId: string;
 }
 
@@ -75,6 +76,24 @@ export default function BureauDetailPage() {
   const [editPosteModal, setEditPosteModal] = useState(false);
   // pour le nouveau numéro
   const [newNumero, setNewNumero] = useState<number | null>(null);
+
+  // pour la modale détail équipement
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
+    null,
+  );
+  const [showEquipDetailModal, setShowEquipDetailModal] = useState(false);
+  // ouvre la modale détail équipement
+  const openEquipDetailModal = (eq: Equipment) => {
+    setSelectedEquipment(eq);
+    setShowEquipDetailModal(true);
+  };
+
+  // ferme la modale détail équipement
+  const closeEquipDetailModal = () => {
+    setSelectedEquipment(null);
+    setShowEquipDetailModal(false);
+  };
+
   // Fetch postes + detail
   const fetchDetail = () => {
     setLoading(true);
@@ -91,6 +110,32 @@ export default function BureauDetailPage() {
       .finally(() => setLoading(false));
   };
   useEffect(fetchDetail, [id]);
+  // juste sous fetchDetail
+  useEffect(() => {
+    fetch(`${API}/equipements?emplacementId=${id}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        return res.json();
+      })
+      .then((data: any[]) => {
+        setAllEquipements(
+          data.map((eq) => ({
+            id: eq.id,
+            type: eq.equipmentType,
+            familleMI: eq.familleMI,
+            designation: eq.designation,
+            etat: eq.etat,
+            codeInventaire: eq.codeInventaire,
+            numeroSerie: eq.numeroSerie,
+            user: eq.user ? { nom: eq.user.nom, prenom: eq.user.prenom } : null,
+            posteId: eq.posteId || "",
+          })),
+        );
+      })
+
+      .catch(() => setAllEquipements([]));
+  }, [id]);
+
   // ouvrir la modale
   const openEditModal = (poste: Poste) => {
     setSelectedPoste(poste);
@@ -129,26 +174,29 @@ export default function BureauDetailPage() {
   const openEquipmentModal = (poste: Poste) => {
     setSelectedPoste(poste);
     setShowEquipmentModal(true);
-    fetch(`${API}/postes/${poste.id}/equipements`, { credentials: "include" })
+
+    fetch(`${API}/postes/${poste.id}`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
         return res.json();
       })
-      .then((data: any[]) =>
+      .then((resp: any) => {
+        // resp.equipements contient maintenant bien tous les équipements de ce poste
+        const list = Array.isArray(resp.equipements) ? resp.equipements : [];
         setEquipmentList(
-          data.map((eq) => ({
+          list.map((eq: any) => ({
             id: eq.id,
-            type: eq.type,
-            famille: eq.famille,
+            type: eq.equipmentType,
+            familleMI: eq.familleMI,
             designation: eq.designation,
             etat: eq.etat,
             codeInventaire: eq.codeInventaire,
             numeroSerie: eq.numeroSerie,
-            utilisateurs: eq.utilisateurs ?? [],
+            user: eq.user ? { nom: eq.user.nom, prenom: eq.user.prenom } : null,
             posteId: poste.id,
           })),
-        ),
-      )
+        );
+      })
       .catch((err) => alert("Erreur chargement équipements : " + err.message));
   };
 
@@ -300,15 +348,16 @@ export default function BureauDetailPage() {
 
             {/* View modes */}
             {viewMode === "grid" ? (
-              // --- GRID ---
+              // --- GRID sur les postes ---
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {emplacement.postes.map((poste) => (
+                {emplacement!.postes.map((poste) => (
                   <div
                     key={poste.id}
-                    onClick={() =>
-                      deleteMode
-                        ? handleSelect(poste.id)
-                        : openEquipmentModal(poste)
+                    onClick={
+                      () =>
+                        deleteMode
+                          ? handleSelect(poste.id)
+                          : openEquipmentModal(poste) // Pour afficher la modale poste
                     }
                     className={`relative flex flex-col items-center rounded-2xl bg-white p-6 shadow-md transition hover:shadow-xl ${
                       deleteMode ? "cursor-pointer" : ""
@@ -330,34 +379,59 @@ export default function BureauDetailPage() {
                 ))}
               </div>
             ) : (
-              // --- LIST ---
-              <table className="w-full table-auto border-collapse text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border p-2">Poste</th>
-                    <th className="border p-2">Équipements</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {emplacement.postes.map((poste) => {
-                    const count = equipmentList.filter(
-                      (e) => e.posteId === poste.id,
-                    ).length;
-                    return (
-                      <tr
-                        key={poste.id}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => openEquipmentModal(poste)}
-                      >
-                        <td className="border p-2">Poste {poste.numero}</td>
-                        <td className="border p-2">
-                          {count > 0 ? `${count} équipement(s)` : "Aucun"}
+              // --- LISTE de tous les équipements ---
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold">Tous les équipements</h2>
+                <table className="w-full table-auto border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border p-2">Type</th>
+                      <th className="border p-2">Famille MI</th>
+                      <th className="border p-2">Utilisateurs</th>
+                      <th className="border p-2">État</th>
+                      <th className="border p-2">Poste</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allEquipements.length > 0 ? (
+                      allEquipements.map((eq) => {
+                        const poste = emplacement!.postes.find(
+                          (p) => p.id === eq.posteId,
+                        );
+                        return (
+                          <tr
+                            key={eq.id}
+                            className="cursor-pointer hover:bg-gray-50"
+                            onClick={() => openEquipDetailModal(eq)} // Pour afficher la modale équipement
+                          >
+                            <td className="border p-2">{eq.type}</td>
+                            <td className="border p-2">{eq.familleMI}</td>
+                            <td className="border p-2">
+                              {eq.user
+                                ? `${eq.user.nom} ${eq.user.prenom}`
+                                : "-"}
+                            </td>
+
+                            <td className="border p-2">{eq.etat}</td>
+                            <td className="border p-2">
+                              {poste ? `Poste ${poste.numero}` : "Aucun poste"}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="border p-4 text-center text-gray-500"
+                        >
+                          Aucun équipement trouvé.
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {/* Batch delete */}
@@ -496,25 +570,19 @@ export default function BureauDetailPage() {
                     </button>
                   </div>
 
-                  {/* Liste des utilisateurs */}
+                  {/* Utilisateurs */}
                   {equipmentList.length > 0 && (
                     <div className="mb-6">
                       <h3 className="mb-2 text-xl font-semibold">
-                        Utilisateurs
+                        Utilisateur
                       </h3>
-                      <ul className="list-inside list-disc text-gray-700">
-                        {Array.from(
-                          new Set(
-                            equipmentList.flatMap((eq) =>
-                              eq.utilisateurs.map(
-                                (u) => `${u.nom} ${u.prenom}`,
-                              ),
-                            ),
-                          ),
-                        ).map((full) => (
-                          <li key={full}>{full}</li>
-                        ))}
-                      </ul>
+                      <p className="text-gray-700">
+                        {equipmentList
+                          .map((eq) =>
+                            eq.user ? `${eq.user.nom} ${eq.user.prenom}` : "–",
+                          )
+                          .join(", ")}
+                      </p>
                     </div>
                   )}
 
@@ -555,7 +623,7 @@ export default function BureauDetailPage() {
 
                               <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
                                 <div>
-                                  <strong>Famille MI:</strong> {eq.famille}
+                                  <strong>Famille MI:</strong> {eq.familleMI}
                                 </div>
                                 <div>
                                   <strong>Désignation:</strong> {eq.designation}
@@ -584,52 +652,59 @@ export default function BureauDetailPage() {
           </>
         )}
       </div>
-      {showReassignModal && reassignEquipment && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center">
+      {/* Modale Détail Équipement */}
+      {showEquipDetailModal && selectedEquipment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/40"
-            onClick={() => setShowReassignModal(false)}
+            onClick={closeEquipDetailModal}
           />
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg">
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
             <button
-              onClick={() => setShowReassignModal(false)}
-              className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
+              onClick={closeEquipDetailModal}
+              className="absolute right-4 top-4 text-2xl text-gray-500"
             >
               &times;
             </button>
-            <h2 className="mb-4 text-2xl font-bold">Réaffecter l’équipement</h2>
-            <label className="mb-4 block">
-              Choisir un autre poste
-              <select
-                value={targetPosteId ?? ""}
-                onChange={(e) => setTargetPosteId(e.target.value)}
-                className="mt-1 w-full rounded border p-2"
-              >
-                <option value="" disabled>
-                  -- sélectionnez un poste --
-                </option>
-                {emplacement!.postes
-                  .filter((p) => p.id !== reassignEquipment.posteId)
-                  .filter((p) => {
-                    const types = allEquipements
-                      .filter((e) => e.posteId === p.id)
-                      .map((e) => e.equipmentType);
-                    return !types.includes(reassignEquipment.type);
-                  })
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      Poste {p.numero}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <button
-              onClick={handleConfirmReassign}
-              disabled={!targetPosteId}
-              className="w-full rounded bg-blue-600 py-2 text-white disabled:opacity-50"
-            >
-              Confirmer
-            </button>
+            <h2 className="mb-4 text-2xl font-bold">Détail de l’équipement</h2>
+            <div className="space-y-2 text-gray-700">
+              <p>
+                <strong>Type :</strong> {selectedEquipment.type}
+              </p>
+              <p>
+                <strong>Famille MI :</strong> {selectedEquipment.familleMI}
+              </p>
+              <p>
+                <strong>Désignation :</strong> {selectedEquipment.designation}
+              </p>
+              <p>
+                <strong>État :</strong> {selectedEquipment.etat}
+              </p>
+              <p>
+                <strong>Code Inventaire :</strong>{" "}
+                {selectedEquipment.codeInventaire}
+              </p>
+              <p>
+                <strong>Numéro de série :</strong>{" "}
+                {selectedEquipment.numeroSerie}
+              </p>
+              <p>
+                <strong>Utilisateur :</strong>{" "}
+                {selectedEquipment.user
+                  ? `${selectedEquipment.user.nom} ${selectedEquipment.user.prenom}`
+                  : "Aucun"}
+              </p>
+
+              <p>
+                <strong>Poste :</strong>{" "}
+                {(() => {
+                  const p = emplacement!.postes.find(
+                    (x) => x.id === selectedEquipment.posteId,
+                  );
+                  return p ? `Poste ${p.numero}` : "Aucun poste";
+                })()}
+              </p>
+            </div>
           </div>
         </div>
       )}
