@@ -242,11 +242,6 @@ export default function DemandeInterventionForm() {
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-6xl p-8">
-        {/* Barre de progression (étape 1/1) */}
-        <div className="mb-6 h-1 w-full rounded-full bg-gray-200">
-          <div className="h-1 w-full rounded-full bg-gradient-to-r from-blue-400 to-blue-700 transition-all duration-1000" />
-        </div>
-
         {/* Header */}
         <div className="mb-8 rounded-xl bg-gradient-to-r from-blue-600 to-blue-800 p-8 text-center shadow-2xl">
           <h1 className="text-6xl font-extrabold tracking-wide text-white">
