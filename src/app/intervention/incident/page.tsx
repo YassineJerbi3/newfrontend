@@ -29,7 +29,7 @@ export default function DemandeInterventionForm() {
     fonction: "",
     direction: "",
     emplacementId: "",
-    typeObjet: "", // on envoie le type d’équipement ici
+    typeObject: "", // on envoie le type d’équipement ici
     equipementId: "",
     priorite: "",
     etat: "",
@@ -90,7 +90,7 @@ export default function DemandeInterventionForm() {
     if (!formData.emplacementId) {
       setAllEquipements([]);
       setEquipmentTypes([]);
-      setFormData((f) => ({ ...f, typeObjet: "", equipementId: "" }));
+      setFormData((f) => ({ ...f, typeObject: "", equipementId: "" }));
       setFilteredEquipements([]);
       setSelectedEquipement(null);
       return;
@@ -109,7 +109,7 @@ export default function DemandeInterventionForm() {
         // réinitialiser sélection
         setFormData((f) => ({
           ...f,
-          typeObjet: "",
+          typeObject: "",
           equipementId: "",
         }));
         setFilteredEquipements([]);
@@ -120,19 +120,19 @@ export default function DemandeInterventionForm() {
 
   // 4) filtrer les équipements quand on choisit un type
   useEffect(() => {
-    if (!formData.typeObjet) {
+    if (!formData.typeObject) {
       setFilteredEquipements([]);
       setFormData((f) => ({ ...f, equipementId: "" }));
       setSelectedEquipement(null);
       return;
     }
     const filtered = allEquipements.filter(
-      (eq) => eq.equipmentType === formData.typeObjet,
+      (eq) => eq.equipmentType === formData.typeObject,
     );
     setFilteredEquipements(filtered);
     setFormData((f) => ({ ...f, equipementId: "" }));
     setSelectedEquipement(null);
-  }, [formData.typeObjet, allEquipements]);
+  }, [formData.typeObject, allEquipements]);
 
   // simuler upload
   const simulateUpload = (file: File) => {
@@ -155,6 +155,23 @@ export default function DemandeInterventionForm() {
       const f: File = files[0];
       simulateUpload(f);
       setFormData((f) => ({ ...f, pieceJointe: f }));
+      return;
+    }
+    // Si on change le type d'équipement…
+    if (name === "typeObject") {
+      // 1) on met à jour formData.typeObject
+      // 2) on vide equipementId + selectedEquipement
+      // 3) on filtre les équipements disponibles
+      const filtered = allEquipements.filter(
+        (eq) => eq.equipmentType === value,
+      );
+      setFormData((f) => ({
+        ...f,
+        typeObject: value,
+        equipementId: "",
+      }));
+      setFilteredEquipements(filtered);
+      setSelectedEquipement(null);
       return;
     }
 
@@ -224,7 +241,7 @@ export default function DemandeInterventionForm() {
           fonction: f.fonction,
           direction: f.direction,
           emplacementId: "",
-          typeObjet: "",
+          typeObject: "",
           equipementId: "",
           priorite: "",
           etat: "",
@@ -301,8 +318,8 @@ export default function DemandeInterventionForm() {
                   Type
                 </label>
                 <select
-                  name="typeObjet"
-                  value={formData.typeObjet}
+                  name="typeObject"
+                  value={formData.typeObject}
                   onChange={handleChange}
                   disabled={!equipmentTypes.length}
                   className="rounded-lg border border-gray-300 bg-white px-5 py-3 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
@@ -325,7 +342,7 @@ export default function DemandeInterventionForm() {
                   name="equipementId"
                   value={formData.equipementId}
                   onChange={handleChange}
-                  disabled={!formData.typeObjet}
+                  disabled={!formData.typeObject}
                   required
                   className="rounded-lg border border-gray-300 bg-white px-5 py-3 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
                 >
