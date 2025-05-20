@@ -29,7 +29,7 @@ export default function DemandeInterventionForm() {
     fonction: "",
     direction: "",
     emplacementId: "",
-    typeObjet: "", // ← on envoie le type d’équipement ici
+    typeObjet: "", // on envoie le type d’équipement ici
     equipementId: "",
     priorite: "",
     etat: "",
@@ -40,6 +40,7 @@ export default function DemandeInterventionForm() {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
     {},
   );
+  const [echeanceError, setEcheanceError] = useState("");
 
   const prioriteOptions = [
     { value: "URGENT", label: "Urgent" },
@@ -163,11 +164,50 @@ export default function DemandeInterventionForm() {
       setSelectedEquipement(eq);
     }
 
+    if (name === "echeance") {
+      setEcheanceError("");
+    }
+
     setFormData((f) => ({ ...f, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation de la date d’échéance en fonction de la priorité
+    const today = new Date();
+    const echeanceDate = new Date(formData.echeance);
+    let minDays = 0;
+
+    switch (formData.priorite) {
+      case "URGENT":
+        minDays = 2;
+        break;
+      case "NORMALE":
+        minDays = 4;
+        break;
+      case "BASSE":
+        minDays = 7;
+        break;
+      default:
+        break;
+    }
+
+    const minDate = new Date(today);
+    minDate.setDate(today.getDate() + minDays);
+
+    if (formData.echeance === "") {
+      setEcheanceError("Ce champ est obligatoire.");
+      return;
+    }
+
+    if (echeanceDate < minDate) {
+      setEcheanceError(
+        `La date d’échéance doit être au minimum ${minDays} jour(s) après aujourd’hui pour une priorité « ${formData.priorite.toLowerCase()} ».`,
+      );
+      return;
+    }
+
     const payload = new FormData();
     Object.entries(formData).forEach(([k, v]) => {
       if (v != null) payload.append(k, v as any);
@@ -194,236 +234,256 @@ export default function DemandeInterventionForm() {
         }));
         setUploadProgress({});
         setSelectedEquipement(null);
+        setEcheanceError("");
       })
       .catch(console.error);
   };
 
   return (
     <DefaultLayout>
-      <div className="mx-auto max-w-3xl p-6">
-        <h1 className="mb-8 text-center text-3xl font-bold">
-          Demande d’Intervention
-        </h1>
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-6 rounded-md border border-gray-300 bg-white p-6 shadow-sm"
-        >
-          {/* Identification (readonly) */}
-          <div className="grid grid-cols-2 gap-4">
-            {["nom", "prenom", "fonction", "direction"].map((field) => (
-              <div key={field}>
-                <label className="block text-sm font-bold uppercase text-gray-900">
-                  {field.charAt(0).toUpperCase() + field.slice(1)}
-                </label>
-                <input
-                  type="text"
-                  name={field}
-                  value={(formData as any)[field]}
-                  readOnly
-                  className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 shadow-sm"
-                />
-              </div>
-            ))}
-          </div>
+      <div className="mx-auto max-w-6xl p-8">
+        {/* Barre de progression (étape 1/1) */}
+        <div className="mb-6 h-1 w-full rounded-full bg-gray-200">
+          <div className="h-1 w-full rounded-full bg-gradient-to-r from-blue-400 to-blue-700 transition-all duration-1000" />
+        </div>
 
-          {/* Emplacement */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Emplacement
-            </label>
-            <select
-              name="emplacementId"
-              value={formData.emplacementId}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
-            >
-              <option value="">— Choisir —</option>
-              {emplacements.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nom}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Header */}
+        <div className="mb-8 rounded-xl bg-gradient-to-r from-blue-600 to-blue-800 p-8 text-center shadow-2xl">
+          <h1 className="text-6xl font-extrabold tracking-wide text-white">
+            Demande d’Intervention
+          </h1>
+        </div>
 
-          {/* Type d’équipement → envoyé vers typeObjet */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Type d’équipement
-            </label>
-            <select
-              name="typeObjet"
-              value={formData.typeObjet}
-              onChange={handleChange}
-              disabled={!equipmentTypes.length}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
-            >
-              <option value="">— Choisir —</option>
-              {equipmentTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Famille MI de l’équipement */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Famille MI de l’équipement
-            </label>
-            <select
-              name="equipementId"
-              value={formData.equipementId}
-              onChange={handleChange}
-              disabled={!formData.typeObjet}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
-            >
-              <option value="">— Choisir —</option>
-              {filteredEquipements.map((eq) => (
-                <option key={eq.id} value={eq.id}>
-                  {eq.familleMI}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* N° de série (lecture seule) */}
-          {selectedEquipement && (
-            <div>
-              <label className="block text-sm font-bold uppercase text-gray-900">
-                N° de série de l’équipement
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={selectedEquipement.numeroSerie}
-                className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 shadow-sm"
-              />
-            </div>
-          )}
-
-          {/* Priorité */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Priorité
-            </label>
-            <div className="mt-2 flex space-x-6">
-              {prioriteOptions.map(({ value, label }) => (
-                <label key={value} className="inline-flex items-center">
+        <form onSubmit={handleSubmit} className="space-y-10">
+          {/** IDENTITÉ **/}
+          <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-1/2 before:-translate-x-1/2 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-4 before:py-1 before:text-sm before:font-semibold before:text-white before:content-['IDENTITÉ']">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {["nom", "prenom", "fonction", "direction"].map((field) => (
+                <div key={field} className="flex flex-col">
+                  <label className="mb-2 text-sm font-medium uppercase text-gray-700">
+                    {field.charAt(0).toUpperCase() + field.slice(1)}
+                  </label>
                   <input
-                    type="radio"
-                    name="priorite"
-                    value={value}
-                    checked={formData.priorite === value}
-                    onChange={handleChange}
-                    required
-                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2">{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* État */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              État
-            </label>
-            <div className="mt-2 flex space-x-6">
-              {etatOptions.map(({ value, label }) => (
-                <label key={value} className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    name="etat"
-                    value={value}
-                    checked={formData.etat === value}
-                    onChange={handleChange}
-                    required
-                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2">{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Description détaillée de la panne
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows={5}
-              required
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500"
-            />
-          </div>
-
-          {/* Pièces jointes */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Pièces jointes
-            </label>
-            <div className="relative mt-1 flex items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10">
-              <input
-                type="file"
-                name="pieceJointe"
-                onChange={handleChange}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-              <span className="text-gray-600">
-                Cliquez ou déposez un fichier
-              </span>
-            </div>
-            {formData.pieceJointe && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-700">
-                  {formData.pieceJointe.name} —{" "}
-                  {uploadProgress[formData.pieceJointe.name] ?? 0}%
-                </p>
-                <div className="h-1 w-full rounded bg-gray-300">
-                  <div
-                    className="h-1 rounded bg-blue-600"
-                    style={{
-                      width: `${
-                        uploadProgress[formData.pieceJointe.name] || 0
-                      }%`,
-                    }}
+                    type="text"
+                    name={field}
+                    value={(formData as any)[field]}
+                    readOnly
+                    placeholder={`Votre ${field}`}
+                    className="rounded-lg border border-gray-300 bg-gray-50 px-5 py-3 text-gray-800 placeholder-gray-400 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
                   />
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {/** ÉQUIPEMENT **/}
+          <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-1/2 before:-translate-x-1/2 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-4 before:py-1 before:text-sm before:font-semibold before:text-white before:content-['ÉQUIPEMENT']">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {/* Emplacement */}
+              <div className="flex flex-col">
+                <label className="mb-2 text-sm font-medium uppercase text-gray-700">
+                  Emplacement
+                </label>
+                <select
+                  name="emplacementId"
+                  value={formData.emplacementId}
+                  onChange={handleChange}
+                  required
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
+                >
+                  <option value="">— Choisir —</option>
+                  {emplacements.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nom}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
+
+              {/* Type */}
+              <div className="flex flex-col">
+                <label className="mb-2 text-sm font-medium uppercase text-gray-700">
+                  Type
+                </label>
+                <select
+                  name="typeObjet"
+                  value={formData.typeObjet}
+                  onChange={handleChange}
+                  disabled={!equipmentTypes.length}
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
+                >
+                  <option value="">— Choisir —</option>
+                  {equipmentTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Famille MI */}
+              <div className="flex flex-col">
+                <label className="mb-2 text-sm font-medium uppercase text-gray-700">
+                  Famille MI
+                </label>
+                <select
+                  name="equipementId"
+                  value={formData.equipementId}
+                  onChange={handleChange}
+                  disabled={!formData.typeObjet}
+                  required
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
+                >
+                  <option value="">— Choisir —</option>
+                  {filteredEquipements.map((eq) => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.familleMI}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* N° de série */}
+              {selectedEquipement && (
+                <div className="col-span-full">
+                  <label className="mb-2 text-sm font-medium uppercase text-gray-700">
+                    N° de série
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={selectedEquipement.numeroSerie}
+                    className="w-full rounded-lg border border-gray-300 bg-gray-50 px-5 py-3 transition focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Échéance */}
-          <div>
-            <label className="block text-sm font-bold uppercase text-gray-900">
-              Échéance de réparation
-            </label>
-            <input
-              type="date"
-              name="echeance"
-              value={formData.echeance}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500"
-            />
+          {/** PRIORITÉ & ÉTAT **/}
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+            {/* Priorité */}
+            <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-10 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-3 before:py-1 before:text-xs before:font-semibold before:text-white before:content-['PRIORITÉ']">
+              <div className="flex flex-wrap gap-8">
+                {prioriteOptions.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className="inline-flex items-center space-x-3"
+                  >
+                    <span className="relative flex h-6 w-6 items-center justify-center">
+                      <input
+                        type="radio"
+                        name="priorite"
+                        value={value}
+                        checked={formData.priorite === value}
+                        onChange={handleChange}
+                        required
+                        className="peer absolute h-full w-full cursor-pointer opacity-0"
+                      />
+                      <span className="block h-4 w-4 rounded-full border-2 border-blue-500 transition peer-checked:border-transparent peer-checked:bg-blue-500" />
+                    </span>
+                    <span className="text-gray-800">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* État */}
+            <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-10 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-3 before:py-1 before:text-xs before:font-semibold before:text-white before:content-['ÉTAT']">
+              <div className="flex flex-wrap gap-8">
+                {etatOptions.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className="inline-flex items-center space-x-3"
+                  >
+                    <span className="relative flex h-6 w-6 items-center justify-center">
+                      <input
+                        type="radio"
+                        name="etat"
+                        value={value}
+                        checked={formData.etat === value}
+                        onChange={handleChange}
+                        required
+                        className="peer absolute h-full w-full cursor-pointer opacity-0"
+                      />
+                      <span className="block h-4 w-4 rounded-full border-2 border-blue-500 transition peer-checked:border-transparent peer-checked:bg-blue-500" />
+                    </span>
+                    <span className="text-gray-800">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Submit */}
-          <div className="text-center">
+          {/** DESCRIPTION & ATTACHEMENTS **/}
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+            {/* Description */}
+            <div className="flex flex-col space-y-2">
+              <label className="text-sm font-medium uppercase text-gray-700">
+                Description
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={5}
+                placeholder="Expliquez la panne en détail..."
+                required
+                className="rounded-lg border border-gray-300 bg-gray-50 px-5 py-4 placeholder-gray-400 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
+              />
+            </div>
+            {/* Pièce jointe */}
+            <div className="flex flex-col space-y-2">
+              <label className="text-sm font-medium uppercase text-gray-700">
+                Pièce jointe
+              </label>
+              <div className="relative flex h-40 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100">
+                <input
+                  type="file"
+                  name="pieceJointe"
+                  onChange={handleChange}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+                <p className="text-gray-500">
+                  Cliquez ou glissez un fichier ici
+                </p>
+              </div>
+              {formData.pieceJointe && (
+                <div className="flex justify-between text-sm text-gray-700">
+                  <span>{formData.pieceJointe.name}</span>
+                  <span>{uploadProgress[formData.pieceJointe.name] ?? 0}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/** ÉCHÉANCE & SUBMIT **/}
+          <div className="grid grid-cols-1 items-end gap-8 md:grid-cols-2">
+            <div className="flex flex-col space-y-2">
+              <label className="text-sm font-medium uppercase text-gray-700">
+                Échéance
+              </label>
+              <input
+                type="date"
+                name="echeance"
+                value={formData.echeance}
+                onChange={handleChange}
+                required
+                className={`rounded-lg border ${
+                  echeanceError ? "border-red-500" : "border-gray-300"
+                } bg-gray-50 px-5 py-3 focus:outline-none focus:ring-4 ${
+                  echeanceError ? "focus:ring-red-100" : "focus:ring-blue-200"
+                } transition`}
+              />
+              {echeanceError && (
+                <p className="text-sm text-red-600">{echeanceError}</p>
+              )}
+            </div>
             <button
               type="submit"
-              className="rounded-md bg-blue-600 px-6 py-3 text-white hover:bg-blue-700"
+              className="w-full rounded-full bg-gradient-to-r from-blue-600 to-blue-800 px-8 py-4 text-xl font-bold text-white shadow-2xl transition hover:scale-105 focus:ring-4 focus:ring-blue-200"
             >
-              Envoyer
+              Envoyer ma demande
             </button>
           </div>
         </form>
