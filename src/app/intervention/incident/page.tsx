@@ -1,126 +1,154 @@
 "use client";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+
+interface Emplacement {
+  id: string;
+  nom: string;
+}
+
+interface Equipement {
+  id: string;
+  designation: string;
+  fabricant: string;
+  numeroSerie: string;
+}
+
+interface User {
+  id: string;
+  nom: string;
+  prenom: string;
+  fonction: string;
+  direction: string;
+}
 
 export default function DemandeInterventionForm() {
   const [formData, setFormData] = useState({
-    // Identification du demandeur
     nom: "",
     prenom: "",
     fonction: "",
     direction: "",
-    // Information sur l'intervention
+    emplacementId: "",
+    equipementId: "",
     priorite: "",
-    equipement: "",
-    numSerie: "",
-    fabricant: "",
-    localisation: "",
-    typeObjet: [],
-    typeObjetAutre: "",
     etat: "",
     description: "",
-    pieceJointe: null, // single file – change to array if needed
+    pieceJointe: null as File | null,
     echeance: "",
   });
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
+    {},
+  );
 
-  // Simulated file upload progress state.
-  const [uploadProgress, setUploadProgress] = useState({});
-
-  // List options
-  const fonctionOptions = ["admin", "prof", "responsable"];
-  const directionOptions = [
-    "informatique",
-    "administratif",
-    "technique",
-    "gestion",
-    "economie",
+  const prioriteOptions = [
+    { value: "URGENT", label: "Urgent" },
+    { value: "NORMALE", label: "Normale" },
+    { value: "BASSE", label: "Basse" },
   ];
-  const prioriteOptions = ["urgent", "normale", "basse"];
-  const typeObjetOptions = [
-    "unite centrale",
-    "ecran",
-    "logiciel",
-    "resau",
-    "imprimante",
-    "autre",
+  const etatOptions = [
+    { value: "EN_ARRET", label: "En arrêt" },
+    { value: "EN_MARCHE", label: "En marche" },
   ];
-  const etatOptions = ["en arret", "en marche"];
 
-  // Simulated file upload function.
-  const simulateUpload = (file) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      setUploadProgress((prev) => ({ ...prev, [file.name]: progress }));
+  const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
+  const [equipements, setEquipements] = useState<Equipement[]>([]);
+
+  // 1) user
+  useEffect(() => {
+    fetch("http://localhost:2000/users/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((u: User) =>
+        setFormData((f) => ({
+          ...f,
+          nom: u.nom,
+          prenom: u.prenom,
+          fonction: u.fonction,
+          direction: u.direction,
+        })),
+      )
+      .catch(console.error);
+  }, []);
+
+  // 2) emplacements
+  useEffect(() => {
+    fetch("http://localhost:2000/emplacements", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { items: Emplacement[] }) => setEmplacements(data.items))
+      .catch(console.error);
+  }, []);
+
+  // 3) equipements filtrés
+  useEffect(() => {
+    if (!formData.emplacementId) {
+      setEquipements([]);
+      return;
+    }
+    fetch(
+      `http://localhost:2000/equipements?emplacementId=${formData.emplacementId}`,
+      { credentials: "include" },
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.items;
+        setEquipements(list);
+      })
+      .catch(console.error);
+  }, [formData.emplacementId]);
+
+  // simulate upload
+  const simulateUpload = (file: File) => {
+    let prog = 0;
+    const iv = setInterval(() => {
+      prog = Math.min(100, prog + Math.floor(Math.random() * 10) + 5);
+      setUploadProgress((p) => ({ ...p, [file.name]: prog }));
+      if (prog === 100) clearInterval(iv);
     }, 300);
   };
 
-  const handleChange = (e) => {
-    const { name, value, type, checked, files } = e.target;
-
-    // Handling file input (only one file for now)
-    if (name === "pieceJointe") {
-      const file = files[0];
-      if (file) {
-        simulateUpload(file);
-        setFormData((prev) => ({ ...prev, pieceJointe: file }));
-      }
-    }
-    // Handling checkbox for "typeObjet"
-    else if (name === "typeObjet") {
-      if (checked) {
-        setFormData((prev) => ({
-          ...prev,
-          typeObjet: [...prev.typeObjet, value],
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          typeObjet: prev.typeObjet.filter((item) => item !== value),
-        }));
-      }
-    }
-    // Other fields (text, date, etc.)
-    else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value, files } = e.target as any;
+    if (name === "pieceJointe" && files?.[0]) {
+      const f: File = files[0];
+      simulateUpload(f);
+      setFormData((f) => ({ ...f, pieceJointe: f }));
+    } else {
+      setFormData((f) => ({ ...f, [name]: value }));
     }
   };
 
-  // Handle radio button changes.
-  const handleRadioChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Demande d'intervention soumise :", formData);
-    // Reset form data and progress.
-    setFormData({
-      nom: "",
-      prenom: "",
-      fonction: "",
-      direction: "",
-      priorite: "",
-      equipement: "",
-      numSerie: "",
-      fabricant: "",
-      localisation: "",
-      typeObjet: [],
-      typeObjetAutre: "",
-      etat: "",
-      description: "",
-      pieceJointe: null,
-      echeance: "",
+    const payload = new FormData();
+    Object.entries(formData).forEach(([k, v]) => {
+      if (v != null) payload.append(k, v as any);
     });
-    setUploadProgress({});
+
+    fetch("http://localhost:2000/incidents", {
+      method: "POST",
+      credentials: "include",
+      body: payload,
+    })
+      .then(() => {
+        setFormData({
+          nom: formData.nom,
+          prenom: formData.prenom,
+          fonction: formData.fonction,
+          direction: formData.direction,
+          emplacementId: "",
+          equipementId: "",
+          priorite: "",
+          etat: "",
+          description: "",
+          pieceJointe: null,
+          echeance: "",
+        });
+        setUploadProgress({});
+      })
+      .catch(console.error);
   };
 
   return (
@@ -129,355 +157,188 @@ export default function DemandeInterventionForm() {
         <h1 className="mb-8 text-center text-3xl font-bold">
           Demande d'Intervention
         </h1>
-        {/* Overall form container */}
         <form
           onSubmit={handleSubmit}
-          className="space-y-8 rounded-md border border-gray-300 bg-white p-6 shadow-sm"
+          className="space-y-6 rounded-md border border-gray-300 bg-white p-6 shadow-sm"
         >
-          {/* Section: Identification du demandeur */}
-          <div>
-            <h2 className="mb-4 border-b border-gray-200 pb-2 text-2xl font-bold text-gray-800">
-              Identification du demandeur
-            </h2>
-            <div className="mb-4">
-              <label
-                htmlFor="nom"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Nom
-              </label>
-              <input
-                type="text"
-                id="nom"
-                name="nom"
-                value={formData.nom}
-                onChange={handleChange}
-                placeholder="Entrez votre nom"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="prenom"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Prénom
-              </label>
-              <input
-                type="text"
-                id="prenom"
-                name="prenom"
-                value={formData.prenom}
-                onChange={handleChange}
-                placeholder="Entrez votre prénom"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="fonction"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Fonction
-              </label>
-              <select
-                id="fonction"
-                name="fonction"
-                value={formData.fonction}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              >
-                <option value="">Sélectionnez votre fonction</option>
-                {fonctionOptions.map((option, index) => (
-                  <option key={index} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="direction"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Direction/Département/Service
-              </label>
-              <select
-                id="direction"
-                name="direction"
-                value={formData.direction}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              >
-                <option value="">Sélectionnez votre direction</option>
-                {directionOptions.map((option, index) => (
-                  <option key={index} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Section: Information sur l'intervention */}
-          <div>
-            <h2 className="mb-4 border-b border-gray-200 pb-2 text-2xl font-bold text-gray-800">
-              Information sur l'intervention
-            </h2>
-            <div className="mb-4">
-              <label className="mb-1 block text-sm font-bold uppercase text-gray-900">
-                Priorité
-              </label>
-              <div className="mt-2 flex space-x-4">
-                {prioriteOptions.map((option, index) => (
-                  <label key={index} className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      name="priorite"
-                      value={option}
-                      checked={formData.priorite === option}
-                      onChange={handleRadioChange}
-                      required
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="ml-2 capitalize">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="equipement"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Équipement
-              </label>
-              <input
-                type="text"
-                id="equipement"
-                name="equipement"
-                value={formData.equipement}
-                onChange={handleChange}
-                placeholder="Entrez l'équipement concerné"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="numSerie"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                N° de série de l'équipement
-              </label>
-              <input
-                type="text"
-                id="numSerie"
-                name="numSerie"
-                value={formData.numSerie}
-                onChange={handleChange}
-                placeholder="Entrez le numéro de série"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="fabricant"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Fabricant
-              </label>
-              <input
-                type="text"
-                id="fabricant"
-                name="fabricant"
-                value={formData.fabricant}
-                onChange={handleChange}
-                placeholder="Indiquez le fabricant"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="localisation"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Localisation de l'équipement
-              </label>
-              <input
-                type="text"
-                id="localisation"
-                name="localisation"
-                value={formData.localisation}
-                onChange={handleChange}
-                placeholder="Indiquez la localisation"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="mb-1 block text-sm font-bold uppercase text-gray-900">
-                Type d'objet
-              </label>
-              <div className="mt-2 flex flex-wrap gap-4">
-                {typeObjetOptions.map((option, index) => (
-                  <label key={index} className="inline-flex items-center">
-                    <input
-                      type="checkbox"
-                      name="typeObjet"
-                      value={option}
-                      checked={formData.typeObjet.includes(option)}
-                      onChange={handleChange}
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="ml-2">{option}</span>
-                  </label>
-                ))}
-              </div>
-              {formData.typeObjet.includes("autre") && (
-                <div className="mt-2">
-                  <label
-                    htmlFor="typeObjetAutre"
-                    className="mb-1 block text-sm font-bold uppercase text-gray-900"
-                  >
-                    Précisez le type d'objet
-                  </label>
-                  <input
-                    type="text"
-                    id="typeObjetAutre"
-                    name="typeObjetAutre"
-                    value={formData.typeObjetAutre}
-                    onChange={handleChange}
-                    placeholder="Indiquez le type d'objet"
-                    required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-              )}
-            </div>
-            <div className="mb-4">
-              <label className="mb-1 block text-sm font-bold uppercase text-gray-900">
-                État
-              </label>
-              <div className="mt-2 flex space-x-4">
-                {etatOptions.map((option, index) => (
-                  <label key={index} className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      name="etat"
-                      value={option}
-                      checked={formData.etat === option}
-                      onChange={handleRadioChange}
-                      required
-                      className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="ml-2">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="description"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Description détaillée de la panne
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Décrivez la panne en détail..."
-                rows="6"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              ></textarea>
-            </div>
-            <div className="mb-4">
-              <label className="mb-1 block text-sm font-bold uppercase text-gray-900">
-                Pièces jointes
-              </label>
-              <div className="relative mt-1 flex items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10">
-                <div className="text-center">
-                  <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M28 8H20a4 4 0 00-4 4v24a4 4 0 004 4h8a4 4 0 004-4V12a4 4 0 00-4-4z"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="mt-2 block text-sm text-gray-600">
-                    Glissez-déposez un fichier ou cliquez pour sélectionner
-                  </span>
-                </div>
+          {/* Identification (readonly) */}
+          <div className="grid grid-cols-2 gap-4">
+            {["nom", "prenom", "fonction", "direction"].map((field) => (
+              <div key={field}>
+                <label className="block text-sm font-bold uppercase text-gray-900">
+                  {field.charAt(0).toUpperCase() + field.slice(1)}
+                </label>
                 <input
-                  id="pieceJointe"
-                  name="pieceJointe"
-                  type="file"
-                  onChange={handleChange}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  type="text"
+                  name={field}
+                  value={(formData as any)[field]}
+                  readOnly
+                  className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 shadow-sm"
                 />
               </div>
-              {formData.pieceJointe &&
-                uploadProgress[formData.pieceJointe.name] != null && (
-                  <div className="mt-4">
-                    <p className="break-all text-sm text-gray-700">
-                      {formData.pieceJointe.name}
-                    </p>
-                    <div className="mt-1 w-full">
-                      <div className="h-1 w-full rounded bg-gray-300">
-                        <div
-                          className="h-1 rounded bg-blue-600"
-                          style={{
-                            width: `${uploadProgress[formData.pieceJointe.name]}%`,
-                          }}
-                        ></div>
-                      </div>
-                      <p className="mt-1 text-center text-xs text-gray-600">
-                        {uploadProgress[formData.pieceJointe.name]}%
-                      </p>
-                    </div>
-                  </div>
-                )}
-            </div>
+            ))}
+          </div>
+
+          {/* Sélection Emplacement / Équipement */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label
-                htmlFor="echeance"
-                className="mb-1 block text-sm font-bold uppercase text-gray-900"
-              >
-                Échéance de réparation
+              <label className="block text-sm font-bold uppercase text-gray-900">
+                Emplacement
               </label>
-              <input
-                type="date"
-                id="echeance"
-                name="echeance"
-                value={formData.echeance}
+              <select
+                name="emplacementId"
+                value={formData.emplacementId}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
+              >
+                <option value="">— Choisir —</option>
+                {emplacements.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nom}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold uppercase text-gray-900">
+                Équipement
+              </label>
+              <select
+                name="equipementId"
+                value={formData.equipementId}
+                onChange={handleChange}
+                required
+                disabled={!formData.emplacementId}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
+              >
+                <option value="">— Choisir —</option>
+                {equipements.map((eq) => (
+                  <option key={eq.id} value={eq.id}>
+                    {eq.designation}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Priorité */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Priorité
+            </label>
+            <div className="mt-2 flex space-x-6">
+              {prioriteOptions.map(({ value, label }) => (
+                <label key={value} className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name="priorite"
+                    value={value}
+                    checked={formData.priorite === value}
+                    onChange={handleChange}
+                    required
+                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* État */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              État
+            </label>
+            <div className="mt-2 flex space-x-6">
+              {etatOptions.map(({ value, label }) => (
+                <label key={value} className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name="etat"
+                    value={value}
+                    checked={formData.etat === value}
+                    onChange={handleChange}
+                    required
+                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Description détaillée de la panne
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={5}
+              required
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500"
+            />
+          </div>
+
+          {/* Pièces jointes */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Pièces jointes
+            </label>
+            <div className="relative mt-1 flex items-center justify-center rounded-md border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10">
+              <input
+                type="file"
+                name="pieceJointe"
+                onChange={handleChange}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+              <span className="text-gray-600">
+                Cliquez ou déposez un fichier
+              </span>
+            </div>
+            {formData.pieceJointe && (
+              <div className="mt-2">
+                <p className="text-sm text-gray-700">
+                  {formData.pieceJointe.name} —{" "}
+                  {uploadProgress[formData.pieceJointe.name] ?? 0}%
+                </p>
+                <div className="h-1 w-full rounded bg-gray-300">
+                  <div
+                    className="h-1 rounded bg-blue-600"
+                    style={{
+                      width: `${
+                        uploadProgress[formData.pieceJointe.name] || 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Échéance */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Échéance de réparation
+            </label>
+            <input
+              type="date"
+              name="echeance"
+              value={formData.echeance}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500"
+            />
+          </div>
+
+          {/* Submit */}
           <div className="text-center">
             <button
               type="submit"
-              className="rounded-md bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
+              className="rounded-md bg-blue-600 px-6 py-3 text-white hover:bg-blue-700"
             >
               Envoyer
             </button>
