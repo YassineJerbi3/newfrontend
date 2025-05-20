@@ -9,8 +9,8 @@ interface Emplacement {
 
 interface Equipement {
   id: string;
-  designation: string;
-  fabricant: string;
+  familleMI: string;
+  equipmentType: string;
   numeroSerie: string;
 }
 
@@ -29,6 +29,7 @@ export default function DemandeInterventionForm() {
     fonction: "",
     direction: "",
     emplacementId: "",
+    typeObjet: "", // ← on envoie le type d’équipement ici
     equipementId: "",
     priorite: "",
     etat: "",
@@ -51,9 +52,15 @@ export default function DemandeInterventionForm() {
   ];
 
   const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
-  const [equipements, setEquipements] = useState<Equipement[]>([]);
+  const [allEquipements, setAllEquipements] = useState<Equipement[]>([]);
+  const [equipmentTypes, setEquipmentTypes] = useState<string[]>([]);
+  const [filteredEquipements, setFilteredEquipements] = useState<Equipement[]>(
+    [],
+  );
+  const [selectedEquipement, setSelectedEquipement] =
+    useState<Equipement | null>(null);
 
-  // 1) user
+  // 1) charger user courant
   useEffect(() => {
     fetch("http://localhost:2000/users/me", { credentials: "include" })
       .then((r) => r.json())
@@ -69,7 +76,7 @@ export default function DemandeInterventionForm() {
       .catch(console.error);
   }, []);
 
-  // 2) emplacements
+  // 2) charger emplacements
   useEffect(() => {
     fetch("http://localhost:2000/emplacements", { credentials: "include" })
       .then((r) => r.json())
@@ -77,10 +84,14 @@ export default function DemandeInterventionForm() {
       .catch(console.error);
   }, []);
 
-  // 3) equipements filtrés
+  // 3) charger tous les équipements de l’emplacement sélectionné
   useEffect(() => {
     if (!formData.emplacementId) {
-      setEquipements([]);
+      setAllEquipements([]);
+      setEquipmentTypes([]);
+      setFormData((f) => ({ ...f, typeObjet: "", equipementId: "" }));
+      setFilteredEquipements([]);
+      setSelectedEquipement(null);
       return;
     }
     fetch(
@@ -89,19 +100,46 @@ export default function DemandeInterventionForm() {
     )
       .then((r) => r.json())
       .then((data) => {
-        const list = Array.isArray(data) ? data : data.items;
-        setEquipements(list);
+        const list: Equipement[] = Array.isArray(data) ? data : data.items;
+        setAllEquipements(list);
+        // extraire les types
+        const types = Array.from(new Set(list.map((eq) => eq.equipmentType)));
+        setEquipmentTypes(types);
+        // réinitialiser sélection
+        setFormData((f) => ({
+          ...f,
+          typeObjet: "",
+          equipementId: "",
+        }));
+        setFilteredEquipements([]);
+        setSelectedEquipement(null);
       })
       .catch(console.error);
   }, [formData.emplacementId]);
 
-  // simulate upload
+  // 4) filtrer les équipements quand on choisit un type
+  useEffect(() => {
+    if (!formData.typeObjet) {
+      setFilteredEquipements([]);
+      setFormData((f) => ({ ...f, equipementId: "" }));
+      setSelectedEquipement(null);
+      return;
+    }
+    const filtered = allEquipements.filter(
+      (eq) => eq.equipmentType === formData.typeObjet,
+    );
+    setFilteredEquipements(filtered);
+    setFormData((f) => ({ ...f, equipementId: "" }));
+    setSelectedEquipement(null);
+  }, [formData.typeObjet, allEquipements]);
+
+  // simuler upload
   const simulateUpload = (file: File) => {
     let prog = 0;
     const iv = setInterval(() => {
       prog = Math.min(100, prog + Math.floor(Math.random() * 10) + 5);
       setUploadProgress((p) => ({ ...p, [file.name]: prog }));
-      if (prog === 100) clearInterval(iv);
+      if (prog >= 100) clearInterval(iv);
     }, 300);
   };
 
@@ -111,13 +149,21 @@ export default function DemandeInterventionForm() {
     >,
   ) => {
     const { name, value, files } = e.target as any;
+
     if (name === "pieceJointe" && files?.[0]) {
       const f: File = files[0];
       simulateUpload(f);
       setFormData((f) => ({ ...f, pieceJointe: f }));
-    } else {
-      setFormData((f) => ({ ...f, [name]: value }));
+      return;
     }
+
+    // sélectionner un équipement complet
+    if (name === "equipementId") {
+      const eq = filteredEquipements.find((e) => e.id === value) || null;
+      setSelectedEquipement(eq);
+    }
+
+    setFormData((f) => ({ ...f, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -126,27 +172,28 @@ export default function DemandeInterventionForm() {
     Object.entries(formData).forEach(([k, v]) => {
       if (v != null) payload.append(k, v as any);
     });
-
     fetch("http://localhost:2000/incidents", {
       method: "POST",
       credentials: "include",
       body: payload,
     })
       .then(() => {
-        setFormData({
-          nom: formData.nom,
-          prenom: formData.prenom,
-          fonction: formData.fonction,
-          direction: formData.direction,
+        setFormData((f) => ({
+          nom: f.nom,
+          prenom: f.prenom,
+          fonction: f.fonction,
+          direction: f.direction,
           emplacementId: "",
+          typeObjet: "",
           equipementId: "",
           priorite: "",
           etat: "",
           description: "",
           pieceJointe: null,
           echeance: "",
-        });
+        }));
         setUploadProgress({});
+        setSelectedEquipement(null);
       })
       .catch(console.error);
   };
@@ -155,7 +202,7 @@ export default function DemandeInterventionForm() {
     <DefaultLayout>
       <div className="mx-auto max-w-3xl p-6">
         <h1 className="mb-8 text-center text-3xl font-bold">
-          Demande d'Intervention
+          Demande d’Intervention
         </h1>
         <form
           onSubmit={handleSubmit}
@@ -179,48 +226,84 @@ export default function DemandeInterventionForm() {
             ))}
           </div>
 
-          {/* Sélection Emplacement / Équipement */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold uppercase text-gray-900">
-                Emplacement
-              </label>
-              <select
-                name="emplacementId"
-                value={formData.emplacementId}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
-              >
-                <option value="">— Choisir —</option>
-                {emplacements.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nom}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-bold uppercase text-gray-900">
-                Équipement
-              </label>
-              <select
-                name="equipementId"
-                value={formData.equipementId}
-                onChange={handleChange}
-                required
-                disabled={!formData.emplacementId}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
-              >
-                <option value="">— Choisir —</option>
-                {equipements.map((eq) => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.designation}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Emplacement */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Emplacement
+            </label>
+            <select
+              name="emplacementId"
+              value={formData.emplacementId}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
+            >
+              <option value="">— Choisir —</option>
+              {emplacements.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nom}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Type d’équipement → envoyé vers typeObjet */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Type d’équipement
+            </label>
+            <select
+              name="typeObjet"
+              value={formData.typeObjet}
+              onChange={handleChange}
+              disabled={!equipmentTypes.length}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
+            >
+              <option value="">— Choisir —</option>
+              {equipmentTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Famille MI de l’équipement */}
+          <div>
+            <label className="block text-sm font-bold uppercase text-gray-900">
+              Famille MI de l’équipement
+            </label>
+            <select
+              name="equipementId"
+              value={formData.equipementId}
+              onChange={handleChange}
+              disabled={!formData.typeObjet}
+              required
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm"
+            >
+              <option value="">— Choisir —</option>
+              {filteredEquipements.map((eq) => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.familleMI}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* N° de série (lecture seule) */}
+          {selectedEquipement && (
+            <div>
+              <label className="block text-sm font-bold uppercase text-gray-900">
+                N° de série de l’équipement
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={selectedEquipement.numeroSerie}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-2 shadow-sm"
+              />
+            </div>
+          )}
 
           {/* Priorité */}
           <div>
