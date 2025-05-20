@@ -34,7 +34,7 @@ export default function DemandeInterventionForm() {
     priorite: "",
     etat: "",
     description: "",
-    pieceJointe: null as File | null,
+    pieceJointe: [] as File[], // plusieurs fichiers
     echeance: "",
   });
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
@@ -103,15 +103,9 @@ export default function DemandeInterventionForm() {
       .then((data) => {
         const list: Equipement[] = Array.isArray(data) ? data : data.items;
         setAllEquipements(list);
-        // extraire les types
         const types = Array.from(new Set(list.map((eq) => eq.equipmentType)));
         setEquipmentTypes(types);
-        // réinitialiser sélection
-        setFormData((f) => ({
-          ...f,
-          typeObject: "",
-          equipementId: "",
-        }));
+        setFormData((f) => ({ ...f, typeObject: "", equipementId: "" }));
         setFilteredEquipements([]);
         setSelectedEquipement(null);
       })
@@ -134,7 +128,7 @@ export default function DemandeInterventionForm() {
     setSelectedEquipement(null);
   }, [formData.typeObject, allEquipements]);
 
-  // simuler upload
+  // simuler upload progress
   const simulateUpload = (file: File) => {
     let prog = 0;
     const iv = setInterval(() => {
@@ -151,17 +145,16 @@ export default function DemandeInterventionForm() {
   ) => {
     const { name, value, files } = e.target as any;
 
-    if (name === "pieceJointe" && files?.[0]) {
-      const f: File = files[0];
-      simulateUpload(f);
-      setFormData((f) => ({ ...f, pieceJointe: f }));
+    // 1) pièces‑jointes multiples
+    if (name === "pieceJointe" && files) {
+      const filesArray = Array.from(files) as File[];
+      filesArray.forEach(simulateUpload);
+      setFormData((f) => ({ ...f, pieceJointe: filesArray }));
       return;
     }
-    // Si on change le type d'équipement…
+
+    // 2) type d’équipement
     if (name === "typeObject") {
-      // 1) on met à jour formData.typeObject
-      // 2) on vide equipementId + selectedEquipement
-      // 3) on filtre les équipements disponibles
       const filtered = allEquipements.filter(
         (eq) => eq.equipmentType === value,
       );
@@ -175,27 +168,28 @@ export default function DemandeInterventionForm() {
       return;
     }
 
-    // sélectionner un équipement complet
+    // 3) sélection d’équipement
     if (name === "equipementId") {
       const eq = filteredEquipements.find((e) => e.id === value) || null;
       setSelectedEquipement(eq);
     }
 
+    // 4) reset erreur échéance
     if (name === "echeance") {
       setEcheanceError("");
     }
 
+    // 5) tous les autres champs
     setFormData((f) => ({ ...f, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation de la date d’échéance en fonction de la priorité
+    // validation échéance selon priorité
     const today = new Date();
     const echeanceDate = new Date(formData.echeance);
     let minDays = 0;
-
     switch (formData.priorite) {
       case "URGENT":
         minDays = 2;
@@ -206,35 +200,41 @@ export default function DemandeInterventionForm() {
       case "BASSE":
         minDays = 7;
         break;
-      default:
-        break;
     }
-
     const minDate = new Date(today);
     minDate.setDate(today.getDate() + minDays);
 
-    if (formData.echeance === "") {
+    if (!formData.echeance) {
       setEcheanceError("Ce champ est obligatoire.");
       return;
     }
-
     if (echeanceDate < minDate) {
       setEcheanceError(
-        `La date d’échéance doit être au minimum ${minDays} jour(s) après aujourd’hui pour une priorité « ${formData.priorite.toLowerCase()} ».`,
+        `La date d’échéance doit être au minimum ${minDays} jour(s) après aujourd’hui pour une priorité “${formData.priorite.toLowerCase()}”.`,
       );
       return;
     }
 
+    // construction de la FormData
     const payload = new FormData();
-    Object.entries(formData).forEach(([k, v]) => {
-      if (v != null) payload.append(k, v as any);
+    payload.append("equipementId", formData.equipementId);
+    payload.append("priorite", formData.priorite);
+    payload.append("description", formData.description);
+    payload.append("typeObject", formData.typeObject);
+    payload.append("etat", formData.etat);
+    payload.append("echeance", formData.echeance);
+    formData.pieceJointe.forEach((file) => {
+      payload.append("pieceJointe", file);
     });
+
+    // envoi
     fetch("http://localhost:2000/incidents", {
       method: "POST",
       credentials: "include",
       body: payload,
     })
       .then(() => {
+        // reset form
         setFormData((f) => ({
           nom: f.nom,
           prenom: f.prenom,
@@ -246,7 +246,7 @@ export default function DemandeInterventionForm() {
           priorite: "",
           etat: "",
           description: "",
-          pieceJointe: null,
+          pieceJointe: [],
           echeance: "",
         }));
         setUploadProgress({});
@@ -255,7 +255,6 @@ export default function DemandeInterventionForm() {
       })
       .catch(console.error);
   };
-
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-6xl p-8">
@@ -453,9 +452,11 @@ export default function DemandeInterventionForm() {
                 <input
                   type="file"
                   name="pieceJointe"
+                  multiple
                   onChange={handleChange}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 />
+
                 <p className="text-gray-500">
                   Cliquez ou glissez un fichier ici
                 </p>
