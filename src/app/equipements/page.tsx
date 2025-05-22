@@ -448,36 +448,6 @@ export default function TableEquipementsPage() {
           max-w-2xl overflow-y-auto
         "
               >
-                {/* Confirmation interne */}
-                {pendingDelete && (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30">
-                    <div className="rounded-xl bg-white p-6 text-center shadow-lg ring-1 ring-gray-200">
-                      <h3 className="mb-3 flex items-center justify-center gap-2 text-lg font-bold text-red-800">
-                        <Trash2 size={20} /> Confirmer la suppression
-                      </h3>
-                      <p className="mb-5 text-sm text-gray-700">
-                        Supprimer la maintenance « {pendingDelete.type} » ?
-                      </p>
-                      <div className="flex justify-center gap-4">
-                        <button
-                          onClick={() => setPendingDelete(null)}
-                          className="rounded-lg border border-gray-300 px-5 py-2 text-sm hover:bg-gray-100"
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          onClick={() =>
-                            deleteMaintenanceConfirmed(pendingDelete.id)
-                          }
-                          className="rounded-lg bg-red-800 px-5 py-2 text-sm font-semibold text-white hover:bg-red-900"
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Carte */}
                 <div className="relative overflow-hidden rounded-xl bg-white shadow-2xl">
                   {/* En-tête */}
@@ -799,6 +769,35 @@ export default function TableEquipementsPage() {
                         })}
                       </ul>
                     </section>
+                    {/* Confirmation interne */}
+                    {pendingDelete && (
+                      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30">
+                        <div className="rounded-xl bg-white p-6 text-center shadow-lg ring-1 ring-gray-200">
+                          <h3 className="mb-3 flex items-center justify-center gap-2 text-lg font-bold text-red-800">
+                            <Trash2 size={20} /> Confirmer la suppression
+                          </h3>
+                          <p className="mb-5 text-sm text-gray-700">
+                            Supprimer la maintenance « {pendingDelete.type} » ?
+                          </p>
+                          <div className="flex justify-center gap-4">
+                            <button
+                              onClick={() => setPendingDelete(null)}
+                              className="rounded-lg border border-gray-300 px-5 py-2 text-sm hover:bg-gray-100"
+                            >
+                              Annuler
+                            </button>
+                            <button
+                              onClick={() =>
+                                deleteMaintenanceConfirmed(pendingDelete.id)
+                              }
+                              className="rounded-lg bg-red-800 px-5 py-2 text-sm font-semibold text-white hover:bg-red-900"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Footer */}
                     <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
