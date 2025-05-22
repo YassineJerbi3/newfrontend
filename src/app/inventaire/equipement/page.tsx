@@ -29,7 +29,7 @@ const EquipmentType = {
   ECRAN_INTERACTIF: "ECRAN INTERACTIF",
   UNITE_CENTRALE: "UNITE CENTRALE",
   SERVEUR: "SERVEUR",
-  CAMERA_DE_SURVEILLANCE: "CAMERA_DE_SURVEILLANCE",
+  CAMERA_DE_SURVEILLANCE: "CAMERA DE SURVEILLANCE",
   TV: "TV",
 } as const;
 
@@ -262,240 +262,265 @@ export default function AddEquipementPage() {
 
   return (
     <DefaultLayout>
-      <div className="mx-auto max-w-xl rounded bg-white p-6 shadow-lg">
-        <h1 className="mb-4 text-xl font-bold">Ajouter Nouvel Équipement</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Champs texte */}
-          {[
-            { label: "Famille MI", name: "familleMI" },
-            { label: "Désignation", name: "designation" },
-            { label: "Code", name: "code" },
-            { label: "Numéro de série", name: "numeroSerie" },
-            { label: "Code inventaire", name: "codeInventaire" },
-          ].map(({ label, name }) => (
-            <label className="block" key={name}>
-              {label}
-              <input
-                name={name}
-                type="text"
-                value={(formData as any)[name]}
-                onChange={handleChange}
-                required
-                className="w-full rounded border p-2"
-              />
-            </label>
-          ))}
+      <div className="mx-auto max-w-2xl space-y-12 p-8">
+        {/* Titre principal */}
+        <h1 className="text-center text-4xl font-extrabold text-gray-900">
+          Détails du Nouvel Équipement
+        </h1>
 
-          {/* Filtre BUREAU / CLASSE */}
-          <div className="space-y-2 border-t pt-4">
-            <span className="block font-medium">Type d’emplacement</span>
-            <div className="flex items-center space-x-4">
-              {["", "BUREAU", "CLASSE"].map((val) => (
-                <label key={val} className="inline-flex items-center">
+        <form onSubmit={handleSubmit} className="space-y-12">
+          {/* ==== Informations de base ==== */}
+          <section className="grid grid-cols-1 gap-6 rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm sm:grid-cols-2">
+            <h2 className="col-span-full mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
+              Informations de base
+            </h2>
+            {[
+              { icon: "📦", label: "Famille MI", name: "familleMI" },
+              { icon: "🏷️", label: "Désignation", name: "designation" },
+              { icon: "🔢", label: "Code", name: "code" },
+              { icon: "🔖", label: "N° Série", name: "numeroSerie" },
+              { icon: "💼", label: "Code Inventaire", name: "codeInventaire" },
+            ].map(({ icon, label, name }) => (
+              <div
+                key={name}
+                className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+              >
+                <span className="text-2xl">{icon}</span>
+                <div className="flex-1">
+                  <label htmlFor={name} className="sr-only">
+                    {label}
+                  </label>
                   <input
-                    type="radio"
-                    name="filterType"
-                    value={val}
-                    checked={filterType === val}
-                    onChange={() => setFilterType(val as any)}
-                    className="mr-1"
+                    id={name}
+                    name={name}
+                    type="text"
+                    value={(formData as any)[name]}
+                    onChange={handleChange}
+                    required
+                    placeholder={label}
+                    className="w-full border-0 bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none"
                   />
-                  {val === "" ? "Tous" : val}
-                </label>
-              ))}
-            </div>
-            <label className="block">
-              Choisir un emplacement
-              <div className="max-h-48 overflow-y-auto rounded border">
-                <select
-                  name="emplacementId"
-                  value={formData.emplacementId}
-                  onChange={handleChange}
-                  size={6}
-                  className="w-full bg-white"
-                  required
-                >
-                  <option value="" disabled>
-                    — Sélectionnez un emplacement —
-                  </option>
-                  {Object.entries(grouped).map(([letter, list]) => (
-                    <optgroup
-                      key={letter}
-                      label={letter}
-                      className="bg-gray-100"
-                    >
-                      {list.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.nom}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-            </label>
-          </div>
-
-          {/* Utilisateur */}
-          {filterType === "BUREAU" ? (
-            <label className="block">
-              Utilisateur (réel)
-              <select
-                name="userId"
-                value={formData.userId}
-                onChange={handleChange}
-                className="w-full rounded border p-2"
-                required
-              >
-                <option value="">Sélectionnez un utilisateur</option>
-                {bureauUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nom} {u.prenom}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <label className="block">
-              Utilisateur (type)
-              <select
-                name="utilisateur"
-                value={formData.utilisateur}
-                onChange={handleChange}
-                className="w-full rounded border p-2"
-                required
-              >
-                {Object.values(UtilisateurType).map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {/* Type de l’équipement (après utilisateur) */}
-          <label className="block">
-            Type de l’équipement
-            <select
-              name="equipmentType"
-              value={formData.equipmentType}
-              onChange={handleChange}
-              className="w-full rounded border p-2"
-              required
-            >
-              {Object.values(EquipmentType).map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* Sélecteur Poste : uniquement pour ECRAN ou UNITE_CENTRALE */}
-          {(formData.equipmentType === EquipmentType.ECRAN ||
-            formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
-            formData.emplacementId && (
-              <label className="block">
-                Poste (optionnel)
-                <select
-                  name="posteId"
-                  value={formData.posteId}
-                  onChange={handleChange}
-                  className="w-full rounded border p-2"
-                >
-                  <option value="">Aucun poste</option>
-                  {postesDispo.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.numero === null
-                        ? "Poste Enseignant"
-                        : `Poste ${p.numero}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-          {/* État */}
-          <label className="block">
-            État
-            <select
-              name="etat"
-              value={formData.etat}
-              onChange={handleChange}
-              className="w-full rounded border p-2"
-              required
-            >
-              {Object.values(EquipementEtat).map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* Date mise en service */}
-          <label className="block">
-            Date de mise en service
-            <input
-              name="dateMiseService"
-              type="date"
-              value={formData.dateMiseService}
-              onChange={handleChange}
-              required
-              className="w-full rounded border p-2"
-            />
-          </label>
-
-          {/* Maintenance */}
-          <div className="space-y-2 border-t pt-4">
-            <h2 className="text-lg font-semibold">Maintenance Préventive</h2>
-            {formData.maintenanceRecords.map((m, i) => (
-              <div key={i} className="flex gap-2">
-                <select
-                  name="type"
-                  value={m.type}
-                  onChange={(e) => handleMaintenanceChange(i, e)}
-                  className="flex-1 rounded border p-2"
-                  required
-                >
-                  {Object.values(MaintenanceType).map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  name="description"
-                  value={m.description}
-                  onChange={(e) => handleMaintenanceChange(i, e)}
-                  placeholder="Description"
-                  className="flex-2 rounded border p-2"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => removeMaintenanceRow(i)}
-                  className="text-red-600"
-                >
-                  ×
-                </button>
+                </div>
               </div>
             ))}
-            <button
-              type="button"
-              onClick={addMaintenanceRow}
-              className="text-blue-600"
-            >
-              + Ajouter maintenance
-            </button>
-          </div>
+          </section>
 
-          {error && <div className="text-red-600">{error}</div>}
+          {/* ==== Emplacement & Utilisateur ==== */}
+          <section className="rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm">
+            <h2 className="mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
+              Emplacement & Utilisateur
+            </h2>
 
+            {/* Filtre */}
+            <div className="mb-6 flex gap-4">
+              {["Tous", "BUREAU", "CLASSE"].map((val) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() =>
+                    setFilterType(val === "Tous" ? "" : (val as any))
+                  }
+                  className={`flex-1 rounded-full py-2 font-medium transition ${
+                    (filterType === "" && val === "Tous") || filterType === val
+                      ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow"
+                      : "bg-white text-gray-700 hover:bg-blue-50"
+                  }`}
+                >
+                  {val}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {[
+                {
+                  name: "emplacementId",
+                  label: "Emplacement",
+                  icon: "📍",
+                  options: Object.entries(grouped).flatMap(([_, list]) =>
+                    list.map((e) => ({ value: e.id, label: e.nom })),
+                  ),
+                },
+                {
+                  name: filterType === "BUREAU" ? "userId" : "utilisateur",
+                  label:
+                    filterType === "BUREAU"
+                      ? "Utilisateur réel"
+                      : "Type d’utilisateur",
+                  icon: "👤",
+                  options:
+                    filterType === "BUREAU"
+                      ? bureauUsers.map((u) => ({
+                          value: u.id,
+                          label: `${u.nom} ${u.prenom}`,
+                        }))
+                      : Object.values(UtilisateurType).map((v) => ({
+                          value: v,
+                          label: v,
+                        })),
+                },
+              ].map(({ name, label, icon, options }) => (
+                <div
+                  key={name}
+                  className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                >
+                  <span className="text-2xl">{icon}</span>
+                  <select
+                    name={name}
+                    value={(formData as any)[name]}
+                    onChange={handleChange}
+                    required
+                    className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+                  >
+                    <option value="">{label}</option>
+                    {options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ==== Détails Équipement ==== */}
+          <section className="rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm">
+            <h2 className="mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
+              Détails Équipement
+            </h2>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {[
+                {
+                  name: "equipmentType",
+                  label: "Type d’équipement",
+                  icon: "🖥️",
+                  opts: Object.values(EquipmentType),
+                },
+                {
+                  name: "etat",
+                  label: "État",
+                  icon: "🔧",
+                  opts: Object.values(EquipementEtat),
+                },
+              ].map(({ name, label, icon, opts }) => (
+                <div
+                  key={name}
+                  className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                >
+                  <span className="text-2xl">{icon}</span>
+                  <select
+                    name={name}
+                    value={(formData as any)[name]}
+                    onChange={handleChange}
+                    required
+                    className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+                  >
+                    <option value="">{label}</option>
+                    {opts.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+
+              {/* Date mise en service */}
+              <div className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md">
+                <span className="text-2xl">📅</span>
+                <input
+                  name="dateMiseService"
+                  type="date"
+                  value={formData.dateMiseService}
+                  onChange={handleChange}
+                  required
+                  className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Poste (optionnel) */}
+            {(formData.equipmentType === EquipmentType.ECRAN ||
+              formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
+              formData.emplacementId && (
+                <div className="relative mt-6 flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md">
+                  <span className="text-2xl">💻</span>
+                  <select
+                    name="posteId"
+                    value={formData.posteId}
+                    onChange={handleChange}
+                    className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+                  >
+                    <option value="">Aucun poste</option>
+                    {postesDispo.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.numero == null
+                          ? "Poste Enseignant"
+                          : `Poste ${p.numero}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+          </section>
+
+          {/* ==== Maintenance Préventive ==== */}
+          <section className="rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm">
+            <h2 className="mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
+              Maintenance Préventive
+            </h2>
+            <div className="space-y-4">
+              {formData.maintenanceRecords.map((m, i) => (
+                <div key={i} className="flex gap-4">
+                  <select
+                    name="type"
+                    value={m.type}
+                    onChange={(e) => handleMaintenanceChange(i, e)}
+                    className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                    required
+                  >
+                    {Object.values(MaintenanceType).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    name="description"
+                    value={m.description}
+                    onChange={(e) => handleMaintenanceChange(i, e)}
+                    placeholder="Description"
+                    className="flex-2 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeMaintenanceRow(i)}
+                    className="mt-2 text-2xl text-red-500 transition hover:text-red-700"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addMaintenanceRow}
+                className="mt-4 inline-block font-medium text-blue-600 hover:text-blue-800"
+              >
+                + Ajouter maintenance
+              </button>
+            </div>
+          </section>
+
+          {/* Message d’erreur */}
+          {error && <div className="text-center text-red-600">{error}</div>}
+
+          {/* ==== Bouton final ==== */}
           <button
             type="submit"
-            className="w-full rounded bg-blue-600 p-2 text-white hover:bg-blue-700"
+            className="mx-auto block rounded-full bg-gradient-to-r from-blue-600 to-blue-800 px-12 py-4 text-2xl font-bold text-white shadow-2xl transition hover:from-blue-700 hover:to-blue-900"
           >
             Ajouter l’équipement
           </button>

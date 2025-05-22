@@ -4,7 +4,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { Edit2, Trash2 } from "lucide-react";
-
+import {
+  Tag,
+  FileText,
+  Hash,
+  Calendar,
+  MapPin,
+  User,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 interface Emplacement {
   id: string;
   nom: string;
@@ -386,318 +395,440 @@ export default function TableEquipementsPage() {
           </table>
         </div>
 
-        {/* Modal */}
         {showModal && selectedEquip && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
-              <h2 className="mb-4 text-xl font-bold text-blue-700">
-                Détails de l’équipement
-              </h2>
+          <>
+            {/* CSS inline */}
+            <style jsx>{`
+              @keyframes scaleIn {
+                from {
+                  opacity: 0;
+                  transform: scale(0.95);
+                }
+                to {
+                  opacity: 1;
+                  transform: scale(1);
+                }
+              }
+              .animate-scaleIn {
+                animation: scaleIn 0.2s ease-out forwards;
+              }
+              /* Scroll moderne */
+              .scrollbar-thin {
+                scrollbar-width: thin;
+              }
+              .scrollbar-thumb {
+                scrollbar-color: #cbd5e0 transparent;
+              }
+              .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+              }
+              .scrollbar-thin::-webkit-scrollbar-track {
+                background: transparent;
+              }
+              .scrollbar-thin::-webkit-scrollbar-thumb {
+                background-color: #cbd5e0;
+                border-radius: 3px;
+              }
+            `}</style>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* readonly */}
-                {[
-                  ["Famille MI", selectedEquip.familleMI],
-                  ["Désignation", selectedEquip.designation],
-                  ["Code", selectedEquip.code],
-                  ["N° de série", selectedEquip.numeroSerie],
-                  ["Code inv.", selectedEquip.codeInventaire],
-                  ["Date service", selectedEquip.dateMiseService],
-                ].map(([label, val]) => (
-                  <div key={label} className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-600">
-                      {label}
-                    </span>
-                    <input
-                      readOnly
-                      value={val}
-                      className="mt-1 w-full rounded border bg-gray-100 p-2 text-sm"
-                    />
+            {/* Overlay */}
+            <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
+
+            {/* Modal container */}
+            <div
+              className="
+        fixed inset-[90px_0_0_350px] z-50 flex 
+        items-center justify-center p-4
+      "
+            >
+              <div
+                className="
+          animate-scaleIn scrollbar-thin scrollbar-thumb relative
+          max-h-[80vh] w-full
+          max-w-2xl overflow-y-auto
+        "
+              >
+                {/* Confirmation interne */}
+                {pendingDelete && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30">
+                    <div className="rounded-xl bg-white p-6 text-center shadow-lg ring-1 ring-gray-200">
+                      <h3 className="mb-3 flex items-center justify-center gap-2 text-lg font-bold text-red-800">
+                        <Trash2 size={20} /> Confirmer la suppression
+                      </h3>
+                      <p className="mb-5 text-sm text-gray-700">
+                        Supprimer la maintenance « {pendingDelete.type} » ?
+                      </p>
+                      <div className="flex justify-center gap-4">
+                        <button
+                          onClick={() => setPendingDelete(null)}
+                          className="rounded-lg border border-gray-300 px-5 py-2 text-sm hover:bg-gray-100"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={() =>
+                            deleteMaintenanceConfirmed(pendingDelete.id)
+                          }
+                          className="rounded-lg bg-red-800 px-5 py-2 text-sm font-semibold text-white hover:bg-red-900"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                )}
 
-                {/* UTILISATEUR */}
-                <div className="col-span-2 flex flex-col">
-                  <span className="text-sm font-medium text-gray-600">
-                    Utilisateur *
-                  </span>
-
-                  {selectedEquip.emplacement?.type === "BUREAU" ? (
-                    <select
-                      value={selectedEquip.user?.id || ""}
-                      onChange={(e) => {
-                        const u =
-                          bureauUsers.find((u) => u.id === e.target.value) ||
-                          null;
-                        setSelectedEquip({ ...selectedEquip, user: u });
-                      }}
-                      className="mt-1 rounded border p-2 text-sm"
+                {/* Carte */}
+                <div className="relative overflow-hidden rounded-xl bg-white shadow-2xl">
+                  {/* En-tête */}
+                  <div className="flex items-center justify-between bg-blue-600 px-6 py-4">
+                    <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
+                      <FileText size={20} /> Détails équipement
+                    </h2>
+                    <button
+                      onClick={() => setShowModal(false)}
+                      aria-label="Fermer"
+                      className="text-white hover:opacity-80 focus:outline-none"
                     >
-                      <option value="">Sélectionner un utilisateur</option>
-                      {bureauUsers.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.nom} {u.prenom}
-                        </option>
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Corps défilable si besoin */}
+                  <div className="space-y-8 p-6">
+                    {/* Grille des champs */}
+                    <section className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                      {(
+                        [
+                          // eslint-disable-next-line react/jsx-key
+                          [<Tag />, "Famille MI", selectedEquip.familleMI],
+                          [
+                            // eslint-disable-next-line react/jsx-key
+                            <FileText />,
+                            "Désignation",
+                            selectedEquip.designation,
+                          ],
+                          // eslint-disable-next-line react/jsx-key
+                          [<Hash />, "Code", selectedEquip.code],
+                          // eslint-disable-next-line react/jsx-key
+                          [<Hash />, "N° de série", selectedEquip.numeroSerie],
+                          // eslint-disable-next-line react/jsx-key
+                          [<Hash />, "Code inv.", selectedEquip.codeInventaire],
+                          [
+                            // eslint-disable-next-line react/jsx-key
+                            <Calendar />,
+                            "Date service",
+                            selectedEquip.dateMiseService,
+                          ],
+                        ] as const
+                      ).map(([IconEl, label, val], i) => (
+                        <div key={i} className="relative flex flex-col">
+                          <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                            {IconEl} {label}
+                          </label>
+                          <div className="relative">
+                            <input
+                              readOnly
+                              value={val}
+                              className="
+                        w-full rounded-md border border-gray-300 bg-gray-100
+                        py-2 pl-10 pr-4 text-sm shadow-inner
+                        focus:outline-none focus:ring-2 focus:ring-blue-200
+                      "
+                            />
+                            <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                              {IconEl}
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </select>
-                  ) : (
-                    <select
-                      value={selectedEquip.utilisateur || ""}
-                      onChange={(e) =>
-                        setSelectedEquip({
-                          ...selectedEquip,
-                          utilisateur: e.target.value,
-                        })
-                      }
-                      className="mt-1 rounded border p-2 text-sm"
-                    >
-                      <option value="ENSEIGNANT">ENSEIGNANT</option>
-                      <option value="ETUDIANT">ETUDIANT</option>
-                    </select>
-                  )}
-                </div>
 
-                {/* ÉTAT */}
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-600">
-                    État *
-                  </span>
-                  <select
-                    value={selectedEquip.etat}
-                    onChange={(e) =>
-                      setSelectedEquip({
-                        ...selectedEquip,
-                        etat: e.target.value,
-                      })
-                    }
-                    className="mt-1 rounded border p-2 text-sm"
-                  >
-                    <option value="FONCTIONNEL">FONCTIONNEL</option>
-                    <option value="EN_PANNE">EN_PANNE</option>
-                  </select>
-                </div>
-
-                {/* Emplacement */}
-                <div className="col-span-2 flex flex-col">
-                  <span className="text-sm font-medium text-gray-600">
-                    Emplacement *
-                  </span>
-                  <select
-                    value={selectedEquip.emplacement?.id || ""}
-                    onChange={(e) => {
-                      const emp =
-                        emplacements.find((x) => x.id === e.target.value) ||
-                        null;
-                      setSelectedEquip({ ...selectedEquip, emplacement: emp });
-                    }}
-                    className="mt-1 rounded border p-2 text-sm"
-                  >
-                    <option value="">Aucun</option>
-                    {emplacements.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.nom}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* séparation */}
-              <hr className="my-6 border-gray-300" />
-
-              {/* Ajout maintenance préventive */}
-              <div className="mb-4">
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Ajouter une maintenance préventive
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <select
-                    id="newType"
-                    className="rounded border p-2 text-sm"
-                    defaultValue="MENSUELLE"
-                  >
-                    {[
-                      "HEBDOMADAIRE",
-                      "MENSUELLE",
-                      "TRIMESTRIELLE",
-                      "SEMESTRIELLE",
-                      "ANNUELLE",
-                    ].map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    id="newDesc"
-                    placeholder="Description*"
-                    className="flex-1 rounded border p-2 text-sm"
-                  />
-                  <button
-                    onClick={() => {
-                      const type = (
-                        document.getElementById("newType") as HTMLSelectElement
-                      ).value as MaintenanceType;
-                      const desc = (
-                        document.getElementById("newDesc") as HTMLInputElement
-                      ).value;
-                      if (!desc) return alert("Description obligatoire");
-                      addMaintenance({ type, description: desc });
-                      (
-                        document.getElementById("newDesc") as HTMLInputElement
-                      ).value = "";
-                    }}
-                    className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
-                  >
-                    + Ajouter
-                  </button>
-                </div>
-              </div>
-
-              {/* maintenance existante */}
-              <div className="max-h-48 overflow-y-auto">
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Maintenance préventive existante
-                </h3>
-                <ul className="space-y-2">
-                  {selectedEquip.maintenanceRecords.map((rec) => {
-                    const isEd = rec.id === editingId;
-                    return (
-                      <li
-                        key={rec.id}
-                        className="flex items-center space-x-2 text-sm"
-                      >
-                        {isEd ? (
-                          <>
-                            <select
-                              value={editType}
-                              onChange={(e) =>
-                                setEditType(e.target.value as MaintenanceType)
-                              }
-                              className="w-32 rounded border p-1 text-sm"
-                            >
-                              {[
-                                "HEBDOMADAIRE",
-                                "MENSUELLE",
-                                "TRIMESTRIELLE",
-                                "SEMESTRIELLE",
-                                "ANNUELLE",
-                              ].map((t) => (
-                                <option key={t} value={t}>
-                                  {t}
+                      {/* Utilisateur */}
+                      <div className="col-span-full flex flex-col">
+                        <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                          <User size={16} /> Utilisateur *
+                        </label>
+                        <select
+                          value={
+                            selectedEquip.emplacement?.type === "BUREAU"
+                              ? selectedEquip.user?.id || ""
+                              : selectedEquip.utilisateur || ""
+                          }
+                          onChange={(e) => {
+                            if (selectedEquip.emplacement?.type === "BUREAU") {
+                              const u =
+                                bureauUsers.find(
+                                  (u) => u.id === e.target.value,
+                                ) || null;
+                              setSelectedEquip({ ...selectedEquip, user: u });
+                            } else {
+                              setSelectedEquip({
+                                ...selectedEquip,
+                                utilisateur: e.target.value,
+                              });
+                            }
+                          }}
+                          className="rounded-md border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                          {selectedEquip.emplacement?.type === "BUREAU" ? (
+                            <>
+                              <option value="">
+                                Sélectionner un utilisateur
+                              </option>
+                              {bureauUsers.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.nom} {u.prenom}
                                 </option>
                               ))}
-                            </select>
-                            <input
-                              value={editDesc}
-                              onChange={(e) => setEditDesc(e.target.value)}
-                              className="flex-1 rounded border p-2 text-sm"
-                            />
-                            <button
-                              onClick={() => {
-                                updateMaintenance({
-                                  id: rec.id,
-                                  type: editType,
-                                  description: editDesc,
-                                });
-                                setEditingId(null);
-                              }}
-                              className="rounded bg-green-600 px-2 py-1 text-xs text-white"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="rounded border px-2 py-1 text-xs"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="w-32">{rec.type}</span>
-                            <span className="flex-1">{rec.description}</span>
-                            <button
-                              onClick={() => {
-                                setEditingId(rec.id);
-                                setEditType(rec.type);
-                                setEditDesc(rec.description);
-                              }}
-                              className="rounded p-2 hover:bg-blue-100"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => setPendingDelete(rec)}
-                              className="rounded p-2 hover:bg-red-100"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+                            </>
+                          ) : (
+                            <>
+                              <option value="ENSEIGNANT">ENSEIGNANT</option>
+                              <option value="ETUDIANT">ETUDIANT</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
 
-              {/* confirmation suppression maintenance */}
-              {pendingDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                  <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-                    <h3 className="mb-4 text-lg font-bold text-red-600">
-                      Supprimer la maintenance ?
-                    </h3>
-                    <p className="mb-6">
-                      Êtes‑vous sûr de vouloir supprimer la maintenance “
-                      {pendingDelete.type}” ?
-                    </p>
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        onClick={() => setPendingDelete(null)}
-                        className="rounded border px-4 py-2"
-                      >
-                        Annuler
-                      </button>
+                      {/* État */}
+                      <div className="flex flex-col">
+                        <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                          <CheckCircle size={16} /> État *
+                        </label>
+                        <select
+                          value={selectedEquip.etat}
+                          onChange={(e) =>
+                            setSelectedEquip({
+                              ...selectedEquip,
+                              etat: e.target.value,
+                            })
+                          }
+                          className="rounded-md border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                          <option value="FONCTIONNEL">FONCTIONNEL</option>
+                          <option value="EN_PANNE">EN_PANNE</option>
+                        </select>
+                      </div>
+
+                      {/* Emplacement */}
+                      <div className="col-span-full flex flex-col">
+                        <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                          <MapPin size={16} /> Emplacement *
+                        </label>
+                        <select
+                          value={selectedEquip.emplacement?.id || ""}
+                          onChange={(e) => {
+                            const emp =
+                              emplacements.find(
+                                (x) => x.id === e.target.value,
+                              ) || null;
+                            setSelectedEquip({
+                              ...selectedEquip,
+                              emplacement: emp,
+                            });
+                          }}
+                          className="rounded-md border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                          <option value="">Aucun</option>
+                          {emplacements.map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.nom}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </section>
+
+                    <hr className="border-gray-200" />
+
+                    {/* Maintenance préventive */}
+                    <section>
+                      <h3 className="text-md mb-4 flex items-center gap-2 font-medium text-gray-700">
+                        <Edit2 size={16} /> Maintenance préventive
+                      </h3>
+
+                      {/* Ajout */}
+                      <div className="mb-4 flex flex-wrap items-center gap-3">
+                        <select
+                          id="newType"
+                          className="rounded-md border border-gray-300 px-4 py-2 text-sm"
+                          defaultValue="MENSUELLE"
+                        >
+                          {[
+                            "HEBDOMADAIRE",
+                            "MENSUELLE",
+                            "TRIMESTRIELLE",
+                            "SEMESTRIELLE",
+                            "ANNUELLE",
+                          ].map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          id="newDesc"
+                          placeholder="Description*"
+                          className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            const type = (
+                              document.getElementById(
+                                "newType",
+                              ) as HTMLSelectElement
+                            ).value as MaintenanceType;
+                            const desc = (
+                              document.getElementById(
+                                "newDesc",
+                              ) as HTMLInputElement
+                            ).value;
+                            if (!desc) return alert("Description obligatoire");
+                            addMaintenance({ type, description: desc });
+                            (
+                              document.getElementById(
+                                "newDesc",
+                              ) as HTMLInputElement
+                            ).value = "";
+                          }}
+                          className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700"
+                        >
+                          + Ajouter
+                        </button>
+                      </div>
+
+                      {/* Liste avec scroll moderne */}
+                      <ul className="scrollbar-thin scrollbar-thumb max-h-56 space-y-3 overflow-y-auto">
+                        {selectedEquip.maintenanceRecords.map((rec) => {
+                          const isEd = rec.id === editingId;
+                          return (
+                            <li
+                              key={rec.id}
+                              className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                            >
+                              {isEd ? (
+                                <>
+                                  <select
+                                    value={editType}
+                                    onChange={(e) =>
+                                      setEditType(
+                                        e.target.value as MaintenanceType,
+                                      )
+                                    }
+                                    className="w-36 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                  >
+                                    {[
+                                      "HEBDOMADAIRE",
+                                      "MENSUELLE",
+                                      "TRIMESTRIELLE",
+                                      "SEMESTRIELLE",
+                                      "ANNUELLE",
+                                    ].map((t) => (
+                                      <option key={t} value={t}>
+                                        {t}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    value={editDesc}
+                                    onChange={(e) =>
+                                      setEditDesc(e.target.value)
+                                    }
+                                    className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm"
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        updateMaintenance({
+                                          id: rec.id,
+                                          type: editType,
+                                          description: editDesc,
+                                        });
+                                        setEditingId(null);
+                                      }}
+                                      className="rounded-lg bg-green-800 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-green-900"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingId(null)}
+                                      className="rounded-lg border border-gray-300 px-4 py-2 text-xs text-gray-600 hover:bg-gray-100"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-36 text-sm font-medium text-gray-800">
+                                    {rec.type}
+                                  </span>
+                                  <span className="flex-1 text-sm text-gray-600">
+                                    {rec.description}
+                                  </span>
+                                  <div className="ml-auto flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setEditingId(rec.id);
+                                        setEditType(rec.type);
+                                        setEditDesc(rec.description);
+                                      }}
+                                      className="rounded p-1 hover:bg-blue-50"
+                                      aria-label="Modifier"
+                                    >
+                                      <Edit2
+                                        size={18}
+                                        className="text-blue-600"
+                                      />
+                                    </button>
+                                    <button
+                                      onClick={() => setPendingDelete(rec)}
+                                      className="rounded p-1 hover:bg-red-50"
+                                      aria-label="Supprimer"
+                                    >
+                                      <Trash2
+                                        size={18}
+                                        className="text-red-600"
+                                      />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+
+                    {/* Footer */}
+                    <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
                       <button
                         onClick={() =>
-                          deleteMaintenanceConfirmed(pendingDelete.id)
+                          window.confirm("Supprimer cet équipement ?") &&
+                          deleteEquip()
                         }
-                        className="rounded bg-red-600 px-4 py-2 text-white"
+                        className="rounded-lg bg-red-800 px-6 py-2 text-sm font-medium text-white hover:bg-red-900"
                       >
-                        Confirmer
+                        Supprimer
+                      </button>
+                      <button
+                        onClick={saveEquip}
+                        className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      >
+                        Enregistrer
+                      </button>
+                      <button
+                        onClick={() => setShowModal(false)}
+                        className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        Fermer
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* footer */}
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  onClick={() =>
-                    window.confirm("Supprimer cet équipement ?") &&
-                    deleteEquip()
-                  }
-                  className="rounded bg-red-600 px-4 py-2 text-sm text-white"
-                >
-                  Supprimer
-                </button>
-                <button
-                  onClick={saveEquip}
-                  className="rounded bg-blue-600 px-4 py-2 text-sm text-white"
-                >
-                  Enregistrer
-                </button>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="rounded border px-4 py-2 text-sm"
-                >
-                  Fermer
-                </button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </DefaultLayout>

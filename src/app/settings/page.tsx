@@ -195,189 +195,220 @@ export default function SettingsPage() {
 
   return (
     <DefaultLayout>
-      <div className="min-h-screen bg-gray-50 py-10">
-        <div className="mx-auto max-w-xl rounded-2xl bg-white p-8 shadow-lg">
-          <h1 className="mb-6 text-3xl font-extrabold text-gray-800">
-            Paramètres du compte
-          </h1>
+      <div className="min-h-screen bg-gray-50 px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-lg space-y-12">
+          {/* Header */}
+          <div className="text-center">
+            <h1 className="text-4xl font-extrabold text-gray-900">
+              Paramètres du compte
+            </h1>
+            <p className="mt-2 text-gray-600">
+              Gérez votre profil, votre email et votre mot de passe
+            </p>
+          </div>
 
+          {/* Message */}
           {message && (
-            <div className="mb-6 rounded bg-green-100 px-4 py-3 text-green-800">
-              {message}
+            <div className="rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
+              <p className="text-sm text-green-700">{message}</p>
             </div>
           )}
 
-          {/* Profile summary */}
-          <div className="mb-8 border-b pb-6">
-            <div className="text-gray-600">Profil actuel</div>
-            <div className="mt-2 text-xl font-semibold text-gray-900">
-              {data.prenom} {data.nom}
+          {/* Profil actuel */}
+          <section className="rounded-xl bg-white shadow-md">
+            <div className="border-l-4 border-blue-500 p-6">
+              <h2 className="mb-2 text-lg font-semibold text-gray-800">
+                Profil actuel
+              </h2>
+              <p className="text-2xl font-bold text-gray-900">
+                {data.prenom} {data.nom}
+              </p>
+              <p className="text-gray-500">{data.email}</p>
             </div>
-            <div className="text-sm text-gray-500">{data.email}</div>
-          </div>
+          </section>
 
-          {/* Editable fields */}
-          <div className="space-y-6">
-            {(["nom", "prenom"] as (keyof UserData)[]).map((field) => (
-              <EditableField
-                key={field}
-                label={field}
-                value={data[field]}
-                onSave={(val) => saveField(field, val)}
-              />
-            ))}
+          {/* Édition du profil */}
+          <section className="space-y-8">
+            <div className="divide-y divide-gray-100 rounded-xl bg-white shadow-md">
+              {/* Nom & Prénom */}
+              <div className="space-y-6 p-6">
+                {(["nom", "prenom"] as (keyof UserData)[]).map((field) => (
+                  <EditableField
+                    key={field}
+                    label={field.charAt(0).toUpperCase() + field.slice(1)}
+                    value={data[field]}
+                    onSave={(val) => saveField(field, val)}
+                  />
+                ))}
+              </div>
+              {/* Email */}
+              <div className="flex items-center justify-between border-t p-6">
+                <div>
+                  <p className="text-sm font-medium uppercase text-gray-500">
+                    Email
+                  </p>
+                  <p className="mt-1 text-lg text-gray-800">{data.email}</p>
+                </div>
+                <button
+                  onClick={openEmailModal}
+                  className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 font-medium text-white transition hover:opacity-90"
+                >
+                  Modifier
+                </button>
+              </div>
+            </div>
 
-            <ActionRow
-              label="Email"
-              value={data.email}
-              actionLabel="Modifier"
-              onAction={openEmailModal}
-            />
-
-            <div className="border-t pt-4">
-              <div className="mb-2 text-sm uppercase text-gray-500">
-                Mot de passe
+            {/* Mot de passe */}
+            <div className="flex items-center justify-between rounded-xl bg-white p-6 shadow-md">
+              <div>
+                <p className="text-sm font-medium uppercase text-gray-500">
+                  Mot de passe
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Sécurisez votre compte.
+                </p>
               </div>
               <button
                 onClick={openPasswordModal}
-                className="rounded-lg bg-blue-100 px-4 py-1 text-blue-600 hover:bg-blue-200"
+                className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 font-medium text-white transition hover:opacity-90"
               >
-                Changer le mot de passe
+                Changer
               </button>
             </div>
-          </div>
+          </section>
         </div>
+      </div>
 
-        {/* Email Modal */}
-        {showEmailModal && (
-          <Modal
-            title="Changer l’email"
-            onClose={() => setShowEmailModal(false)}
-          >
-            {emailModalMsg && (
-              <div className="mb-2 text-red-600">{emailModalMsg}</div>
-            )}
+      {/* Modals */}
+      {showEmailModal && (
+        <Modal title="Changer l’email" onClose={() => setShowEmailModal(false)}>
+          {emailModalMsg && (
+            <p className="mb-4 text-sm text-red-600">{emailModalMsg}</p>
+          )}
+          <div className="space-y-4">
             <input
               type="email"
               placeholder="Nouvel email"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              className="mb-3 w-full rounded border px-3 py-2"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
             <input
               type="password"
               placeholder="Mot de passe actuel"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mb-4 w-full rounded border px-3 py-2"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
-            <div className="flex justify-end">
+            <div className="flex justify-end space-x-3">
               <button
                 onClick={sendEmailChange}
-                className="mr-2 rounded bg-blue-600 px-4 py-2 text-white"
+                className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2 font-medium text-white transition hover:opacity-90"
               >
                 Confirmer
               </button>
               <button
                 onClick={() => setShowEmailModal(false)}
-                className="rounded bg-gray-300 px-4 py-2"
+                className="rounded-md bg-gray-200 px-5 py-2 transition hover:bg-gray-300"
               >
                 Annuler
               </button>
             </div>
-          </Modal>
-        )}
+          </div>
+        </Modal>
+      )}
 
-        {/* Password Modal */}
-        {showPasswordModal && (
-          <Modal
-            title="Changer le mot de passe"
-            onClose={() => setShowPasswordModal(false)}
-          >
-            {pwModalMsg && (
-              <div className="mb-2 text-red-600">{pwModalMsg}</div>
-            )}
+      {showPasswordModal && (
+        <Modal
+          title="Changer le mot de passe"
+          onClose={() => setShowPasswordModal(false)}
+        >
+          {pwModalMsg && (
+            <p className="mb-4 text-sm text-red-600">{pwModalMsg}</p>
+          )}
 
-            {resetStep === "request" && (
-              <>
-                <p className="mb-4">
-                  Un code de vérification sera envoyé à votre email.
-                </p>
+          {resetStep === "request" && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Un code de vérification sera envoyé à votre email.
+              </p>
+              <button
+                onClick={requestCode}
+                className="w-full rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2 font-medium text-white transition hover:opacity-90"
+              >
+                Envoyer le code
+              </button>
+            </div>
+          )}
+
+          {resetStep === "verify" && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Code envoyé. Expire dans{" "}
+                <span className="font-mono">
+                  {Math.floor(timeLeft / 60)}:
+                  {String(timeLeft % 60).padStart(2, "0")}
+                </span>
+              </p>
+              <input
+                type="text"
+                placeholder="Entrez le code"
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={verifyCode}
+                  className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2 font-medium text-white transition hover:opacity-90"
+                >
+                  Vérifier
+                </button>
                 <button
                   onClick={requestCode}
-                  className="rounded bg-blue-600 px-4 py-2 text-white"
+                  className="rounded-md bg-gray-200 px-5 py-2 transition hover:bg-gray-300"
                 >
-                  Envoyer le code
+                  Renvoyer
                 </button>
-              </>
-            )}
+              </div>
+            </div>
+          )}
 
-            {resetStep === "verify" && (
-              <>
-                <p className="mb-2">
-                  Code envoyé. Expire dans {Math.floor(timeLeft / 60)}:
-                  {String(timeLeft % 60).padStart(2, "0")}
-                </p>
-                <input
-                  type="text"
-                  placeholder="Entrez le code"
-                  value={resetCode}
-                  onChange={(e) => setResetCode(e.target.value)}
-                  className="mb-3 w-full rounded border px-3 py-2"
-                />
-                <div className="flex justify-end">
-                  <button
-                    onClick={verifyCode}
-                    className="mr-2 rounded bg-blue-600 px-4 py-2 text-white"
-                  >
-                    Vérifier
-                  </button>
-                  <button
-                    onClick={requestCode}
-                    className="rounded bg-gray-300 px-4 py-2"
-                  >
-                    Renvoyer le code
-                  </button>
-                </div>
-              </>
-            )}
-
-            {resetStep === "change" && (
-              <>
-                <input
-                  type="password"
-                  placeholder="Nouveau mot de passe"
-                  value={passwords.password}
-                  onChange={(e) =>
-                    setPasswords((ps) => ({ ...ps, password: e.target.value }))
-                  }
-                  className="mb-3 w-full rounded border px-3 py-2"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirmer mot de passe"
-                  value={passwords.confirmPassword}
-                  onChange={(e) =>
-                    setPasswords((ps) => ({
-                      ...ps,
-                      confirmPassword: e.target.value,
-                    }))
-                  }
-                  className="mb-4 w-full rounded border px-3 py-2"
-                />
-                <div className="flex justify-end">
-                  <button
-                    onClick={savePassword}
-                    className="mr-2 rounded bg-blue-600 px-4 py-2 text-white"
-                  >
-                    Sauvegarder
-                  </button>
-                </div>
-              </>
-            )}
-          </Modal>
-        )}
-      </div>
+          {resetStep === "change" && (
+            <div className="space-y-4">
+              <input
+                type="password"
+                placeholder="Nouveau mot de passe"
+                value={passwords.password}
+                onChange={(e) =>
+                  setPasswords((ps) => ({ ...ps, password: e.target.value }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+              <input
+                type="password"
+                placeholder="Confirmer mot de passe"
+                value={passwords.confirmPassword}
+                onChange={(e) =>
+                  setPasswords((ps) => ({
+                    ...ps,
+                    confirmPassword: e.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={savePassword}
+                  className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2 font-medium text-white transition hover:opacity-90"
+                >
+                  Sauvegarder
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </DefaultLayout>
   );
 }
