@@ -233,166 +233,157 @@ export default function TableEquipementsPage() {
           Liste des équipements
         </h1>
 
-        {/* tableau */}
-        <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-          <table className="w-full table-fixed border-collapse text-left">
-            <thead className="bg-blue-100">
-              <tr>
-                {[
-                  "Famille MI",
-                  "Désignation",
-                  "Code",
-                  "N° de série",
-                  "Code inv.",
-                  "Date de mise",
-                  "Emplacement",
-                  "Utilisateur",
-                  "État",
-                ].map((h) => (
-                  <th key={h} className="px-4 py-2">
-                    {h}
-                  </th>
+        {/* Tableau “Dashboard” Ultra-Modern */}
+        <div className="relative overflow-x-auto rounded-2xl bg-white shadow-2xl">
+          {/* Scroll interne */}
+          <div className="scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-transparent max-h-[70vh] overflow-y-auto">
+            <table className="min-w-full table-auto border-separate [border-spacing:0]">
+              <thead>
+                {/* En-tête en gradient plus doux */}
+                <tr className="sticky top-0 z-20 bg-gradient-to-r from-blue-700 to-blue-500 text-white">
+                  {[
+                    "Famille MI",
+                    "Désignation",
+                    "Code",
+                    "N° de série",
+                    "Code inv.",
+                    "Date de mise",
+                    "Emplacement",
+                    "Utilisateur",
+                    "État",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-xs font-semibold uppercase tracking-wider"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+                {/* Filtres Glassmorphism */}
+                <tr className="sticky top-[48px] z-10 bg-white/70 backdrop-blur-sm">
+                  {[
+                    {
+                      name: "familleMI",
+                      type: "select",
+                      opts: [...new Set(equipements.map((e) => e.familleMI))],
+                    },
+                    { name: "designation", type: "input" },
+                    { name: "code", type: "input" },
+                    { name: "numeroSerie", type: "input" },
+                    { name: "codeInventaire", type: "input" },
+                    { name: "dateMiseService", type: "date" },
+                    {
+                      name: "emplacement",
+                      type: "select",
+                      opts: emplacements.map((e) => e.nom),
+                    },
+                    { name: "utilisateur", type: "input" },
+                    {
+                      name: "etat",
+                      type: "select",
+                      opts: [...new Set(equipements.map((e) => e.etat))],
+                    },
+                  ].map((f, i) => (
+                    <th key={i} className="px-4 py-2">
+                      {f.type === "input" ? (
+                        <input
+                          name={f.name}
+                          value={(filters as any)[f.name]}
+                          onChange={handleFilterChange}
+                          placeholder="…"
+                          className="
+                    w-full rounded-lg border border-blue-300 bg-white/80 px-3
+                    py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400
+                  "
+                        />
+                      ) : f.type === "date" ? (
+                        <input
+                          type="date"
+                          name={f.name}
+                          value={(filters as any)[f.name]}
+                          onChange={handleFilterChange}
+                          className="
+                    w-full rounded-lg border border-blue-300 bg-white/80 px-3
+                    py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400
+                  "
+                        />
+                      ) : (
+                        <select
+                          name={f.name}
+                          value={(filters as any)[f.name]}
+                          onChange={handleFilterChange}
+                          className="
+                    w-full rounded-lg border border-blue-300 bg-white/80 px-3
+                    py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400
+                  "
+                        >
+                          <option value="">Tous</option>
+                          {f.opts!.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-blue-100">
+                {filteredData.map((eq, idx) => (
+                  <tr
+                    key={eq.id}
+                    className={`
+              ${idx % 2 === 0 ? "bg-white" : "bg-blue-50"}
+              cursor-pointer transition-colors duration-200 hover:!bg-blue-100
+            `}
+                    onClick={() => openModal(eq.id)}
+                  >
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.familleMI}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.designation}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.code}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.numeroSerie}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.codeInventaire}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.dateMiseService}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.emplacement?.nom}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.emplacement?.type === "BUREAU" && eq.user
+                        ? `${eq.user.nom} ${eq.user.prenom}`
+                        : eq.utilisateur}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-800">
+                      {eq.etat}
+                    </td>
+                  </tr>
                 ))}
-              </tr>
-              <tr>
-                {/* filtres */}
-                <th className="px-4 py-2">
-                  <select
-                    name="familleMI"
-                    value={filters.familleMI}
-                    onChange={handleFilterChange}
-                    className="w-full rounded border p-1"
-                  >
-                    <option value="">Toutes</option>
-                    {[...new Set(equipements.map((e) => e.familleMI))].map(
-                      (v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </th>
-                <th className="px-4 py-2">
-                  <input
-                    name="designation"
-                    value={filters.designation}
-                    onChange={handleFilterChange}
-                    placeholder="Filtrer…"
-                    className="w-full rounded border p-1"
-                  />
-                </th>
-                <th className="px-4 py-2">
-                  <input
-                    name="code"
-                    value={filters.code}
-                    onChange={handleFilterChange}
-                    placeholder="Filtrer…"
-                    className="w-full rounded border p-1"
-                  />
-                </th>
-                <th className="px-4 py-2">
-                  <input
-                    name="numeroSerie"
-                    value={filters.numeroSerie}
-                    onChange={handleFilterChange}
-                    placeholder="Filtrer…"
-                    className="w-full rounded border p-1"
-                  />
-                </th>
-                <th className="px-4 py-2">
-                  <input
-                    name="codeInventaire"
-                    value={filters.codeInventaire}
-                    onChange={handleFilterChange}
-                    placeholder="Filtrer…"
-                    className="w-full rounded border p-1"
-                  />
-                </th>
-                <th className="px-4 py-2">
-                  <input
-                    type="date"
-                    name="dateMiseService"
-                    value={filters.dateMiseService}
-                    onChange={handleFilterChange}
-                    className="w-full rounded border p-1"
-                  />
-                </th>
-                <th className="px-4 py-2">
-                  <select
-                    name="emplacement"
-                    value={filters.emplacement}
-                    onChange={handleFilterChange}
-                    className="w-full rounded border p-1"
-                  >
-                    <option value="">Tous</option>
-                    {emplacements.map((e) => (
-                      <option key={e.id} value={e.nom}>
-                        {e.nom}
-                      </option>
-                    ))}
-                  </select>
-                </th>
-                <th className="px-4 py-2">
-                  <input
-                    name="utilisateur"
-                    value={filters.utilisateur}
-                    onChange={handleFilterChange}
-                    placeholder="Filtrer…"
-                    className="w-full rounded border p-1"
-                  />
-                </th>
-                <th className="px-4 py-2">
-                  <select
-                    name="etat"
-                    value={filters.etat}
-                    onChange={handleFilterChange}
-                    className="w-full rounded border p-1"
-                  >
-                    <option value="">Tous</option>
-                    {[...new Set(equipements.map((e) => e.etat))].map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((eq) => (
-                <tr
-                  key={eq.id}
-                  className="cursor-pointer even:bg-gray-50 hover:bg-blue-50"
-                  onClick={() => openModal(eq.id)}
-                >
-                  <td className="px-4 py-2">{eq.familleMI}</td>
-                  <td className="px-4 py-2">{eq.designation}</td>
-                  <td className="px-4 py-2">{eq.code}</td>
-                  <td className="px-4 py-2">{eq.numeroSerie}</td>
-                  <td className="px-4 py-2">{eq.codeInventaire}</td>
-                  <td className="px-4 py-2">{eq.dateMiseService}</td>
-                  <td className="px-4 py-2">{eq.emplacement?.nom}</td>
-                  <td className="px-4 py-2">
-                    {eq.emplacement?.type === "BUREAU" && eq.user
-                      ? `${eq.user.nom} ${eq.user.prenom}`
-                      : eq.utilisateur}
-                  </td>
-                  <td className="px-4 py-2">{eq.etat}</td>
-                </tr>
-              ))}
-              {filteredData.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-4 text-center text-gray-500"
-                  >
-                    Aucune donnée trouvée.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                {filteredData.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="px-6 py-8 text-center text-gray-400"
+                    >
+                      Aucune donnée trouvée.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {showModal && selectedEquip && (
