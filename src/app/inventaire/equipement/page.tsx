@@ -265,31 +265,36 @@ export default function AddEquipementPage() {
       <div className="mx-auto max-w-2xl space-y-12 p-8">
         {/* Titre principal */}
         <h1 className="text-center text-4xl font-extrabold text-gray-900">
-          Détails du Nouvel Équipement
+          Ajouter un Nouvel Équipement
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-12">
           {/* ==== Informations de base ==== */}
-          <section className="grid grid-cols-1 gap-6 rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm sm:grid-cols-2">
-            <h2 className="col-span-full mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
-              Informations de base
-            </h2>
-            {[
-              { icon: "📦", label: "Famille MI", name: "familleMI" },
-              { icon: "🏷️", label: "Désignation", name: "designation" },
-              { icon: "🔢", label: "Code", name: "code" },
-              { icon: "🔖", label: "N° Série", name: "numeroSerie" },
-              { icon: "💼", label: "Code Inventaire", name: "codeInventaire" },
-            ].map(({ icon, label, name }) => (
-              <div
-                key={name}
-                className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
-              >
-                <span className="text-2xl">{icon}</span>
-                <div className="flex-1">
-                  <label htmlFor={name} className="sr-only">
-                    {label}
-                  </label>
+          <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="bg-blue-50 py-3 text-center">
+              <h2 className="text-xl font-semibold text-blue-700">
+                Informations de base
+              </h2>
+            </div>
+            {/* Body */}
+            <div className="grid grid-cols-1 gap-6 p-8 sm:grid-cols-2">
+              {[
+                { icon: "📦", label: "Famille MI", name: "familleMI" },
+                { icon: "🏷️", label: "Désignation", name: "designation" },
+                { icon: "🔢", label: "Code", name: "code" },
+                { icon: "🔖", label: "N° Série", name: "numeroSerie" },
+                {
+                  icon: "💼",
+                  label: "Code Inventaire",
+                  name: "codeInventaire",
+                },
+              ].map(({ icon, label, name }) => (
+                <div
+                  key={name}
+                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                >
+                  <span className="text-2xl">{icon}</span>
                   <input
                     id={name}
                     name={name}
@@ -298,99 +303,108 @@ export default function AddEquipementPage() {
                     onChange={handleChange}
                     required
                     placeholder={label}
-                    className="w-full border-0 bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none"
+                    className="flex-1 rounded-lg border-0 bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none"
                   />
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </section>
 
           {/* ==== Emplacement & Utilisateur ==== */}
-          <section className="rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm">
-            <h2 className="mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
-              Emplacement & Utilisateur
-            </h2>
-
-            {/* Filtre */}
-            <div className="mb-6 flex gap-4">
-              {["Tous", "BUREAU", "CLASSE"].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() =>
-                    setFilterType(val === "Tous" ? "" : (val as any))
-                  }
-                  className={`flex-1 rounded-full py-2 font-medium transition ${
-                    (filterType === "" && val === "Tous") || filterType === val
-                      ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow"
-                      : "bg-white text-gray-700 hover:bg-blue-50"
-                  }`}
-                >
-                  {val}
-                </button>
-              ))}
+          <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="bg-blue-50 py-3 text-center">
+              <h2 className="text-xl font-semibold text-blue-700">
+                Emplacement & Utilisateur
+              </h2>
             </div>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {[
-                {
-                  name: "emplacementId",
-                  label: "Emplacement",
-                  icon: "📍",
-                  options: Object.entries(grouped).flatMap(([_, list]) =>
-                    list.map((e) => ({ value: e.id, label: e.nom })),
-                  ),
-                },
-                {
-                  name: filterType === "BUREAU" ? "userId" : "utilisateur",
-                  label:
-                    filterType === "BUREAU"
-                      ? "Utilisateur réel"
-                      : "Type d’utilisateur",
-                  icon: "👤",
-                  options:
-                    filterType === "BUREAU"
-                      ? bureauUsers.map((u) => ({
-                          value: u.id,
-                          label: `${u.nom} ${u.prenom}`,
-                        }))
-                      : Object.values(UtilisateurType).map((v) => ({
-                          value: v,
-                          label: v,
-                        })),
-                },
-              ].map(({ name, label, icon, options }) => (
-                <div
-                  key={name}
-                  className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
-                >
-                  <span className="text-2xl">{icon}</span>
-                  <select
-                    name={name}
-                    value={(formData as any)[name]}
-                    onChange={handleChange}
-                    required
-                    className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+            {/* Body */}
+            <div className="p-8">
+              {/* Filtre */}
+              <div className="mb-6 flex gap-4">
+                {["Tous", "BUREAU", "CLASSE"].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() =>
+                      setFilterType(val === "Tous" ? "" : (val as any))
+                    }
+                    className={`flex-1 rounded-full py-2 font-medium transition ${
+                      (filterType === "" && val === "Tous") ||
+                      filterType === val
+                        ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow"
+                        : "bg-white text-gray-700 hover:bg-blue-50"
+                    }`}
                   >
-                    <option value="">{label}</option>
-                    {options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+                    {val}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {[
+                  {
+                    name: "emplacementId",
+                    label: "Emplacement",
+                    icon: "📍",
+                    options: Object.entries(grouped).flatMap(([_, list]) =>
+                      list.map((e) => ({ value: e.id, label: e.nom })),
+                    ),
+                  },
+                  {
+                    name: filterType === "BUREAU" ? "userId" : "utilisateur",
+                    label:
+                      filterType === "BUREAU"
+                        ? "Utilisateur réel"
+                        : "Type d’utilisateur",
+                    icon: "👤",
+                    options:
+                      filterType === "BUREAU"
+                        ? bureauUsers.map((u) => ({
+                            value: u.id,
+                            label: `${u.nom} ${u.prenom}`,
+                          }))
+                        : Object.values(UtilisateurType).map((v) => ({
+                            value: v,
+                            label: v,
+                          })),
+                  },
+                ].map(({ name, label, icon, options }) => (
+                  <div
+                    key={name}
+                    className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                  >
+                    <span className="text-2xl">{icon}</span>
+                    <select
+                      name={name}
+                      value={(formData as any)[name]}
+                      onChange={handleChange}
+                      required
+                      className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+                    >
+                      <option value="">{label}</option>
+                      {options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 
           {/* ==== Détails Équipement ==== */}
-          <section className="rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm">
-            <h2 className="mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
-              Détails Équipement
-            </h2>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="bg-blue-50 py-3 text-center">
+              <h2 className="text-xl font-semibold text-blue-700">
+                Détails Équipement
+              </h2>
+            </div>
+            {/* Body */}
+            <div className="grid grid-cols-1 gap-6 p-8 sm:grid-cols-2">
               {[
                 {
                   name: "equipmentType",
@@ -407,7 +421,7 @@ export default function AddEquipementPage() {
               ].map(({ name, label, icon, opts }) => (
                 <div
                   key={name}
-                  className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
+                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md"
                 >
                   <span className="text-2xl">{icon}</span>
                   <select
@@ -428,7 +442,7 @@ export default function AddEquipementPage() {
               ))}
 
               {/* Date mise en service */}
-              <div className="relative flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md">
+              <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md">
                 <span className="text-2xl">📅</span>
                 <input
                   name="dateMiseService"
@@ -439,39 +453,43 @@ export default function AddEquipementPage() {
                   className="flex-1 bg-transparent text-gray-900 focus:outline-none"
                 />
               </div>
-            </div>
 
-            {/* Poste (optionnel) */}
-            {(formData.equipmentType === EquipmentType.ECRAN ||
-              formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
-              formData.emplacementId && (
-                <div className="relative mt-6 flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md">
-                  <span className="text-2xl">💻</span>
-                  <select
-                    name="posteId"
-                    value={formData.posteId}
-                    onChange={handleChange}
-                    className="flex-1 bg-transparent text-gray-900 focus:outline-none"
-                  >
-                    <option value="">Aucun poste</option>
-                    {postesDispo.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.numero == null
-                          ? "Poste Enseignant"
-                          : `Poste ${p.numero}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Poste (optionnel) */}
+              {(formData.equipmentType === EquipmentType.ECRAN ||
+                formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
+                formData.emplacementId && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md sm:col-span-2">
+                    <span className="text-2xl">💻</span>
+                    <select
+                      name="posteId"
+                      value={formData.posteId}
+                      onChange={handleChange}
+                      className="flex-1 bg-transparent text-gray-900 focus:outline-none"
+                    >
+                      <option value="">Aucun poste</option>
+                      {postesDispo.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.numero == null
+                            ? "Poste Enseignant"
+                            : `Poste ${p.numero}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+            </div>
           </section>
 
           {/* ==== Maintenance Préventive ==== */}
-          <section className="rounded-3xl bg-white/50 p-8 shadow-lg backdrop-blur-sm">
-            <h2 className="mb-4 border-b border-blue-200 pb-2 text-2xl font-semibold text-blue-700">
-              Maintenance Préventive
-            </h2>
-            <div className="space-y-4">
+          <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="bg-blue-50 py-3 text-center">
+              <h2 className="text-xl font-semibold text-blue-700">
+                Maintenance Préventive
+              </h2>
+            </div>
+            {/* Body */}
+            <div className="space-y-4 p-8">
               {formData.maintenanceRecords.map((m, i) => (
                 <div key={i} className="flex gap-4">
                   <select
