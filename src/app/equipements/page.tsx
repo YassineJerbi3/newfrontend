@@ -229,7 +229,7 @@ export default function TableEquipementsPage() {
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-full px-4 py-6">
-        <h1 className="mb-4 text-2xl font-bold text-blue-700">
+        <h1 className="mb-6 text-center text-3xl font-extrabold text-blue-600">
           Liste des équipements
         </h1>
 

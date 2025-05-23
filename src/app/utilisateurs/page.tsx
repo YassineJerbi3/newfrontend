@@ -4,6 +4,19 @@
 import React, { useState, useEffect, useMemo } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { useAuth } from "@/hooks/AuthProvider";
+import {
+  Briefcase,
+  Building2,
+  CheckCircle,
+  FileText,
+  Mail,
+  MapPin,
+  ShieldCheck,
+  Tag,
+  User,
+  UserCog,
+  XCircle,
+} from "lucide-react";
 
 interface User {
   id: string;
@@ -216,92 +229,114 @@ export default function UsersListPage() {
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-7xl px-4 py-6">
-        <h1 className="mb-4 text-2xl font-bold">Liste des Utilisateurs</h1>
+        <h1 className="mb-6 text-center text-3xl font-extrabold text-blue-600">
+          Liste des Utilisateurs
+        </h1>
 
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="w-full table-fixed border-collapse text-left">
-            <colgroup>
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "25%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "15%" }} />
-            </colgroup>
-            <thead className="bg-blue-100">
-              <tr>
-                {[
-                  "Nom",
-                  "Prénom",
-                  "Email",
-                  "Fonction",
-                  "Direction",
-                  "Rôle",
-                  "Bureau",
-                ].map((h) => (
-                  <th key={h} className="px-4 py-2">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-              <tr className="bg-blue-50">
-                {(["nom", "prenom", "email"] as const).map((f) => (
-                  <th key={f} className="p-2">
-                    <input
-                      name={f}
-                      value={(filters as any)[f]}
-                      onChange={handleFilterChange}
-                      placeholder="Filtrer..."
-                      className="w-full rounded border p-1"
-                    />
-                  </th>
-                ))}
-                {(["fonction", "direction", "roles", "bureauNom"] as const).map(
-                  (f) => (
-                    <th key={f} className="p-2">
+        <div className="relative overflow-x-auto rounded-2xl bg-white shadow-2xl">
+          {/* Scroll interne */}
+          <div className="scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-transparent max-h-[70vh] overflow-y-auto">
+            <table className="min-w-full table-auto border-separate [border-spacing:0]">
+              <thead>
+                {/* En-tête sticky en dégradé bleu */}
+                <tr className="sticky top-0 z-20 bg-gradient-to-r from-blue-700 to-blue-500 text-white">
+                  {[
+                    "Nom",
+                    "Prénom",
+                    "Email",
+                    "Fonction",
+                    "Direction",
+                    "Rôle",
+                    "Bureau",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-xs font-semibold uppercase tracking-wide"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+                {/* Filtres glassmorphism sticky */}
+                <tr className="sticky top-[48px] z-10 bg-white/60 backdrop-blur-sm">
+                  {[
+                    { key: "nom" },
+                    { key: "prenom" },
+                    { key: "email" },
+                    { key: "fonction" },
+                    { key: "direction" },
+                    { key: "roles" },
+                    { key: "bureauNom" },
+                  ].map(({ key }) => (
+                    <th key={key} className="px-4 py-2">
                       <input
-                        name={f}
-                        value={(filters as any)[f]}
+                        name={key}
+                        value={(filters as any)[key]}
                         onChange={handleFilterChange}
-                        placeholder="Filtrer..."
-                        className="w-full rounded border p-1"
+                        placeholder="Filtrer…"
+                        className="
+                  w-full rounded-lg border border-blue-200 bg-white/80 px-3
+                  py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400
+                "
                       />
                     </th>
-                  ),
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-blue-100">
+                {sorted.map((u, idx) => {
+                  const isMe = u.id === currentUser?.id;
+                  return (
+                    <tr
+                      key={u.id}
+                      onClick={() => openModal(u)}
+                      className={`
+                ${idx % 2 === 0 ? "bg-white" : "bg-blue-50"}
+                cursor-pointer transition-colors hover:!bg-blue-100
+              `}
+                    >
+                      <td className="flex items-center gap-2 px-6 py-4 text-sm text-gray-800">
+                        {isMe && (
+                          <span className="inline-block rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
+                            Moi
+                          </span>
+                        )}
+                        {u.nom}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {u.prenom}
+                      </td>
+                      <td className="break-all px-6 py-4 text-sm text-gray-800">
+                        {u.email}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {u.fonction}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {u.direction}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {u.roles}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {u.bureauNom ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {sorted.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-6 py-8 text-center text-gray-400"
+                    >
+                      Aucun utilisateur trouvé.
+                    </td>
+                  </tr>
                 )}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((u) => (
-                <tr
-                  key={u.id}
-                  onClick={() => openModal(u)}
-                  className={`cursor-pointer border-b hover:bg-blue-50 ${
-                    u.id === currentUser?.id ? "bg-green-50" : ""
-                  }`}
-                >
-                  <td className="px-4 py-2">{u.nom}</td>
-                  <td className="px-4 py-2">{u.prenom}</td>
-                  <td className="break-all px-4 py-2">{u.email}</td>
-                  <td className="px-4 py-2">{u.fonction}</td>
-                  <td className="px-4 py-2">{u.direction}</td>
-                  <td className="px-4 py-2">{u.roles}</td>
-                  <td className="px-4 py-2">{u.bureauNom ?? "—"}</td>
-                </tr>
-              ))}
-              {sorted.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-4 text-center text-gray-500"
-                  >
-                    Aucun utilisateur trouvé.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {showEditModal && editUser && (
@@ -319,19 +354,19 @@ export default function UsersListPage() {
                 }
               }
               .animate-scaleIn {
-                animation: scaleIn 0.2s ease-out forwards;
+                animation: scaleIn 0.25s ease-out forwards;
               }
             `}</style>
 
-            {/* Overlay couvrant tout */}
-            <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
+            {/* Overlay */}
+            <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
 
-            {/* Container de la modale positionné à 90px du haut */}
-            <div className="fixed inset-x-0 bottom-0 top-[90px] z-50 flex items-start justify-center p-4">
-              <div className="animate-scaleIn max-h-[calc(100vh-90px-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                {/* En-tête */}
-                <header className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-white">
+            {/* Modal container */}
+            <div className="fixed inset-x-0 bottom-0 top-[90px] z-50 flex items-center justify-center p-4">
+              <div className="animate-scaleIn w-full max-w-xl rounded-3xl bg-white shadow-2xl ring-1 ring-gray-200">
+                {/* Header */}
+                <header className="flex items-center justify-between rounded-t-3xl bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4">
+                  <h2 className="text-xl font-semibold text-white">
                     Modifier l’utilisateur
                   </h2>
                   <button
@@ -339,108 +374,117 @@ export default function UsersListPage() {
                     aria-label="Fermer"
                     className="text-white hover:opacity-80 focus:outline-none"
                   >
-                    ✕
+                    <XCircle size={24} />
                   </button>
                 </header>
 
-                {/* Contenu */}
+                {/* Body */}
                 <div className="space-y-6 p-6">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    {/* Infos en lecture seule */}
-                    <div className="space-y-4 border-r pr-4">
-                      <h3 className="text-md font-bold text-gray-700">
+                    {/* Read-only info */}
+                    <div className="space-y-4 border-r pr-6">
+                      <h3 className="text-lg font-bold text-gray-700">
                         Infos utilisateur
                       </h3>
-                      {(
-                        [
-                          ["Nom", editUser.nom],
-                          ["Prénom", editUser.prenom],
-                          ["Email", editUser.email],
-                        ] as const
-                      ).map(([label, val]) => (
+                      {[
+                        { label: "Nom", value: editUser.nom, Icon: User },
+                        { label: "Prénom", value: editUser.prenom, Icon: User },
+                        { label: "Email", value: editUser.email, Icon: Mail },
+                      ].map(({ label, value, Icon }) => (
                         <div key={label} className="flex flex-col">
-                          <span className="mb-1 text-sm font-medium text-gray-600">
-                            {label}
-                          </span>
+                          <div className="mb-1 flex items-center gap-2 text-sm font-medium text-gray-600">
+                            <Icon size={18} className="text-gray-500" />
+                            <span>{label}</span>
+                          </div>
                           <input
                             readOnly
-                            value={val}
-                            className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            value={value}
+                            className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 text-sm text-gray-700"
                           />
                         </div>
                       ))}
                     </div>
 
-                    {/* Formulaire éditable */}
+                    {/* Editable form */}
                     <form onSubmit={handleSave} className="space-y-4 pl-4">
-                      {(
-                        [
-                          ["Fonction", "fonction", edited.fonction],
-                          ["Direction", "direction", edited.direction],
-                          ["Rôle", "roles", edited.roles],
-                        ] as const
-                      ).map(([label, name, value]) => (
+                      {[
+                        {
+                          label: "Fonction",
+                          name: "fonction",
+                          value: edited.fonction,
+                          Icon: UserCog,
+                          options: ["Manager", "Technicien", "Professeur"],
+                        },
+                        {
+                          label: "Direction",
+                          name: "direction",
+                          value: edited.direction,
+                          Icon: MapPin,
+                          options: ["IT", "HR", "Finance"],
+                        },
+                        {
+                          label: "Rôle",
+                          name: "roles",
+                          value: edited.roles,
+                          Icon: ShieldCheck,
+                          options: [
+                            "Administratif",
+                            "Professor",
+                            "Responsable SI",
+                            "Technicien",
+                          ],
+                        },
+                      ].map(({ label, name, value, Icon, options }) => (
                         <div key={name} className="flex flex-col">
-                          <label className="mb-1 text-sm font-medium text-gray-600">
-                            {label}
-                          </label>
+                          <div className="mb-1 flex items-center gap-2 text-sm font-medium text-gray-600">
+                            <Icon size={18} className="text-gray-500" />
+                            <span>{label}</span>
+                          </div>
                           <select
                             name={name}
                             value={value || ""}
                             onChange={(e) =>
                               setEdited({ ...edited, [name]: e.target.value })
                             }
-                            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
                           >
-                            <option value="">Sélectionner</option>
-                            {name === "fonction" && (
-                              <>
-                                <option value="MANAGER">Manager</option>
-                                <option value="TECHNICIAN">Technicien</option>
-                              </>
-                            )}
-                            {name === "direction" && (
-                              <>
-                                <option value="IT">IT</option>
-                                <option value="HR">HR</option>
-                                <option value="FINANCE">Finance</option>
-                              </>
-                            )}
-                            {name === "roles" && (
-                              <>
-                                <option value="ADMINISTRATIF">
-                                  Administratif
-                                </option>
-                                <option value="PROFESSOR">Professor</option>
-                                <option value="RESPONSABLE SI">
-                                  Responsable SI
-                                </option>
-                                <option value="TECHNICIEN">Technicien</option>
-                              </>
-                            )}
+                            <option value="">
+                              Sélectionner {label.toLowerCase()}
+                            </option>
+                            {options.map((opt) => (
+                              <option key={opt} value={opt.toUpperCase()}>
+                                {opt}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       ))}
 
-                      {/* Sélecteur de bureau */}
-                      <BureauField
-                        emplacements={emplacements}
-                        edited={edited}
-                        setEdited={setEdited}
-                      />
+                      {/* BureauField */}
+                      <div className="flex flex-col">
+                        <div className="mb-1 flex items-center gap-2 text-sm font-medium text-gray-600">
+                          <Building2 size={18} className="text-gray-500" />
+                          <span>Bureau</span>
+                        </div>
+                        <BureauField
+                          emplacements={emplacements}
+                          edited={edited}
+                          setEdited={setEdited}
+                        />
+                      </div>
 
                       {/* Actions */}
-                      <div className="flex justify-end gap-4 pt-4">
+                      <div className="flex justify-end gap-4 pt-6">
                         <button
                           type="button"
                           onClick={handleDelete}
-                          className="flex-1 rounded-lg bg-red-800 px-4 py-2 text-sm font-medium text-white shadow hover:bg-red-900"
+                          className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700"
                         >
                           Supprimer
                         </button>
                         <button
                           type="submit"
-                          className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+                          className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
                         >
                           Sauvegarder
                         </button>
