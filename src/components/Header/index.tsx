@@ -2,80 +2,97 @@ import Link from "next/link";
 import DropdownUser from "./DropdownUser";
 import Image from "next/image";
 import DropdownNotification from "./DropdownNotification";
+import { useEffect } from "react";
 
 const Header = (props: {
-  sidebarOpen: string | boolean | undefined;
-  setSidebarOpen: (arg0: boolean) => void;
+  sidebarOpen: boolean | string | undefined;
+  setSidebarOpen: (open: boolean) => void;
 }) => {
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      header + * {
+        margin-top: 30px;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
-    <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
-      <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
-        <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
-          {/* Hamburger Toggle BTN */}
+    <header
+      className="
+        fixed left-0 right-0 top-0 z-50 flex
+        h-[80px] items-center bg-gray-700/70 text-white shadow-md backdrop-blur-md
+        lg:left-72 lg:right-0
+      "
+    >
+      <div className="flex w-full items-center px-6">
+        {/* ── MOBILE: toggle + logo */}
+        <div className="flex items-center gap-4 lg:hidden">
           <button
             aria-controls="sidebar"
             onClick={(e) => {
               e.stopPropagation();
               props.setSidebarOpen(!props.sidebarOpen);
             }}
-            className="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-boxdark lg:hidden"
+            className="
+              flex h-10 w-10 items-center justify-center
+              rounded-lg bg-gray-600/30 transition-colors
+              hover:bg-gray-600/50
+            "
           >
-            <span className="relative block h-5.5 w-5.5 cursor-pointer">
-              <span className="du-block absolute right-0 h-full w-full">
-                <span
-                  className={`relative left-0 top-0 my-1 block h-0.5 w-0 rounded-sm bg-black delay-[0] duration-200 ease-in-out dark:bg-white ${
-                    !props.sidebarOpen && "!w-full delay-300"
-                  }`}
-                ></span>
-                <span
-                  className={`relative left-0 top-0 my-1 block h-0.5 w-0 rounded-sm bg-black delay-150 duration-200 ease-in-out dark:bg-white ${
-                    !props.sidebarOpen && "delay-400 !w-full"
-                  }`}
-                ></span>
-                <span
-                  className={`relative left-0 top-0 my-1 block h-0.5 w-0 rounded-sm bg-black delay-200 duration-200 ease-in-out dark:bg-white ${
-                    !props.sidebarOpen && "!w-full delay-500"
-                  }`}
-                ></span>
-              </span>
-              <span className="absolute right-0 h-full w-full rotate-45">
-                <span
-                  className={`absolute left-2.5 top-0 block h-full w-0.5 rounded-sm bg-black delay-300 duration-200 ease-in-out dark:bg-white ${
-                    !props.sidebarOpen && "!h-0 !delay-[0]"
-                  }`}
-                ></span>
-                <span
-                  className={`delay-400 absolute left-0 top-2.5 block h-0.5 w-full rounded-sm bg-black duration-200 ease-in-out dark:bg-white ${
-                    !props.sidebarOpen && "!h-0 !delay-200"
-                  }`}
-                ></span>
-              </span>
-            </span>
+            <span
+              className={`block h-0.5 w-5 bg-white transition-transform ${
+                props.sidebarOpen ? "rotate-45" : ""
+              }`}
+            />
+            <span
+              className={`absolute block h-0.5 w-5 bg-white transition-opacity ${
+                props.sidebarOpen ? "opacity-0" : ""
+              }`}
+            />
+            <span
+              className={`block h-0.5 w-5 bg-white transition-transform ${
+                props.sidebarOpen ? "-rotate-45" : ""
+              }`}
+            />
           </button>
-          {/* Hamburger Toggle BTN */}
-
-          <Link className="block flex-shrink-0 lg:hidden" href="/">
+          <Link href="/" className="flex-shrink-0">
             <Image
               width={32}
               height={32}
-              src={"/images/logo/logo-icon.svg"}
+              src="/images/logo/logo-icon.svg"
               alt="Logo"
+              className="brightness-90 filter"
             />
           </Link>
         </div>
 
-        {/* Empty div to take up space and push user to the right */}
-        <div className="flex-1"></div>
+        {/* Spacer */}
+        <div className="flex-1" />
 
-        <div className="flex items-center gap-3 2xsm:gap-7">
-          <ul className="flex items-center gap-2 2xsm:gap-4">
-            {/* Notification Menu Area */}
-            <DropdownNotification></DropdownNotification>
-          </ul>
-
-          {/* User Area */}
-          <DropdownUser />
-          {/* User Area */}
+        {/* ── Notifications & Profile */}
+        <div className="flex items-center gap-5">
+          <button
+            className="
+              rounded-full bg-gray-600/20 p-2 transition-colors
+              hover:bg-gray-600/50"
+            aria-label="Notifications"
+          >
+            <DropdownNotification />
+          </button>
+          <div className="h-6 w-px bg-gray-500" />
+          <button
+            className="
+              rounded-full bg-gray-600/20 p-2 transition-colors
+              hover:bg-gray-600/50"
+            aria-label="Profil"
+          >
+            <DropdownUser />
+          </button>
         </div>
       </div>
     </header>

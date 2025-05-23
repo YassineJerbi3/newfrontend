@@ -9,85 +9,92 @@ import SidebarItem from "@/components/Sidebar/SidebarItem";
 import ClickOutside from "@/components/ClickOutside";
 import useLocalStorage from "@/hooks/useLocalStorage";
 import { useAuth } from "@/hooks/AuthProvider";
-
 import {
-  FiLayout,
-  FiSend,
-  FiBox,
-  FiClock,
-  FiBell,
-  FiAlertTriangle,
-  FiSettings,
-  FiUsers,
-  FiUserPlus,
-  FiFileText,
-  FiFileMinus,
-  FiTool,
-  FiPackage,
-  FiList,
-  FiTrendingUp,
-  FiPlusCircle,
-  FiMapPin,
-  FiXCircle,
-} from "react-icons/fi";
-import { BiDesktop } from "react-icons/bi";
-import { FaUserGraduate, FaBuilding } from "react-icons/fa";
+  FaTachometerAlt,
+  FaTools,
+  FaBug,
+  FaCogs,
+  FaPaperPlane,
+  FaWarehouse,
+  FaPlus,
+  FaMapMarkerAlt,
+  FaBell,
+  FaCalendarAlt,
+  FaChartLine,
+  FaBoxes,
+  FaDesktop,
+  FaUsers,
+  FaUserPlus,
+  FaUniversity,
+  FaListAlt,
+  FaFileAlt,
+} from "react-icons/fa";
+
+import { FaBuilding } from "react-icons/fa";
 
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 }
+// Définition de l’interface MenuItem
+interface MenuItem {
+  label: string;
+  route?: string;
+  icon: JSX.Element;
+  roles: string[];
+  children?: MenuItem[];
+}
 
-const menuGroups = [
+const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
   {
     name: "MENU",
     menuItems: [
       {
         label: "Tableau de bord",
         route: "/",
-        icon: <FiLayout size={18} className="text-current" />,
+        icon: <FaTachometerAlt size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Intervention",
-        icon: <FiAlertTriangle size={18} className="text-current" />,
+        icon: <FaTools size={18} />,
         roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
         children: [
           {
             label: "Incident",
             route: "/intervention/incident",
-            icon: <FiXCircle size={18} className="text-current" />,
+            icon: <FaBug size={18} />,
             roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
           },
           {
             label: "Problème applicatif",
             route: "/intervention/applicatif",
-            icon: <FiSettings size={18} className="text-current" />,
+            icon: <FaCogs size={18} />,
             roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
           },
           {
             label: "Demande de publication",
             route: "/intervention/demande",
-            icon: <FiSend size={18} className="text-current" />,
+            icon: <FaPaperPlane size={18} />,
             roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
           },
         ],
       },
       {
         label: "Inventaire",
-        icon: <FiBox size={18} className="text-current" />,
+        icon: <FaWarehouse size={18} />,
         roles: ["RESPONSABLE SI"],
         children: [
           {
-            label: "Ajouter Equipement",
+            label: "Ajouter Équipement",
             route: "/inventaire/equipement",
-            icon: <FiPlusCircle size={18} className="text-current" />,
+            icon: <FaPlus size={18} />,
             roles: ["RESPONSABLE SI"],
           },
           {
             label: "Ajouter Emplacement",
             route: "/inventaire/placement",
-            icon: <FiMapPin size={18} className="text-current" />,
+            icon: <FaMapMarkerAlt size={18} />,
             roles: ["RESPONSABLE SI"],
           },
         ],
@@ -95,31 +102,31 @@ const menuGroups = [
       {
         label: "Notification",
         route: "/notification/not-user",
-        icon: <FiBell size={18} className="text-current" />,
+        icon: <FaBell size={18} />,
         roles: ["PROFESSOR", "ADMINISTRATIF"],
       },
       {
         label: "Notification",
         route: "/notification/not-technicien",
-        icon: <FiBell size={18} className="text-current" />,
+        icon: <FaBell size={18} />,
         roles: ["TECHNICIEN"],
       },
       {
         label: "Notification",
         route: "/notification/not-responsablesi",
-        icon: <FiBell size={18} className="text-current" />,
+        icon: <FaBell size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Planification",
         route: "/planification",
-        icon: <FiClock size={18} className="text-current" />,
+        icon: <FaCalendarAlt size={18} />,
         roles: ["RESPONSABLE SI", "TECHNICIEN"],
       },
       {
         label: "Suivi",
         route: "/suivre-intervention",
-        icon: <FiTrendingUp size={18} className="text-current" />,
+        icon: <FaChartLine size={18} />,
         roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF", "TECHNICIEN"],
       },
     ],
@@ -130,25 +137,25 @@ const menuGroups = [
       {
         label: "Classes",
         route: "/classes-edit",
-        icon: <FaUserGraduate size={18} className="text-current" />,
+        icon: <FaUniversity size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Classes",
         route: "/classes",
-        icon: <FaUserGraduate size={18} className="text-current" />,
+        icon: <FaUniversity size={18} />,
         roles: ["PROFESSOR"],
       },
       {
         label: "Votre bureau",
         route: "/votre-bureau",
-        icon: <BiDesktop size={18} className="text-current" />,
+        icon: <FaDesktop size={18} />,
         roles: ["PROFESSOR", "ADMINISTRATIF", "TECHNICIEN"],
       },
       {
         label: "Bureaux",
         route: "/bureaux",
-        icon: <FaBuilding size={18} className="text-current" />,
+        icon: <FaBuilding size={18} />,
         roles: ["RESPONSABLE SI"],
       },
     ],
@@ -158,25 +165,25 @@ const menuGroups = [
     menuItems: [
       {
         label: "Gestion de stock",
-        icon: <FiPackage size={18} className="text-current" />,
+        icon: <FaBoxes size={18} />,
         roles: ["RESPONSABLE SI"],
         children: [
           {
             label: "Liste du stock",
             route: "/depot",
-            icon: <FiList size={18} className="text-current" />,
+            icon: <FaListAlt size={18} />,
             roles: ["RESPONSABLE SI"],
           },
           {
             label: "Bon d'entrée",
             route: "/depot/entree",
-            icon: <FiFileText size={18} className="text-current" />,
+            icon: <FaFileAlt size={18} />,
             roles: ["RESPONSABLE SI"],
           },
           {
             label: "Bon de sortie",
             route: "/depot/sortie",
-            icon: <FiFileMinus size={18} className="text-current" />,
+            icon: <FaFileAlt size={18} />,
             roles: ["RESPONSABLE SI"],
           },
         ],
@@ -189,19 +196,19 @@ const menuGroups = [
       {
         label: "Liste des équipements",
         route: "/equipements",
-        icon: <FiBox size={18} className="text-current" />,
+        icon: <FaBoxes size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Liste des utilisateurs",
         route: "/utilisateurs",
-        icon: <FiUsers size={18} className="text-current" />,
+        icon: <FaUsers size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Ajouter utilisateur",
         route: "/utilisateurs/ajouter",
-        icon: <FiUserPlus size={18} className="text-current" />,
+        icon: <FaUserPlus size={18} />,
         roles: ["RESPONSABLE SI"],
       },
     ],
@@ -212,7 +219,7 @@ const menuGroups = [
       {
         label: "Maintenance Préventive",
         route: "/maintenance",
-        icon: <FiTool size={18} className="text-current" />,
+        icon: <FaTools size={18} />,
         roles: ["RESPONSABLE SI"],
       },
     ],
@@ -226,6 +233,19 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     "dashboard",
   );
   const { user } = useAuth();
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+    @keyframes hueShift {
+      0%, 100% { filter: hue-rotate(0deg); }
+      50%      { filter: hue-rotate(20deg); }
+    }
+  `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const userRole = useMemo(() => {
     if (!user?.roles) return null;
@@ -275,39 +295,66 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   return (
     <ClickOutside onClick={() => setSidebarOpen(false)}>
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`
+        fixed left-0 top-0 z-50 flex h-screen w-72 transform
+        flex-col overflow-y-hidden bg-gradient-to-b from-[#01050a]
+        via-[#041021] to-[#082043]
+        text-gray-100 shadow-[0_4px_30px_rgba(0,0,0,0.7)] transition-transform duration-300
+        ease-in-out
+        lg:translate-x-0
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      `}
       >
-        <div className="flex items-center justify-between px-6 py-5 lg:py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-5">
           <Link href="/acceuil">
-            <Image
-              src="/images/logo/logo_escs_top_header.svg"
-              alt="Logo"
-              width={176}
-              height={32}
-              priority
-            />
+            <div
+              style={{
+                display: "inline-block",
+                animation: "hueShift 6s ease-in-out infinite",
+              }}
+            >
+              <Image
+                src="/images/logo/logo_escs_top_header.svg"
+                alt="Logo"
+                width={176}
+                height={32}
+                priority
+                className="brightness-90 filter"
+              />
+            </div>
           </Link>
+
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="block lg:hidden"
+            className="block text-3xl leading-none transition-colors hover:text-[#64b5f6] lg:hidden"
+            aria-label="Close sidebar"
           >
             ×
           </button>
         </div>
+
+        {/* Menu */}
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="no-scrollbar flex-1 overflow-y-auto px-4 py-4"
+          className="no-scrollbar flex-1 overflow-y-auto px-4 py-6"
         >
           {filteredMenuGroups.map((group, gi) => (
-            <div key={gi} className="mb-6">
-              <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">
+            <div key={gi} className="mb-6 last:mb-8">
+              <h3
+                className="
+        mb-3 flex items-center
+        border-l-2 border-blue-500 pl-2 text-xs
+        font-semibold
+        uppercase tracking-wider
+        text-gray-400
+      "
+              >
                 {group.name}
               </h3>
-              <ul className="flex flex-col gap-1.5">
-                {group.menuItems.map((mi: any, i: number) => (
+              <ul className="space-y-1">
+                {group.menuItems.map((mi, i) => (
                   <SidebarItem
                     key={i}
                     item={mi}
@@ -319,6 +366,9 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             </div>
           ))}
         </div>
+
+        {/* Gradient overlay at bottom for depth */}
+        <div className="pointer-events-none absolute bottom-0 left-0 h-16 w-full bg-gradient-to-t from-[#082043] to-transparent" />
       </aside>
     </ClickOutside>
   );
