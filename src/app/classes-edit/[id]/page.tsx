@@ -13,6 +13,15 @@ import {
   FaEdit,
   FaList,
   FaTh,
+  FaMicrochip,
+  FaTv,
+  FaUserTie,
+  FaTimes,
+  FaHashtag,
+  FaBarcode,
+  FaInfoCircle,
+  FaTag,
+  FaLayerGroup,
 } from "react-icons/fa";
 
 interface Poste {
@@ -577,239 +586,306 @@ export default function ClasseDetailPage() {
 
             {/* Equipment Modal */}
             {selectedPoste && showEquipmentModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <>
+                {/* Overlay */}
                 <div
-                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
                   onClick={closeAll}
                 />
-                <div className="relative z-10 max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-                  <button
-                    onClick={closeAll}
-                    className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
-                  >
-                    &times;
-                  </button>
-                  <h2 className="mb-4 text-2xl font-bold text-gray-800">
-                    Poste {selectedPoste.numero} — Détails
-                  </h2>
 
-                  {/* Equipment Modal actions */}
-                  <div className="mb-4 flex gap-2">
-                    {selectedPoste.label !== "Poste Enseignant" && (
-                      <>
-                        <button
-                          onClick={handleDeletePoste}
-                          className="flex items-center rounded bg-red-600 px-3 py-1 text-white hover:bg-red-700"
-                        >
-                          <FaTrash className="mr-1" />
-                          Supprimer Poste
-                        </button>
-                        <button
-                          onClick={openEditPoste}
-                          className="flex items-center rounded bg-yellow-500 px-3 py-1 text-white hover:bg-yellow-600"
-                        >
-                          <FaEdit className="mr-1" />
-                          Modifier Poste
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Edit poste modal */}
-                  {editPosteModal && (
-                    <form
-                      onSubmit={handleEditPoste}
-                      className="mb-6 space-y-4 rounded border bg-gray-100 p-4"
-                    >
-                      <label className="block">
-                        Nouveau numéro
-                        <input
-                          type="number"
-                          value={newNumero}
-                          onChange={(e) => setNewNumero(+e.target.value)}
-                          className="mt-1 w-full rounded border p-2"
-                          required
-                        />
-                      </label>
+                {/* Modal */}
+                <div className="fixed bottom-0 left-[300px] right-0 top-[90px] z-50 flex items-start justify-center overflow-y-auto p-6">
+                  <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+                    {/* Header */}
+                    <div className="flex items-center justify-between bg-gradient-to-r from-blue-900 to-blue-600 p-6 text-white">
+                      <h2 className="flex items-center text-2xl font-bold">
+                        <FaDesktop className="mr-3" size={24} />
+                        Détails du poste {selectedPoste.numero ?? "Enseignant"}
+                      </h2>
                       <button
-                        type="submit"
-                        className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                        onClick={closeAll}
+                        className="text-3xl transition hover:text-gray-200"
                       >
-                        Enregistrer
+                        &times;
                       </button>
-                    </form>
-                  )}
-
-                  {/* Utilisateurs */}
-                  {equipmentList.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="mb-2 text-xl font-semibold">
-                        Utilisateur
-                      </h3>
-                      <p className="text-gray-700">
-                        {selectedPoste?.label ? "ENSEIGNANT" : "ÉTUDIANT"}
-                      </p>
                     </div>
-                  )}
 
-                  {/* Sections ÉCRAN & UNITE CENTRALE */}
-                  {["ECRAN", "UNITE CENTRALE"].map((sectionType) => {
-                    const items = equipmentList.filter(
-                      (eq) => eq.equipmentType === sectionType,
-                    );
-                    if (items.length === 0) return null;
-                    return (
-                      <div key={sectionType} className="mb-6">
-                        <h3 className="mb-2 text-xl font-semibold">
-                          {sectionType === "ECRAN" ? "Écran" : "Unité Centrale"}
-                        </h3>
-                        <div className="space-y-4">
-                          {items.map((eq) => (
-                            <div
-                              key={eq.id}
-                              className="relative rounded-lg border bg-gray-50 p-4 shadow-sm"
-                            >
-                              {/* Equipment actions */}
-                              <div className="absolute right-2 top-2 flex gap-2">
-                                <button
-                                  onClick={() => handleDetachEquipment(eq.id)}
-                                  className="text-red-600 hover:text-red-800"
-                                  title="Détacher de ce poste"
-                                >
-                                  <FaTrash />
-                                </button>
-                                {/*
-    N'afficher “Réaffecter” QUE si ce n'est pas le poste Enseignant
-    (sur un poste numéroté, i.e. selectedPoste.numero != null)
-  */}
-                                {selectedPoste?.numero != null && (
-                                  <button
-                                    onClick={() => openReassignModal(eq)}
-                                    className="text-blue-600 hover:text-blue-800"
-                                    title="Réaffecter à un autre poste"
+                    {/* Body */}
+                    <div className="space-y-8 p-6">
+                      {/* Utilisateur */}
+                      {equipmentList.length > 0 && (
+                        <div className="flex items-center space-x-4 rounded-xl bg-blue-50 p-4 shadow-sm">
+                          <FaUserTie className="text-blue-600" size={20} />
+                          <div>
+                            <label className="block text-sm font-medium text-blue-800">
+                              Utilisateur
+                            </label>
+                            <p className="mt-1 text-gray-700">
+                              {selectedPoste.label ? "ENSEIGNANT" : "ÉTUDIANT"}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sections Équipements côte à côte */}
+                      <div className="grid grid-cols-2 gap-8">
+                        {["ECRAN", "UNITE CENTRALE"].map((type) => {
+                          const items = equipmentList.filter(
+                            (e) => e.equipmentType === type,
+                          );
+                          if (!items.length) return null;
+                          return (
+                            <div key={type} className="space-y-4">
+                              <h3 className="text-lg font-semibold text-gray-800">
+                                {type === "ECRAN" ? "Écran" : "Unité Centrale"}
+                              </h3>
+                              <div className="space-y-4">
+                                {items.map((eq) => (
+                                  <div
+                                    key={eq.id}
+                                    className="flex flex-col justify-between space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow transition hover:shadow-lg"
                                   >
-                                    <FaEdit />
-                                  </button>
-                                )}
-                              </div>
+                                    {/* Infos */}
+                                    <div className="flex items-center space-x-4">
+                                      <div className="flex-shrink-0">
+                                        {type === "ECRAN" ? (
+                                          <FaTv
+                                            className="text-blue-600"
+                                            size={24}
+                                          />
+                                        ) : (
+                                          <FaMicrochip
+                                            className="text-blue-600"
+                                            size={24}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Famille MI
+                                          </label>
+                                          <p>{eq.familleMI || "—"}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Désignation
+                                          </label>
+                                          <p>{eq.designation}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            État
+                                          </label>
+                                          <p>{eq.etat}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Code Inv.
+                                          </label>
+                                          <p>{eq.codeInventaire}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Série
+                                          </label>
+                                          <p>{eq.numeroSerie}</p>
+                                        </div>
+                                      </div>
+                                    </div>
 
-                              <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                                <div>
-                                  <strong>Famille MI:</strong> {eq.familleMI}
-                                </div>
-                                <div>
-                                  <strong>Désignation:</strong> {eq.designation}
-                                </div>
-                                <div>
-                                  <strong>État:</strong> {eq.etat}
-                                </div>
-                                <div>
-                                  <strong>Code Inventaire:</strong>{" "}
-                                  {eq.codeInventaire}
-                                </div>
-                                <div>
-                                  <strong>Numéro de série:</strong>{" "}
-                                  {eq.numeroSerie}
-                                </div>
+                                    {/* Actions */}
+                                    <div className="flex justify-end space-x-2">
+                                      <button
+                                        onClick={() =>
+                                          handleDetachEquipment(eq.id)
+                                        }
+                                        className="flex items-center space-x-1 rounded-full border border-red-300 bg-red-50 px-3 py-1 text-red-600 transition hover:bg-red-100 hover:shadow-sm"
+                                      >
+                                        <FaTrash size={14} />
+                                        <span className="text-xs">
+                                          Détacher
+                                        </span>
+                                      </button>
+                                      {selectedPoste.numero != null && (
+                                        <button
+                                          onClick={() => openReassignModal(eq)}
+                                          className="flex items-center space-x-1 rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-blue-600 transition hover:bg-blue-100 hover:shadow-sm"
+                                        >
+                                          <FaEdit size={14} />
+                                          <span className="text-xs">
+                                            Réaffecter
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex justify-end gap-4 bg-gray-100 p-6">
+                      {selectedPoste.label !== "Poste Enseignant" && (
+                        <>
+                          <button
+                            onClick={handleDeletePoste}
+                            className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-red-900 to-red-600 px-5 py-2 text-white transition hover:from-red-800 hover:to-red-500"
+                          >
+                            <FaTrash /> <span>Supprimer</span>
+                          </button>
+                          <button
+                            onClick={openEditPoste}
+                            className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-blue-900 to-blue-600 px-5 py-2 text-white transition hover:from-blue-800 hover:to-blue-500"
+                          >
+                            <FaEdit /> <span>Modifier</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
+
+            {/* Equipement Detail Modal */}
+            {/* Equipement Detail Modal */}
             {/* Equipement Detail Modal */}
             {selectedEquipment && showEquipDetailModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <>
+                {/* Overlay limité à la zone de contenu */}
                 <div
-                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  className="fixed bottom-0 left-[288.8px] right-0 top-[80px] z-50 bg-black/50 backdrop-blur-sm"
                   onClick={closeEquipDetailModal}
                 />
-                <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-                  {/* Header */}
-                  <div className="mb-4 flex items-center justify-between border-b pb-2">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                      Détail de l’équipement
-                    </h2>
-                    <button
-                      onClick={closeEquipDetailModal}
-                      className="text-2xl text-gray-500 hover:text-gray-800"
-                    >
-                      &times;
-                    </button>
-                  </div>
 
-                  {/* Corps */}
-                  <div className="space-y-3 text-gray-700">
-                    <div>
-                      <strong>Type :</strong> {selectedEquipment.equipmentType}
-                    </div>
-                    <div>
-                      <strong>Famille MI :</strong>{" "}
-                      {selectedEquipment.familleMI || "—"}
-                    </div>
-                    <div>
-                      <strong>Désignation :</strong>{" "}
-                      {selectedEquipment.designation}
-                    </div>
-                    <div>
-                      <strong>État :</strong> {selectedEquipment.etat}
-                    </div>
-                    <div>
-                      <strong>Code Inventaire :</strong>{" "}
-                      {selectedEquipment.codeInventaire}
-                    </div>
-                    <div>
-                      <strong>Numéro de série :</strong>{" "}
-                      {selectedEquipment.numeroSerie}
-                    </div>
-                    <div>
-                      <strong>Poste :</strong>{" "}
-                      {(() => {
-                        // On cherche le poste dans la liste (inclut le Poste Enseignant injecté)
-                        const poste = emplacement!.postes.find(
-                          (p) => p.id === selectedEquipment.posteId,
-                        );
-                        if (!poste) return "Aucun poste";
-                        // Si label (cas Poste Enseignant) : on l’affiche, sinon le numéro
-                        return poste.label ?? `Poste ${poste.numero}`;
-                      })()}
-                    </div>
-                    {(selectedEquipment.utilisateurs ?? []).length > 0 && (
-                      <div>
-                        <strong>Utilisateurs :</strong>{" "}
-                        {Array.from(
-                          new Set(
-                            (selectedEquipment.utilisateurs ?? []).map(
-                              (u) => `${u.nom} ${u.prenom}`,
-                            ),
-                          ),
-                        ).join(", ")}
+                {/* Modal */}
+                <div className="fixed bottom-0 left-[288.8px] right-0 top-[80px] z-50 flex items-center justify-center px-8 py-12">
+                  <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl">
+                    {/* Header */}
+                    <div className="flex items-center justify-between rounded-t-3xl bg-gradient-to-r from-blue-900 to-blue-600 p-6 text-white">
+                      <div className="flex items-center space-x-3">
+                        {selectedEquipment.equipmentType === "ECRAN" ? (
+                          <FaTv size={28} />
+                        ) : (
+                          <FaMicrochip size={28} />
+                        )}
+                        <h2 className="text-2xl font-bold">
+                          Détail {selectedEquipment.equipmentType.toLowerCase()}
+                        </h2>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Footer Actions */}
-                  {(selectedEquipment.equipmentType === "ECRAN" ||
-                    selectedEquipment.equipmentType === "UNITE CENTRALE") && (
-                    <div className="mt-6 flex justify-end">
                       <button
-                        onClick={() => {
-                          closeEquipDetailModal();
-                          openReassignModal(selectedEquipment);
-                        }}
-                        className="flex items-center rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                        onClick={closeEquipDetailModal}
+                        className="text-3xl transition hover:text-gray-200"
                       >
-                        <FaEdit className="mr-1" />
-                        Réaffecter
+                        &times;
                       </button>
                     </div>
-                  )}
+
+                    {/* Body — 3 colonnes, pas de scroll */}
+                    <div className="grid grid-cols-1 gap-6 p-6 text-gray-700 md:grid-cols-3">
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaLayerGroup className="text-blue-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Famille MI
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.familleMI || "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaTag className="text-green-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Désignation
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.designation}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaInfoCircle className="text-yellow-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            État
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.etat}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaBarcode className="text-purple-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Code Inventaire
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.codeInventaire}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaHashtag className="text-indigo-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Numéro de série
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.numeroSerie}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaDesktop className="text-teal-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Poste attribué
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {(() => {
+                              const poste = emplacement!.postes.find(
+                                (p) => p.id === selectedEquipment.posteId,
+                              );
+                              return poste?.label ?? `Poste ${poste?.numero}`;
+                            })() || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex justify-end gap-3 rounded-b-3xl bg-gray-100 p-4">
+                      {(selectedEquipment.equipmentType === "ECRAN" ||
+                        selectedEquipment.equipmentType ===
+                          "UNITE CENTRALE") && (
+                        <button
+                          onClick={() => {
+                            closeEquipDetailModal();
+                            openReassignModal(selectedEquipment);
+                          }}
+                          className="flex items-center space-x-1 rounded-full border border-blue-300 bg-blue-50 px-4 py-1 text-blue-600 transition hover:bg-blue-100"
+                        >
+                          <FaEdit size={14} />
+                          <span className="text-sm">Réaffecter</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Reassign Modal */}
