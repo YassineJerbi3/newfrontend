@@ -11,9 +11,7 @@ const Header = (props: {
   useEffect(() => {
     const style = document.createElement("style");
     style.innerHTML = `
-      header + * {
-        margin-top: 30px;
-      }
+      header + * { margin-top: 30px; }
     `;
     document.head.appendChild(style);
     return () => {
@@ -24,9 +22,9 @@ const Header = (props: {
   return (
     <header
       className="
-        fixed left-0 right-0 top-0 z-50 flex
-        h-[80px] items-center bg-gray-700/70 text-white shadow-md backdrop-blur-md
-        lg:left-72 lg:right-0
+        fixed left-0 right-0 top-0 z-50 flex h-[80px] items-center
+        overflow-visible bg-white/90 text-gray-900 shadow-md
+        backdrop-blur-md lg:left-72 lg:right-0
       "
     >
       <div className="flex w-full items-center px-6">
@@ -40,8 +38,7 @@ const Header = (props: {
             }}
             className="
               flex h-10 w-10 items-center justify-center
-              rounded-lg bg-gray-600/30 transition-colors
-              hover:bg-gray-600/50
+              rounded-lg bg-[#010810] bg-opacity-20 transition-colors hover:bg-opacity-30
             "
           >
             <span
@@ -78,17 +75,19 @@ const Header = (props: {
         <div className="flex items-center gap-5">
           <button
             className="
-              rounded-full bg-gray-600/20 p-2 transition-colors
-              hover:bg-gray-600/50"
+              rounded-full bg-[#010810] bg-opacity-20 p-2 transition-colors
+              hover:bg-opacity-30
+            "
             aria-label="Notifications"
           >
             <DropdownNotification />
           </button>
-          <div className="h-6 w-px bg-gray-500" />
+          <div className="h-6 w-px bg-[#0d2435]" />
           <button
             className="
-              rounded-full bg-gray-600/20 p-2 transition-colors
-              hover:bg-gray-600/50"
+              rounded-full bg-[#010810] bg-opacity-20 p-2 transition-colors
+              hover:bg-opacity-30
+            "
             aria-label="Profil"
           >
             <DropdownUser />

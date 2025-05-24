@@ -3,78 +3,132 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/AuthProvider";
+import Image from "next/image";
+
+// Icons
+const MailIcon = () => (
+  <svg
+    className="h-5 w-5 text-gray-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v11a2 2 0 002 2z"
+    />
+  </svg>
+);
+const LockIcon = () => (
+  <svg
+    className="h-5 w-5 text-gray-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 11c1.104 0 2 .896 2 2v2a2 2 0 11-4 0v-2c0-1.104.896-2 2-2zm6 0V9a6 6 0 10-12 0v2H4v10h16V11h-2z"
+    />
+  </svg>
+);
+
+const steps = ["request", "verify", "reset"] as const;
+const stepLabels = ["Email", "Code", "Nouveau mot de passe"];
 
 export default function LoginPage() {
   const router = useRouter();
   const { isLoggedIn, initialized, login } = useAuth();
 
-  // login form state
+  // ── Login form
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<
+    "email" | "password" | "general" | null
+  >(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // forgot-password modal state
+  // ── Forgot-password form
   const [showForgot, setShowForgot] = useState(false);
-  const [fpStep, setFpStep] = useState<"request" | "verify" | "reset">(
-    "request",
-  );
+  const [fpStep, setFpStep] = useState<(typeof steps)[number]>("request");
   const [fpEmail, setFpEmail] = useState("");
   const [fpCode, setFpCode] = useState("");
   const [fpNew, setFpNew] = useState("");
   const [fpConfirm, setFpConfirm] = useState("");
-  const [fpMsg, setFpMsg] = useState<string | null>(null);
+  const [fpMsg, setFpMsg] = useState("");
+  const [fpMsgType, setFpMsgType] = useState<"error" | "success">("error");
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef<number>();
 
-  // countdown effect
-  useEffect(() => {
-    if (expiresAt) {
-      const tick = () => {
-        const diff = Math.max(
-          0,
-          Math.floor((expiresAt.getTime() - Date.now()) / 1000),
-        );
-        setTimeLeft(diff);
-      };
-      tick();
-      timerRef.current = window.setInterval(tick, 1000);
-      return () => clearInterval(timerRef.current);
-    }
-  }, [expiresAt]);
-
-  // redirect if already logged
+  // Redirect if logged in
   useEffect(() => {
     if (initialized && isLoggedIn) router.replace("/acceuil");
   }, [initialized, isLoggedIn, router]);
+
+  // Countdown
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () =>
+      setTimeLeft(
+        Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
+      );
+    tick();
+    timerRef.current = window.setInterval(tick, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [expiresAt]);
+
   if (!initialized || isLoggedIn) return null;
 
-  // ── LOGIN SUBMIT ────────────────────────────────────────────────────────────
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60)
+      .toString()
+      .padStart(2, "0");
+    const sec = (s % 60).toString().padStart(2, "0");
+    return `${m}:${sec}`;
+  };
+
+  // Login submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setErrorField(null);
+    setErrorMsg("");
     const res = await fetch("http://localhost:2000/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      return setError(j.message || "Login failed");
+      const m = j.message || "Erreur de connexion";
+      if (/email/i.test(m)) setErrorField("email");
+      else if (/pass/i.test(m)) setErrorField("password");
+      else setErrorField("general");
+      setErrorMsg(m);
+      return;
     }
     const me = await fetch("http://localhost:2000/auth/me", {
       credentials: "include",
     });
-    if (!me.ok) return setError("Could not fetch user");
+    if (!me.ok) {
+      setErrorField("general");
+      setErrorMsg("Impossible de récupérer le profil");
+      return;
+    }
     login(await me.json());
     router.push("/acceuil");
   };
 
-  // ── FORGOT PASSWORD HANDLERS ───────────────────────────────────────────────
+  // Send/Resend code
   const requestCode = async () => {
-    setFpMsg(null);
-    if (!fpEmail) return setFpMsg("Veuillez entrer votre email.");
+    setFpMsg("");
+    setFpMsgType("error");
+    if (!fpEmail) return setFpMsg("Email requis");
     const res = await fetch("http://localhost:2000/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -82,15 +136,22 @@ export default function LoginPage() {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      return setFpMsg(j.message || "Email introuvable");
+      return setFpMsg(j.message || "Email non trouvé");
     }
     const j = await res.json();
     setExpiresAt(new Date(j.expiresAt));
     setFpStep("verify");
+    if (fpStep === "verify") {
+      setFpMsg("Code renvoyé !");
+      setFpMsgType("success");
+      setTimeout(() => setFpMsg(""), 10000);
+    }
   };
 
+  // Verify code
   const verifyCode = async () => {
-    setFpMsg(null);
+    setFpMsg("");
+    setFpMsgType("error");
     const res = await fetch(
       "http://localhost:2000/auth/forgot-password/verify",
       {
@@ -101,16 +162,17 @@ export default function LoginPage() {
     );
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      return setFpMsg(j.message || "Code invalide/expiré");
+      return setFpMsg(j.message || "Code invalide");
     }
     setFpStep("reset");
   };
 
+  // Reset password
   const resetPassword = async () => {
-    setFpMsg(null);
+    setFpMsg("");
+    setFpMsgType("error");
     if (fpNew !== fpConfirm)
-      return setFpMsg("Les mots de passe ne correspondent pas.");
-
+      return setFpMsg("Les mots de passe ne correspondent pas");
     const res = await fetch(
       "http://localhost:2000/auth/forgot-password/reset",
       {
@@ -128,162 +190,300 @@ export default function LoginPage() {
       const j = await res.json().catch(() => ({}));
       return setFpMsg(j.message || "Erreur");
     }
-
-    // close the modal on success:
     setShowForgot(false);
-
-    // optionally reset step and show a toast or message on the login page
-    setFpMsg("Mot de passe réinitialisé. Vous pouvez vous reconnecter.");
     setFpStep("request");
+    setFpMsg("Mot de passe réinitialisé");
+    setFpMsgType("success");
+    setTimeout(() => setFpMsg(""), 10000);
   };
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gray-100">
-        <form
-          onSubmit={handleSubmit}
-          className="w-80 space-y-4 rounded bg-white p-6 shadow-md"
-        >
-          <h2 className="text-center text-2xl font-bold text-blue-600">
-            Se connecter
-          </h2>
-          {error && <p className="text-red-600">{error}</p>}
+      {/* Main login */}
+      <div className="animate-fadeIn flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-100 to-blue-300">
+        <div className="relative flex w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+          {/* Form */}
+          <div className="w-full p-12 lg:w-1/2">
+            <h1 className="mb-4 text-3xl font-extrabold text-blue-700">
+              Gestion de Parc IT
+            </h1>
+            <p className="mb-8 text-gray-600">Connectez-vous pour continuer</p>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Email */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <MailIcon />
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre.email@exemple.tn"
+                    required
+                    className={`w-full rounded-lg border py-3 pl-10 pr-4 ${
+                      errorField === "email"
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    } shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200`}
+                  />
+                </div>
+                {errorField === "email" && (
+                  <p className="mt-1 text-sm text-red-600">{errorMsg}</p>
+                )}
+              </div>
 
-          <div>
-            <label className="block text-sm">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded border px-3 py-2"
-              required
-            />
+              {/* Password */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Mot de passe
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <LockIcon />
+                  </span>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className={`w-full rounded-lg border py-3 pl-10 pr-4 ${
+                      errorField === "password"
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    } shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200`}
+                  />
+                </div>
+                {errorField === "password" && (
+                  <p className="mt-1 text-sm text-red-600">{errorMsg}</p>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between">
+                <button
+                  type="submit"
+                  className="transform rounded-lg bg-blue-600 px-6 py-3 font-medium text-white shadow transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg"
+                >
+                  Se connecter
+                </button>
+                <button
+                  type="button"
+                  className="text-sm text-blue-600 hover:underline"
+                  onClick={() => setShowForgot(true)}
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+              {errorField === "general" && (
+                <p className="mt-2 text-center text-sm text-red-600">
+                  {errorMsg}
+                </p>
+              )}
+            </form>
           </div>
 
-          <div>
-            <label className="block text-sm">Mot de passe</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border px-3 py-2"
-              required
-            />
-          </div>
+          {/* Divider flush to image */}
+          <div className="ml-auto hidden h-full w-px origin-top rotate-[15deg] bg-blue-800 lg:block" />
 
-          <div className="flex justify-end text-sm">
-            <button
-              type="button"
-              onClick={() => setShowForgot(true)}
-              className="text-blue-600 hover:underline"
-            >
-              Mot de passe oublié ?
-            </button>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700"
+          {/* Image */}
+          <div
+            className="hidden w-1/2 overflow-hidden lg:block"
+            style={{ clipPath: "polygon(15% 0,100% 0,100% 100%,0 100%)" }}
           >
-            Se connecter
-          </button>
-        </form>
+            <Image
+              src="/images/logo/istockphoto-1705582381-612x612.jpg"
+              alt="IT Park"
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-cover opacity-80 blur-sm filter"
+              priority
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="absolute bottom-6 text-sm text-gray-600">
+          © {new Date().getFullYear()} École de Manouba — Tous droits réservés
+        </footer>
       </div>
 
+      {/* Forgot Password Modal */}
       {showForgot && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="w-full max-w-md space-y-4 rounded bg-white p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-blue-600">
-                Mot de passe oublié
-              </h3>
-              <button
-                onClick={() => setShowForgot(false)}
-                className="text-gray-400"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
+          <div className="animate-scaleUp relative w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-2xl">
+            <button
+              onClick={() => setShowForgot(false)}
+              className="absolute right-4 top-4 text-2xl text-gray-400 hover:text-gray-700"
+            >
+              &times;
+            </button>
+            <h3 className="text-center text-2xl font-semibold text-blue-700">
+              Réinitialiser le mot de passe
+            </h3>
+
+            {fpMsg && (
+              <div
+                className={`rounded px-4 py-2 text-sm ${
+                  fpMsgType === "error"
+                    ? "bg-red-50 text-red-700"
+                    : "bg-green-50 text-green-700"
+                } transition-opacity duration-500`}
               >
-                &times;
-              </button>
+                {fpMsg}
+              </div>
+            )}
+
+            {/* Enhanced stepper */}
+            <div className="mb-6 px-6">
+              <div className="relative">
+                {/* Gradient track */}
+                <div className="absolute inset-0 flex items-center">
+                  <div className="h-1 w-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 shadow" />
+                </div>
+                {/* Circles */}
+                <div className="relative z-10 flex justify-between">
+                  {stepLabels.map((label, i) => {
+                    const done = steps.indexOf(fpStep) > i;
+                    const active = fpStep === steps[i];
+                    return (
+                      <div
+                        key={i}
+                        className="flex flex-col items-center space-y-1"
+                      >
+                        <div
+                          className={`
+                            flex h-10 w-10 items-center justify-center rounded-full border-2 ring-2 ring-white transition
+                            ${
+                              done || active
+                                ? "border-blue-600 bg-blue-600 text-white shadow-lg"
+                                : "border-gray-300 bg-white text-gray-500"
+                            }
+                          `}
+                        >
+                          {i + 1}
+                        </div>
+                        <span
+                          className={`text-sm font-medium transition ${
+                            done || active ? "text-blue-600" : "text-gray-500"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
+            {/* Step content */}
             {fpStep === "request" && (
               <>
-                <p>Entrez votre email pour recevoir un code :</p>
                 <input
                   type="email"
                   value={fpEmail}
                   onChange={(e) => setFpEmail(e.target.value)}
-                  className="w-full rounded border px-3 py-2"
-                  placeholder="Email"
+                  placeholder="Votre email"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
                 <button
                   onClick={requestCode}
-                  className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700"
+                  className="w-full transform rounded-lg bg-blue-600 py-3 font-medium text-white shadow transition hover:-translate-y-0.5 hover:bg-blue-700"
                 >
                   Envoyer le code
                 </button>
               </>
             )}
-
             {fpStep === "verify" && (
               <>
-                <p>
-                  Code envoyé à {fpEmail}. Expire dans{" "}
-                  {Math.floor(timeLeft / 60)}:
-                  {String(timeLeft % 60).padStart(2, "0")}
-                </p>
                 <input
+                  type="text"
                   value={fpCode}
                   onChange={(e) => setFpCode(e.target.value)}
-                  className="w-full rounded border px-3 py-2"
-                  placeholder="Code à 6 chiffres"
+                  placeholder="Entrez le code"
+                  className="mb-3 w-full rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
-                <div className="flex space-x-2">
-                  <button
-                    onClick={verifyCode}
-                    className="flex-1 rounded bg-blue-600 py-2 text-white hover:bg-blue-700"
-                  >
-                    Vérifier
-                  </button>
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="inline-block rounded bg-gray-100 px-3 py-1 text-xs font-medium">
+                    {formatTime(timeLeft)}
+                  </span>
                   <button
                     onClick={requestCode}
-                    className="flex-1 rounded bg-gray-200 py-2 hover:bg-gray-300"
+                    className="text-sm text-blue-600 hover:underline"
                   >
-                    Renvoyer
+                    Renvoyer le code
                   </button>
                 </div>
+                <button
+                  onClick={verifyCode}
+                  className="w-full transform rounded-lg bg-blue-600 py-3 font-medium text-white shadow transition hover:-translate-y-0.5 hover:bg-blue-700"
+                >
+                  Vérifier
+                </button>
               </>
             )}
-
             {fpStep === "reset" && (
               <>
-                <p>Choisissez un nouveau mot de passe :</p>
                 <input
                   type="password"
                   value={fpNew}
                   onChange={(e) => setFpNew(e.target.value)}
-                  className="w-full rounded border px-3 py-2"
                   placeholder="Nouveau mot de passe"
+                  className="mb-3 w-full rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
                 <input
                   type="password"
                   value={fpConfirm}
                   onChange={(e) => setFpConfirm(e.target.value)}
-                  className="w-full rounded border px-3 py-2"
                   placeholder="Confirmer mot de passe"
+                  className="mb-6 w-full rounded-lg border border-gray-300 px-4 py-3 shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
                 <button
                   onClick={resetPassword}
-                  className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700"
+                  className="w-full transform rounded-lg bg-green-600 py-3 font-medium text-white shadow transition hover:-translate-y-0.5 hover:bg-green-700"
                 >
                   Réinitialiser
                 </button>
               </>
             )}
-
-            {fpMsg && <p className="text-red-600">{fpMsg}</p>}
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.6s ease-out both;
+        }
+
+        @keyframes scaleUp {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-scaleUp {
+          animation: scaleUp 0.3s ease-out both;
+        }
+      `}</style>
     </>
   );
 }
