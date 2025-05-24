@@ -1,5 +1,6 @@
 "use client";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { AlertTriangle } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 interface Emplacement {
@@ -51,6 +52,7 @@ export default function DemandeInterventionForm() {
     { value: "EN_ARRET", label: "En arrêt" },
     { value: "EN_MARCHE", label: "En marche" },
   ];
+  const [submitError, setSubmitError] = useState<string>("");
 
   const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
   const [allEquipements, setAllEquipements] = useState<Equipement[]>([]);
@@ -186,6 +188,9 @@ export default function DemandeInterventionForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // → reset de l’erreur de soumission
+    setSubmitError("");
+
     // validation échéance selon priorité
     const today = new Date();
     const echeanceDate = new Date(formData.echeance);
@@ -233,8 +238,15 @@ export default function DemandeInterventionForm() {
       credentials: "include",
       body: payload,
     })
-      .then(() => {
-        // reset form
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorBody = await res.json();
+          // on affiche le message venant du back (BadRequestException.message)
+          setSubmitError(errorBody.message || "Erreur inconnue");
+          return;
+        }
+        // succès → reset du form
+        setSubmitError("");
         setFormData((f) => ({
           nom: f.nom,
           prenom: f.prenom,
@@ -253,7 +265,10 @@ export default function DemandeInterventionForm() {
         setSelectedEquipement(null);
         setEcheanceError("");
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setSubmitError("Erreur réseau, réessayez plus tard");
+      });
   };
   return (
     <DefaultLayout>
@@ -499,6 +514,18 @@ export default function DemandeInterventionForm() {
               Envoyer ma demande
             </button>
           </div>
+          {submitError && (
+            <div
+              className="
+      mt-4 flex items-start space-x-2
+      rounded-lg border border-red-200
+      bg-red-50 p-3
+    "
+            >
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600" />
+              <p className="text-sm font-medium text-red-800">{submitError}</p>
+            </div>
+          )}
         </form>
       </div>
     </DefaultLayout>

@@ -1,40 +1,61 @@
 "use client";
-import React, { useState, ReactNode } from "react";
+
+import React, { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/AuthProvider";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import { getSocket } from "@/utils/socket";
 
 export default function DefaultLayout({ children }: { children: ReactNode }) {
   const { initialized, isLoggedIn } = useAuth();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 1) Don’t render until auth status is known
-  if (!initialized) {
-    return null;
-  }
+  useEffect(() => {
+    if (!initialized || !isLoggedIn) return;
 
-  // 2) If not logged in, redirect to login
+    const socket = getSocket();
+    if (!socket) return;
+
+    socket.connect();
+
+    socket.on("connect", () => console.log("✅ WS connected:", socket.id));
+    socket.on("disconnect", (reason) =>
+      console.log("❌ WS disconnected:", reason),
+    );
+    socket.on("connect_error", (err) =>
+      console.error("⚠️ WS auth error:", err.message),
+    );
+    socket.on("newIncident", (data) =>
+      console.log("🔔 Nouvelle notification reçue:", data),
+    );
+
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("connect_error");
+      socket.off("newIncident");
+    };
+  }, [initialized, isLoggedIn]);
+
+  if (!initialized) return null;
   if (!isLoggedIn) {
     router.replace("/");
     return null;
   }
 
-  // 3) Authenticated: render layout
   return (
-    <>
-      <div className="flex">
-        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <div className="relative flex flex-1 flex-col lg:ml-72.5">
-          <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-          <main>
-            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-              {children}
-            </div>
-          </main>
-        </div>
+    <div className="flex">
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <div className="relative flex flex-1 flex-col lg:ml-72.5">
+        <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <main>
+          <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+            {children}
+          </div>
+        </main>
       </div>
-    </>
+    </div>
   );
 }

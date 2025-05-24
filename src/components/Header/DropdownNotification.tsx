@@ -1,7 +1,6 @@
-// src/components/Header/DropdownNotification.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import ClickOutside from "@/components/ClickOutside";
 import {
@@ -13,50 +12,86 @@ import {
   FiChevronRight,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import { getSocket } from "@/utils/socket";
 
-// Mock notifications
-const notifications = Array.from({ length: 12 }, (_, i) => {
-  const types = ["success", "info", "warning", "error"];
-  const TypeIcons = {
-    success: FiCheckCircle,
-    info: FiInfo,
-    warning: FiAlertCircle,
-    error: FiX,
-  };
-  const type = types[i % types.length];
-  const Icon = TypeIcons[type];
-  const date = new Date(Date.now() - i * 3600 * 1000 * 3);
-  const dateStr = date.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return {
-    id: i + 1,
-    type,
-    title: `Notification ${i + 1}: événement ${type}`,
-    date: dateStr,
-    Icon,
-  };
-});
+// Map your incident-priority to icon+styles
+const TypeIcons = {
+  URGENT: FiAlertCircle,
+  NORMALE: FiInfo,
+  BASSE: FiCheckCircle,
+};
 
 const typeStyle = {
-  success: "bg-green-100 text-green-600",
-  info: "bg-blue-100 text-blue-600",
-  warning: "bg-yellow-100 text-yellow-600",
-  error: "bg-red-100 text-red-600",
+  URGENT: "bg-red-100 text-red-600",
+  NORMALE: "bg-blue-100 text-blue-600",
+  BASSE: "bg-green-100 text-green-600",
 };
+
+// Shape of a notification item
+interface NotificationItem {
+  id: string; // you can use incidentId + timestamp
+  type: "URGENT" | "NORMALE" | "BASSE";
+  title: string;
+  date: string; // formatted time
+  Icon: React.ComponentType<any>;
+}
 
 export default function DropdownNotification() {
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(true);
-  const [items, setItems] = useState(notifications);
+  const [unread, setUnread] = useState(false);
+  const [items, setItems] = useState<NotificationItem[]>([]);
 
+  // Toggle dropdown; mark read on open
   const toggle = () => {
-    setOpen(!open);
+    setOpen((o) => !o);
     if (unread) setUnread(false);
   };
 
-  const dismiss = (id) => {
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    // Ensure connected once
+    if (!socket.connected) socket.connect();
+
+    // On incoming incident → push onto our list
+    socket.on(
+      "newIncident",
+      (payload: {
+        incidentId: string;
+        equipementId: string;
+        familleMI: string;
+        priorite: "URGENT" | "NORMALE" | "BASSE";
+        dateCreation: string;
+      }) => {
+        const { incidentId, priorite, dateCreation } = payload;
+
+        const icon = TypeIcons[priorite] || FiInfo;
+        const style = typeStyle[priorite] || typeStyle.NORMALE;
+        const time = new Date(dateCreation).toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const newNotif: NotificationItem = {
+          id: `${incidentId}-${Date.now()}`,
+          type: priorite,
+          title: `Incident #${incidentId} (${priorite.toLowerCase()})`,
+          date: time,
+          Icon: icon,
+        };
+
+        setItems((curr) => [newNotif, ...curr]);
+        setUnread(true);
+      },
+    );
+
+    return () => {
+      socket.off("newIncident");
+    };
+  }, []);
+
+  const dismiss = (id: string) => {
     setItems((prev) => prev.filter((n) => n.id !== id));
   };
 
@@ -86,7 +121,7 @@ export default function DropdownNotification() {
               transition={{ duration: 0.2 }}
               className="absolute right-0 z-50 mt-2 flex max-h-[360px] w-[320px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
             >
-              {/* Header with mark all */}
+              {/* Header */}
               <div className="flex items-center justify-between border-b bg-white px-4 py-2">
                 <h5 className="text-sm font-semibold text-gray-800">
                   Notifications
@@ -99,7 +134,7 @@ export default function DropdownNotification() {
                 </button>
               </div>
 
-              {/* Modern vertical list with minimal scrollbar */}
+              {/* List */}
               <ul className="scrollbar-thin scrollbar-thumb-blue-500 scrollbar-track-transparent scrollbar-thumb-rounded-lg flex-1 overflow-y-auto">
                 {items.map(({ id, type, title, date, Icon }) => (
                   <motion.li
@@ -121,20 +156,24 @@ export default function DropdownNotification() {
                         <p className="mt-1 text-xs text-gray-500">{date}</p>
                       </div>
                     </div>
-                    {/* Dismiss button */}
                     <motion.button
                       onClick={() => dismiss(id)}
                       whileTap={{ scale: 0.8 }}
-                      className="p-1 text-red-500 transition hover:text-red-700"
+                      className="p-1 text-gray-400 transition hover:text-gray-600"
                       aria-label="Dismiss"
                     >
                       <FiX size={16} />
                     </motion.button>
                   </motion.li>
                 ))}
+                {items.length === 0 && (
+                  <li className="px-4 py-6 text-center text-gray-500">
+                    Aucune notification
+                  </li>
+                )}
               </ul>
 
-              {/* Footer view all */}
+              {/* Footer */}
               <Link href="/notification/not-responsablesi">
                 <div className="flex cursor-pointer items-center justify-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
                   <FiChevronRight className="rotate-180" />
