@@ -1,25 +1,16 @@
+// utils/socket.ts
 import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
-
-function getAuthTokenFromCookie(): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("Authentication="));
-  return match?.split("=")[1];
-}
-
-export const getSocket = () => {
-  if (!socket && typeof window !== "undefined") {
-    const token = getAuthTokenFromCookie();
-
+export function getSocket(): Socket | null {
+  if (typeof window === "undefined") return null;
+  if (!socket) {
     socket = io("http://localhost:2000", {
-      autoConnect: false,
+      // simply drop autoConnect:false so it connects as soon as you call io()
       transports: ["websocket"],
-      withCredentials: true, // envoie bien les cookies HTTP
-      auth: { token }, // et, si présent, envoie aussi le JWT explicitement
+      withCredentials: true,
     });
+    console.log("🚀 WS client created & connecting (cookies will be sent)");
   }
   return socket;
-};
+}

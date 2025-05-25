@@ -1,3 +1,4 @@
+// app/layouts/DefaultLayout.tsx
 "use client";
 
 import React, { ReactNode, useEffect, useState } from "react";
@@ -18,8 +19,7 @@ export default function DefaultLayout({ children }: { children: ReactNode }) {
     const socket = getSocket();
     if (!socket) return;
 
-    socket.connect();
-
+    // 1️⃣ Register handlers _before_ connecting
     socket.on("connect", () => console.log("✅ WS connected:", socket.id));
     socket.on("disconnect", (reason) =>
       console.log("❌ WS disconnected:", reason),
@@ -28,9 +28,13 @@ export default function DefaultLayout({ children }: { children: ReactNode }) {
       console.error("⚠️ WS auth error:", err.message),
     );
     socket.on("newIncident", (data) =>
-      console.log("🔔 Nouvelle notification reçue:", data),
+      console.log("🔔 Nouvelle notif reçue:", data),
     );
 
+    // 2️⃣ Now open the connection (with cookie)
+    socket.connect();
+
+    // 3️⃣ Cleanup on unmount / logout
     return () => {
       socket.off("connect");
       socket.off("disconnect");
