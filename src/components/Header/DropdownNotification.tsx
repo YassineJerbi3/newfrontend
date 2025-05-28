@@ -90,7 +90,7 @@ export default function DropdownNotification() {
 
     const handler = (payload: any) => {
       const newItem: NotificationItem = {
-        id: payload.id, // UUID réel
+        id: payload.id,
         familleMI: payload.familleMI,
         priorite: payload.priorite,
         creator: payload.creator || "-",
@@ -103,7 +103,10 @@ export default function DropdownNotification() {
 
     const onConnect = () => {
       socket.emit("joinNotifications", { recipientId: user.recipientId });
+      // on écoutait déjà 'newIncident' :
       socket.on("newIncident", handler);
+      // maintenant on écoute aussi 'incident_assign' :
+      socket.on("incident_assign", handler);
     };
 
     socket.on("connect", onConnect);
@@ -112,6 +115,7 @@ export default function DropdownNotification() {
     return () => {
       socket.off("connect", onConnect);
       socket.off("newIncident", handler);
+      socket.off("incident_assign", handler);
     };
   }, [user.recipientId]);
 
@@ -163,9 +167,11 @@ export default function DropdownNotification() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className={`relative flex flex-col border-b border-l-4 px-4 py-3 
-                          last:border-none ${priorityColor[n.priorite] || priorityColor.DEFAULT} 
-                          overflow-hidden transition-shadow hover:bg-gray-50 hover:shadow-sm`}
+                        className={`
+                          relative flex flex-col border-b border-l-4 px-4 py-3 last:border-none
+                          ${priorityColor[n.priorite] || priorityColor.DEFAULT}
+                          overflow-hidden transition-shadow hover:bg-gray-50 hover:shadow-sm
+                        `}
                       >
                         {/* Bouton × */}
                         <button
@@ -177,7 +183,10 @@ export default function DropdownNotification() {
 
                         {/* Badge priorité */}
                         <span
-                          className={`self-start rounded-full border px-2 py-0.5 text-xs font-medium ${priorityColor[n.priorite]}`}
+                          className={`
+                            self-start rounded-full border px-2 py-0.5 text-xs font-medium
+                            ${priorityColor[n.priorite] || priorityColor.DEFAULT}
+                          `}
                         >
                           {n.priorite}
                         </span>
