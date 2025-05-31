@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, MouseEvent } from "react";
-import Link from "next/link";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import Link from "next/link";
 import {
   FiAlertTriangle,
   FiClock,
@@ -11,20 +11,17 @@ import {
   FiFilter,
   FiCalendar,
   FiRefreshCw,
-  FiX,
 } from "react-icons/fi";
 
 interface Notification {
   id: string;
   read: boolean;
-  payload: {
-    incidentId: string;
-    message?: string;
-    dateCreation: string;
-  };
+  incidentId: string;
+  equipmentType: string;
+  location: string;
+  createdAt: string;
 }
 
-// Accent styles for technicien notifications (single priority)
 const ACCENT = {
   border: "border-blue-500",
   badgeBg: "bg-blue-100",
@@ -38,20 +35,26 @@ export default function NotificationTechnicien() {
 
   // Charger les notifications assignées à ce technicien
   useEffect(() => {
-    fetch("http://localhost:2000/notifications", { credentials: "include" })
+    fetch("http://localhost:2000/notifications", {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then((data: any[]) => {
-        // On ne garde que les assignations (incident_assign)
-        const assigned = data.filter((n) => n.type === "incident_assign");
-        setNotes(
-          assigned
-            .map((n) => ({ id: n.id, read: n.read, payload: n.payload }))
-            .sort(
-              (a, b) =>
-                new Date(b.payload.dateCreation).getTime() -
-                new Date(a.payload.dateCreation).getTime(),
-            ),
-        );
+        const assigned = data
+          .filter((n) => n.type === "incident_assign")
+          .map((n) => ({
+            id: n.id,
+            read: n.read,
+            incidentId: n.payload.incidentId,
+            equipmentType: n.payload.equipmentType,
+            location: n.payload.location,
+            createdAt: n.createdAt,
+          }))
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+        setNotes(assigned);
       })
       .catch(console.error);
   }, []);
@@ -74,23 +77,21 @@ export default function NotificationTechnicien() {
       if (filterRead === "READ" && !n.read) return false;
       if (filterRead === "UNREAD" && n.read) return false;
       if (filterDate) {
-        const key = new Date(n.payload.dateCreation).toISOString().slice(0, 10);
+        const key = new Date(n.createdAt).toISOString().slice(0, 10);
         if (key !== filterDate) return false;
       }
       return true;
     });
 
-    return filtered.reduce<Record<string, Notification[]>>(
-      (acc, n) => {
-        const dateLabel = new Date(n.payload.dateCreation).toLocaleDateString(
-          "fr-FR",
-          { day: "2-digit", month: "2-digit", year: "numeric" },
-        );
-        (acc[dateLabel] ||= []).push(n);
-        return acc;
-      },
-      {} as Record<string, Notification[]>,
-    );
+    return filtered.reduce<Record<string, Notification[]>>((acc, n) => {
+      const dateLabel = new Date(n.createdAt).toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      (acc[dateLabel] ||= []).push(n);
+      return acc;
+    }, {});
   }, [notes, filterRead, filterDate]);
 
   return (
@@ -120,7 +121,9 @@ export default function NotificationTechnicien() {
               </label>
               <select
                 value={filterRead}
-                onChange={(e) => setFilterRead(e.target.value as any)}
+                onChange={(e) =>
+                  setFilterRead(e.target.value as "" | "READ" | "UNREAD")
+                }
                 className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-green-200"
               >
                 <option value="">Tous</option>
@@ -168,13 +171,17 @@ export default function NotificationTechnicien() {
               </h2>
               <div className="flex flex-col gap-6">
                 {items.map((n) => (
-                  <div
+                  <Link
                     key={n.id}
-                    className={`w-full rounded-xl border-l-4 bg-white ${ACCENT.border} cursor-pointer p-6 shadow-md transition hover:bg-gray-50 ${n.read ? "opacity-70" : "opacity-100"}`}
+                    href={`/rapport/incident/${n.incidentId}`}
+                    className={`block w-full rounded-xl border-l-4 bg-white ${ACCENT.border} p-6 shadow-md transition hover:bg-gray-50 ${
+                      n.read ? "opacity-70" : "opacity-100"
+                    }`}
                   >
+                    {/* Header */}
                     <div className="mb-3 flex items-center justify-between">
                       <div className="flex items-center gap-3 text-xl font-semibold text-gray-900">
-                        <FiAlertTriangle /> <span>Assignation</span>
+                        <FiAlertTriangle /> <span>Incident</span>
                       </div>
                       <span
                         className={`px-3 py-1 text-sm font-semibold ${ACCENT.badgeText} ${ACCENT.badgeBg} rounded-full`}
@@ -183,31 +190,35 @@ export default function NotificationTechnicien() {
                       </span>
                     </div>
 
+                    {/* Contenu */}
                     <div className="grid grid-cols-1 gap-3 text-gray-700 sm:grid-cols-2">
                       <div className="flex items-center gap-2">
                         <FiClock />
                         <span>
-                          <strong>Heure :</strong>{" "}
-                          {new Date(n.payload.dateCreation).toLocaleTimeString(
-                            "fr-FR",
-                            { hour: "2-digit", minute: "2-digit" },
-                          )}
+                          <strong>Notification :</strong>{" "}
+                          {new Date(n.createdAt).toLocaleTimeString("fr-FR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span>
-                          <strong>Incident ID :</strong> {n.payload.incidentId}
+                          <strong>Équipement :</strong> {n.equipmentType}
                         </span>
                       </div>
-                      {n.payload.message && (
-                        <div className="flex items-start gap-2 sm:col-span-2">
-                          <span className="font-medium">Message :</span>
-                          <span>{n.payload.message}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span>
+                          <strong>Emplacement :</strong> {n.location}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-end gap-4">
+                    {/* Actions */}
+                    <div
+                      className="mt-4 flex items-center justify-end gap-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {!n.read && (
                         <button
                           onClick={(e) => markAsRead(e, n.id)}
@@ -216,14 +227,8 @@ export default function NotificationTechnicien() {
                           <FiEye /> Marquer lu
                         </button>
                       )}
-                      <Link
-                        href={`/rapport/incident/${n.payload.incidentId}`}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <FiX size={20} />
-                      </Link>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>

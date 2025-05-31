@@ -12,31 +12,43 @@ import {
   FiAlertTriangle,
   FiCpu,
   FiMail,
-  FiUser,
-  FiMapPin,
-  FiClock,
+  FiFlag,
   FiBox,
   FiRefreshCw,
   FiFilter,
   FiCalendar,
   FiEye,
-  FiFlag,
   FiX,
+  FiClock,
+  FiUser,
+  FiMapPin,
 } from "react-icons/fi";
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
+type NotificationType =
+  | "incident"
+  | "applicatif"
+  | "demande"
+  | "rapport-incident"
+  | "ALERTE_STOCK"
+  | "DEPASSEMENT_STOCK_ALERT"
+  | "STOCK_INDISPONIBLE";
+
 interface NotificationItem {
   id: string;
   read: boolean;
-  type: "incident" | "applicatif" | "demande";
+  type: NotificationType;
   payload: {
-    priorite: "URGENT" | "NORMALE" | "BASSE";
-    creator: string;
+    priorite?: "URGENT" | "NORMALE" | "BASSE";
+    creator?: string;
     creatorRole?: string;
-    equipmentType: string;
-    location: string;
-    dateCreation: string;
+    equipmentType?: string;
+    location?: string;
+    dateCreation?: string;
+    message?: string;
+    createdAt: string;
+    incidentId?: string;
   };
 }
 
@@ -47,31 +59,61 @@ interface User {
   roles: string;
 }
 
+/**
+ * Small colored dot for unread indicator
+ * Variant styles for priority badges
+ */
 const PRIORITY_STYLES = {
-  URGENT: {
-    accent: "border-red-500",
-    badgeBg: "bg-red-100",
-    badgeText: "text-red-600",
-  },
-  NORMALE: {
-    accent: "border-yellow-500",
-    badgeBg: "bg-yellow-100",
-    badgeText: "text-yellow-600",
-  },
-  BASSE: {
-    accent: "border-blue-500",
-    badgeBg: "bg-blue-100",
-    badgeText: "text-blue-600",
-  },
+  URGENT: { bg: "bg-red-500", text: "text-white" },
+  NORMALE: { bg: "bg-yellow-500", text: "text-white" },
+  BASSE: { bg: "bg-blue-500", text: "text-white" },
 } as const;
 
+/**
+ * Configuration per notification type:
+ * - icon: the icon component
+ * - accent: a small accent color for borders and highlights
+ * - label: display label
+ */
 const TYPE_CONFIG: Record<
-  NotificationItem["type"],
-  { icon: JSX.Element; label: string }
+  NotificationType,
+  { icon: JSX.Element; accent: string; label: string }
 > = {
-  incident: { icon: <FiAlertTriangle />, label: "Incident" },
-  applicatif: { icon: <FiCpu />, label: "Applicatif" },
-  demande: { icon: <FiMail />, label: "Demande" },
+  incident: {
+    icon: <FiAlertTriangle size={20} />,
+    accent: "border-red-500 text-red-500",
+    label: "Incident",
+  },
+  applicatif: {
+    icon: <FiCpu size={20} />,
+    accent: "border-purple-500 text-purple-500",
+    label: "Applicatif",
+  },
+  demande: {
+    icon: <FiMail size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Demande",
+  },
+  "rapport-incident": {
+    icon: <FiFlag size={20} />,
+    accent: "border-indigo-500 text-indigo-500",
+    label: "Rapport",
+  },
+  ALERTE_STOCK: {
+    icon: <FiBox size={20} />,
+    accent: "border-yellow-500 text-yellow-500",
+    label: "Alerte Stock",
+  },
+  DEPASSEMENT_STOCK_ALERT: {
+    icon: <FiBox size={20} />,
+    accent: "border-orange-500 text-orange-500",
+    label: "Dépassement Stock",
+  },
+  STOCK_INDISPONIBLE: {
+    icon: <FiBox size={20} />,
+    accent: "border-gray-500 text-gray-500",
+    label: "Stock Indisp.",
+  },
 };
 
 export default function NotificationResponsableSI() {
@@ -86,78 +128,99 @@ export default function NotificationResponsableSI() {
   const [filterRead, setFilterRead] = useState<"" | "READ" | "UNREAD">("");
   const [filterDate, setFilterDate] = useState<string>("");
 
-  // Modal d'assignation
   const [modalOpen, setModalOpen] = useState(false);
   const [currentIncidentId, setCurrentIncidentId] = useState<string | null>(
     null,
   );
   const [selectedTech, setSelectedTech] = useState<string>("");
 
-  // 1️⃣ Charger les notifications
+  // Fetch notifications from API
   const loadNotifications = useCallback(() => {
     fetch("http://localhost:2000/notifications", { credentials: "include" })
       .then((res) => res.json())
-      .then((data) =>
-        setNotifications(
-          data
-            .map((r: any) => ({
-              id: r.id,
-              read: r.read,
-              type: r.type,
-              payload: r.payload,
-            }))
-            .sort(
-              (a, b) =>
-                new Date(b.payload.dateCreation).getTime() -
-                new Date(a.payload.dateCreation).getTime(),
-            ),
-        ),
-      )
+      .then((data: any[]) => {
+        const items = data
+          .map((r) => ({
+            id: r.id,
+            read: r.read,
+            type: r.type as NotificationType,
+            payload: {
+              ...r.payload,
+              createdAt: r.createdAt,
+            },
+          }))
+          .sort((a, b) => {
+            const aDate = new Date(
+              a.payload.dateCreation ?? a.payload.createdAt,
+            ).getTime();
+            const bDate = new Date(
+              b.payload.dateCreation ?? b.payload.createdAt,
+            ).getTime();
+            return bDate - aDate;
+          });
+        setNotifications(items);
+      })
       .catch(console.error);
   }, []);
 
-  // 2️⃣ Charger les techniciens
+  // Fetch technicians from API
   useEffect(() => {
     fetch("http://localhost:2000/users", { credentials: "include" })
       .then((res) => res.json())
       .then((all: User[]) =>
-        setUsers(all.filter((u) => u.roles === "TECHNICIEN")),
+        setUsers(all.filter((u) => u.roles.includes("TECHNICIEN"))),
       )
       .catch(console.error);
   }, []);
 
-  // 3️⃣ WebSocket en temps réel + reconnection
+  // WebSocket: listen for new notifications
   useEffect(() => {
     loadNotifications();
     const socket = getSocket();
     if (!socket) return;
+    if (socket.disconnected) socket.connect();
 
-    if (socket.disconnected) {
-      socket.connect();
-    }
-
-    const handler = (payload: any) =>
+    const handler = (payload: any) => {
+      const newNotif: NotificationItem = {
+        id: payload.id,
+        read: false,
+        type: payload.type as NotificationType,
+        payload: {
+          ...payload,
+          createdAt: payload.dateCreation ?? new Date().toISOString(),
+        },
+      };
       setNotifications((prev) =>
-        [
-          { id: payload.id, read: false, type: payload.type, payload },
-          ...prev,
-        ].sort(
-          (a, b) =>
-            new Date(b.payload.dateCreation).getTime() -
-            new Date(a.payload.dateCreation).getTime(),
-        ),
+        [newNotif, ...prev].sort((a, b) => {
+          const aDate = new Date(
+            a.payload.dateCreation ?? a.payload.createdAt,
+          ).getTime();
+          const bDate = new Date(
+            b.payload.dateCreation ?? b.payload.createdAt,
+          ).getTime();
+          return bDate - aDate;
+        }),
       );
+    };
 
     socket.on("incident", handler);
     socket.on("incident_assign", handler);
+    socket.on("rapport-incident", handler);
+    socket.on("ALERTE_STOCK", handler);
+    socket.on("DEPASSEMENT_STOCK_ALERT", handler);
+    socket.on("STOCK_INDISPONIBLE", handler);
 
     return () => {
       socket.off("incident", handler);
       socket.off("incident_assign", handler);
+      socket.off("rapport-incident", handler);
+      socket.off("ALERTE_STOCK", handler);
+      socket.off("DEPASSEMENT_STOCK_ALERT", handler);
+      socket.off("STOCK_INDISPONIBLE", handler);
     };
   }, [loadNotifications]);
 
-  // 4️⃣ Marquer comme lu
+  // Mark a notification as read
   const markAsRead = (e: MouseEvent, id: string) => {
     e.stopPropagation();
     fetch(`http://localhost:2000/notifications/${id}/read`, {
@@ -169,16 +232,14 @@ export default function NotificationResponsableSI() {
     );
   };
 
-  // 5️⃣ Ouvrir la modal
-  // Au lieu de `setCurrentIncidentId(idNotification)`
-  // tu reçois désormais directement l'id de l'incident
+  // Open the modal to assign a technician for an incident
   const openAssignModal = (incidentId: string) => {
     setCurrentIncidentId(incidentId);
     setSelectedTech("");
     setModalOpen(true);
   };
 
-  // 6️⃣ Confirmer l’assignation
+  // Confirm assignment of technician
   const confirmAssign = () => {
     if (!currentIncidentId || !selectedTech) return;
     fetch(`http://localhost:2000/incidents/${currentIncidentId}/assign`, {
@@ -190,16 +251,19 @@ export default function NotificationResponsableSI() {
       .then(() => {
         setModalOpen(false);
         setSelectedTech("");
-        // 🔄 on recharge
         loadNotifications();
       })
       .catch(console.error);
   };
 
-  // 7️⃣ Regroupement par date & filtres
+  // Group notifications by date and apply filters
   const grouped = useMemo(() => {
     const filtered = notifications.filter((n) => {
-      const key = new Date(n.payload.dateCreation).toISOString().slice(0, 10);
+      const dateStr = n.payload.dateCreation ?? n.payload.createdAt;
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return false;
+      const key = dateObj.toISOString().slice(0, 10);
+
       if (filterType && n.type !== filterType) return false;
       if (filterPriority && n.payload.priorite !== filterPriority) return false;
       if (filterRead === "READ" && !n.read) return false;
@@ -207,11 +271,14 @@ export default function NotificationResponsableSI() {
       if (filterDate && key !== filterDate) return false;
       return true;
     });
+
     return filtered.reduce<Record<string, NotificationItem[]>>((acc, n) => {
-      const dateLabel = new Date(n.payload.dateCreation).toLocaleDateString(
-        "fr-FR",
-        { day: "2-digit", month: "2-digit", year: "numeric" },
-      );
+      const dateObj = new Date(n.payload.dateCreation ?? n.payload.createdAt);
+      const dateLabel = dateObj.toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
       (acc[dateLabel] ||= []).push(n);
       return acc;
     }, {});
@@ -221,11 +288,11 @@ export default function NotificationResponsableSI() {
     <DefaultLayout>
       <div className="min-h-screen bg-gray-50 px-6 py-8">
         {/* Header */}
-        <div className="mb-6 flex flex-col items-start sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-5xl font-extrabold text-gray-900">
+        <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-4xl font-extrabold text-gray-900">
             Notifications
           </h1>
-          <span className="mt-2 text-gray-700 sm:mt-0">
+          <span className="text-gray-600">
             {new Date().toLocaleDateString("fr-FR", {
               day: "2-digit",
               month: "2-digit",
@@ -234,31 +301,38 @@ export default function NotificationResponsableSI() {
           </span>
         </div>
 
-        {/* Filtres */}
-        <div className="sticky top-[90px] z-20 mx-auto mb-10 max-w-5xl rounded-2xl border border-white/30 bg-white/20 px-6 py-4 shadow-lg backdrop-blur-lg">
-          <div className="flex flex-wrap gap-6">
+        {/* Filters */}
+        <div className="sticky top-[80px] z-20 mx-auto mb-8 max-w-5xl rounded-xl bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-end gap-4">
             {/* Type */}
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FiFilter /> Type
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiFilter size={16} /> Type
               </label>
               <select
                 value={filterType}
                 onChange={(e) =>
                   setFilterType(e.target.value as NotificationItem["type"])
                 }
-                className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-indigo-200"
+                className="w-40 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
               >
                 <option value="">Tous</option>
                 <option value="incident">Incident</option>
                 <option value="applicatif">Applicatif</option>
                 <option value="demande">Demande</option>
+                <option value="rapport-incident">Rapport</option>
+                <option value="ALERTE_STOCK">Alerte Stock</option>
+                <option value="DEPASSEMENT_STOCK_ALERT">
+                  Dépassement Stock
+                </option>
+                <option value="STOCK_INDISPONIBLE">Stock Indisp.</option>
               </select>
             </div>
+
             {/* Priorité */}
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FiFlag /> Priorité
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiFlag size={16} /> Priorité
               </label>
               <select
                 value={filterPriority}
@@ -267,7 +341,7 @@ export default function NotificationResponsableSI() {
                     e.target.value as keyof typeof PRIORITY_STYLES,
                   )
                 }
-                className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-yellow-200"
+                className="w-40 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200"
               >
                 <option value="">Toutes</option>
                 <option value="URGENT">Urgent</option>
@@ -275,33 +349,36 @@ export default function NotificationResponsableSI() {
                 <option value="BASSE">Basse</option>
               </select>
             </div>
+
             {/* Statut */}
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FiEye /> Statut
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiEye size={16} /> Statut
               </label>
               <select
                 value={filterRead}
                 onChange={(e) => setFilterRead(e.target.value as any)}
-                className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-green-200"
+                className="w-40 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-green-400 focus:ring-1 focus:ring-green-200"
               >
                 <option value="">Tous</option>
                 <option value="UNREAD">Non lus</option>
                 <option value="READ">Lus</option>
               </select>
             </div>
+
             {/* Date */}
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FiCalendar /> Date
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiCalendar size={16} /> Date
               </label>
               <input
                 type="date"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
-                className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-purple-200"
+                className="w-40 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-purple-400 focus:ring-1 focus:ring-purple-200"
               />
             </div>
+
             {/* Reset */}
             <button
               onClick={() => {
@@ -310,25 +387,25 @@ export default function NotificationResponsableSI() {
                 setFilterRead("");
                 setFilterDate("");
               }}
-              className="flex items-center gap-2 rounded-full bg-[#30486d] px-5 py-3 font-bold text-white shadow transition hover:bg-[#050f26]"
+              className="ml-auto flex items-center gap-1 rounded-md bg-gray-800 px-4 py-1 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-105"
             >
-              <FiRefreshCw /> Réinitialiser
+              <FiRefreshCw size={16} /> Réinitialiser
             </button>
           </div>
         </div>
 
-        {/* Liste */}
+        {/* Notification Groups */}
         <div className="mx-auto max-w-5xl space-y-10">
           {Object.keys(grouped).length === 0 && (
             <p className="text-center text-gray-500">Aucune notification.</p>
           )}
 
           {Object.entries(grouped).map(([date, items]) => (
-            <div key={date}>
-              <h2 className="mb-4 text-3xl font-semibold text-gray-800">
+            <section key={date}>
+              <h2 className="mb-4 text-2xl font-semibold text-gray-800">
                 {date}
               </h2>
-              <div className="flex flex-col gap-6">
+              <div className="grid auto-rows-auto gap-6">
                 {items.map((n) => {
                   const {
                     priorite,
@@ -337,80 +414,122 @@ export default function NotificationResponsableSI() {
                     equipmentType,
                     location,
                     dateCreation,
+                    message,
+                    incidentId,
                   } = n.payload;
-                  const style = PRIORITY_STYLES[priorite];
-                  const { icon, label } = TYPE_CONFIG[n.type];
+                  const isStock =
+                    n.type === "ALERTE_STOCK" ||
+                    n.type === "DEPASSEMENT_STOCK_ALERT" ||
+                    n.type === "STOCK_INDISPONIBLE";
+                  const { icon, accent, label } = TYPE_CONFIG[n.type];
+                  const priorityStyle = priorite
+                    ? PRIORITY_STYLES[priorite]
+                    : PRIORITY_STYLES.NORMALE;
 
                   return (
                     <div
                       key={n.id}
                       onClick={(e) => {
-                        if (n.type === "incident") {
-                          // on stocke l'incidentId, pas l'id de notif
-                          openAssignModal(n.payload.incidentId as string);
+                        if (n.type === "incident" && incidentId) {
+                          openAssignModal(incidentId);
                         } else {
                           markAsRead(e, n.id);
                         }
                       }}
-                      className={`w-full rounded-xl border-l-4 bg-white ${style.accent} cursor-pointer p-6 shadow-md transition hover:bg-gray-50 ${
-                        n.read ? "opacity-70" : "opacity-100"
-                      }`}
+                      className={`
+                        relative flex transform cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
+                        hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
+                      `}
                     >
-                      {/* Header */}
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-xl font-semibold text-gray-900">
-                          {icon} <span>{label}</span>
+                      {/* Top Accent Bar */}
+                      <div className={`h-1 w-full ${accent}`} />
+
+                      {/* Main Content */}
+                      <div className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${accent} bg-white`}
+                          >
+                            {icon}
+                          </div>
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {label}
+                          </h3>
                         </div>
-                        <span
-                          className={`px-3 py-1 text-sm font-semibold ${style.badgeText} ${style.badgeBg} rounded-full`}
-                        >
-                          {priorite[0] + priorite.slice(1).toLowerCase()}
-                        </span>
-                      </div>
-                      {/* Détails */}
-                      <div className="grid grid-cols-1 gap-3 text-gray-700 sm:grid-cols-2">
-                        <div className="flex items-center gap-2">
-                          <FiMapPin />
-                          <span>
-                            <strong>Emplacement :</strong> {location}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <FiUser />
-                          <span>
-                            <strong>Créateur :</strong> {creator}
-                            {creatorRole && ` (${creatorRole})`}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <FiClock />
-                          <span>
-                            <strong>Heure :</strong>{" "}
-                            {new Date(dateCreation).toLocaleTimeString(
-                              "fr-FR",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
+
+                        {message ? (
+                          <p className="mt-2 text-sm text-gray-600">
+                            {message}
+                          </p>
+                        ) : (
+                          <div className="mt-2 space-y-2 text-sm text-gray-600">
+                            {location && (
+                              <p className="flex items-center gap-1">
+                                <FiMapPin size={14} className="text-gray-500" />
+                                <span>
+                                  <strong>Emplacement:</strong> {location}
+                                </span>
+                              </p>
                             )}
-                          </span>
+                            {creator && (
+                              <p className="flex items-center gap-1">
+                                <FiUser size={14} className="text-gray-500" />
+                                <span>
+                                  <strong>Créateur:</strong> {creator}
+                                  {creatorRole && ` (${creatorRole})`}
+                                </span>
+                              </p>
+                            )}
+                            {equipmentType && (
+                              <p className="flex items-center gap-1">
+                                <FiBox size={14} className="text-gray-500" />
+                                <span>
+                                  <strong>Équipement:</strong> {equipmentType}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          {!isStock && priorite && (
+                            <span
+                              className={`rounded-full px-3 py-0.5 text-xs font-semibold ${priorityStyle.text} ${priorityStyle.bg}`}
+                            >
+                              {priorite.charAt(0) +
+                                priorite.slice(1).toLowerCase()}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2 font-medium text-indigo-700">
-                          <FiBox />
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                          <FiClock size={12} />
                           <span>
-                            <strong>Équipement :</strong> {equipmentType}
+                            {new Date(
+                              dateCreation ?? n.payload.createdAt,
+                            ).toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
                         </div>
                       </div>
+
+                      {/* Unread Indicator */}
+                      {!n.read && (
+                        <div className="absolute right-3 top-3 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                      )}
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </section>
           ))}
         </div>
 
-        {/* Modal d’assignation */}
+        {/* Assign Technician Modal */}
         {modalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="z-10 w-80 rounded-xl bg-white p-6 shadow-lg">
@@ -420,17 +539,17 @@ export default function NotificationResponsableSI() {
                 </h2>
                 <button
                   onClick={() => setModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-500 hover:text-gray-700"
                 >
-                  <FiX size={20} />
+                  <FiX size={18} />
                 </button>
               </div>
-              <label className="block text-gray-700">
+              <label className="block text-sm text-gray-700">
                 Sélectionnez :
                 <select
                   value={selectedTech}
                   onChange={(e) => setSelectedTech(e.target.value)}
-                  className="mt-2 w-full rounded border-gray-300 p-2 shadow-sm"
+                  className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:ring-1 focus:ring-blue-200"
                 >
                   <option value="">-- Choisir --</option>
                   {users.map((u) => (
@@ -440,17 +559,17 @@ export default function NotificationResponsableSI() {
                   ))}
                 </select>
               </label>
-              <div className="mt-6 flex justify-end space-x-4">
+              <div className="mt-6 flex justify-end gap-4">
                 <button
                   onClick={() => setModalOpen(false)}
-                  className="rounded bg-gray-300 px-4 py-2 text-gray-800 hover:bg-gray-400"
+                  className="rounded-md bg-gray-300 px-4 py-1 text-sm text-gray-800 hover:bg-gray-400"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={confirmAssign}
                   disabled={!selectedTech}
-                  className={`rounded px-4 py-2 text-white ${
+                  className={`rounded-md px-4 py-1 text-sm text-white ${
                     !selectedTech
                       ? "bg-blue-300"
                       : "bg-blue-600 hover:bg-blue-700"
