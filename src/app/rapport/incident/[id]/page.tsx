@@ -11,6 +11,8 @@ import {
   FiClock,
   FiPlus,
   FiTrash2,
+  FiMail,
+  FiPhone,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 
@@ -65,18 +67,26 @@ interface RapportExisting {
   nomExterne?: string;
   prenomExterne?: string;
   emailExterne?: string;
+  telephoneExterne?: string;
   travailEffectue?: string;
   dateDebut?: string;
   dateFin?: string;
   cout?: number;
   bonSorties?: BonSortieExisting[];
+  statut: "BROUILLON" | "SOUMIS" | "A_PLANIFIER" | "INVALIDE" | "VALIDE";
 }
 
 // ─── CSS Utilitaire ───────────────────────────────────────────────────────────
 
 const inputBase =
-  "w-full rounded-md border border-gray-200 bg-gray-50 px-4 py-2 text-gray-900 " +
+  "w-full rounded-md border border-gray-200 bg-white px-4 py-2 text-gray-900 " +
   "focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition";
+
+const inputDisabled =
+  "w-full rounded-md border border-gray-200 bg-gray-100 px-4 py-2 text-gray-500 cursor-not-allowed";
+
+const sectionTitle =
+  "mb-2 flex items-center gap-2 text-lg font-semibold text-gray-800";
 
 // ─── Composant Principal ─────────────────────────────────────────────────────
 
@@ -88,6 +98,7 @@ export default function CombinedIncidentForms() {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [view, setView] = useState<"fiche" | "rapport">("fiche");
   const [existing, setExisting] = useState<RapportExisting | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   // Le formulaire du rapport
   const [form, setForm] = useState({
@@ -97,11 +108,15 @@ export default function CombinedIncidentForms() {
     nomExterne: "",
     prenomExterne: "",
     emailExterne: "",
+    telephoneExterne: "",
     travailEffectue: "",
     dateDebut: "",
     dateFin: "",
     cout: "",
   });
+
+  // Erreurs de validation
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Les bon de sortie sélectionnés (lignes dynamiques)
   const [selectedConsumables, setSelectedConsumables] = useState<
@@ -139,6 +154,7 @@ export default function CombinedIncidentForms() {
       .then((data: RapportExisting | null) => {
         if (data) {
           setExisting(data);
+          // Remplir le formulaire avec les valeurs existantes
           setForm({
             diagnosticPanne: data.diagnosticPanne || "",
             natureIntervention: data.natureIntervention,
@@ -146,9 +162,10 @@ export default function CombinedIncidentForms() {
             nomExterne: data.nomExterne || "",
             prenomExterne: data.prenomExterne || "",
             emailExterne: data.emailExterne || "",
+            telephoneExterne: data.telephoneExterne || "",
             travailEffectue: data.travailEffectue || "",
-            dateDebut: data.dateDebut?.slice(0, 10) || "",
-            dateFin: data.dateFin?.slice(0, 10) || "",
+            dateDebut: data.dateDebut?.slice(0, 16) || "",
+            dateFin: data.dateFin?.slice(0, 16) || "",
             cout: data.cout != null ? String(data.cout) : "",
           });
           if (data.bonSorties?.length) {
@@ -158,6 +175,10 @@ export default function CombinedIncidentForms() {
                 quantiteSortie: b.quantiteSortie,
               })),
             );
+          }
+          // Si le rapport est déjà soumis ou validé, passer en lecture seule
+          if (data.statut === "SOUMIS" || data.statut === "VALIDE") {
+            setIsSubmitted(true);
           }
         }
       })
@@ -173,7 +194,6 @@ export default function CombinedIncidentForms() {
       .then(setTypes)
       .catch(console.error);
 
-    // ← CORRECTION HERE: fetch from /magasin instead of /articles-magasin
     fetch("http://localhost:2000/magasin", {
       credentials: "include",
     })
@@ -214,8 +234,6 @@ export default function CombinedIncidentForms() {
     >,
   ) => {
     const { name, value } = e.target;
-
-    // Si on change natureIntervention en "SOUS_TRAITANT", forcer natureResolution à "A_PLANIFIER"
     setForm((f) => {
       let updated = { ...f, [name]: value };
       if (name === "natureIntervention" && value === "SOUS_TRAITANT") {
@@ -223,6 +241,71 @@ export default function CombinedIncidentForms() {
       }
       return updated;
     });
+    // Réinitialiser l’erreur pour ce champ
+    setErrors((errs) => ({ ...errs, [name]: "" }));
+  };
+
+  // ─── Validation avant soumission ───────────────────────────────────────────
+
+  const validateForm = (envoyer: boolean) => {
+    const newErrors: Record<string, string> = {};
+    if (!incident) return false;
+
+    // dateDebut est obligatoire
+    if (!form.dateDebut) {
+      newErrors.dateDebut = "La date de début est requise.";
+    } else {
+      const debut = new Date(form.dateDebut);
+      const creation = new Date(incident.dateCreation);
+      if (debut < creation) {
+        newErrors.dateDebut =
+          "La date de début doit être ≥ la date de création de l'incident.";
+      }
+    }
+
+    // Si IMMEDIATE, dateFin, diagnosticPanne, travailEffectue obligatoire
+    if (form.natureResolution === "IMMEDIATE") {
+      if (!form.dateFin) {
+        newErrors.dateFin =
+          "La date de fin est requise pour une intervention immédiate.";
+      } else if (new Date(form.dateFin) < new Date(form.dateDebut)) {
+        newErrors.dateFin = "La date de fin doit être après la date de début.";
+      }
+      if (!form.diagnosticPanne) {
+        newErrors.diagnosticPanne = "Le diagnostic est requis.";
+      }
+      if (!form.travailEffectue) {
+        newErrors.travailEffectue = "Le travail effectué est requis.";
+      }
+    }
+
+    // Si SOUS-TRAITANT, vérifier téléphone externe valide
+    if (form.natureIntervention === "SOUS_TRAITANT") {
+      if (form.telephoneExterne) {
+        const telPattern = /^[0-9+\-\s]{6,20}$/;
+        if (!telPattern.test(form.telephoneExterne)) {
+          newErrors.telephoneExterne = "Numéro de téléphone invalide.";
+        }
+      }
+    }
+
+    // Vérifier quantités de consommables
+    selectedConsumables.forEach((line, idx) => {
+      if (!line.articleMagasinId) {
+        newErrors[`consommable_${idx}`] = "Sélectionnez un article.";
+      }
+      if (line.quantiteSortie < 1) {
+        newErrors[`quantite_${idx}`] = "Quantité minimale de 1.";
+      } else {
+        const art = articles.find((a) => a.id === line.articleMagasinId);
+        if (art && line.quantiteSortie > art.quantite) {
+          newErrors[`quantite_${idx}`] = `Max ${art.quantite}.`;
+        }
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   // ─── Calcul automatique de la durée en heures (2 décimales) ─────────────────
@@ -246,6 +329,12 @@ export default function CombinedIncidentForms() {
   };
   const removeConsumableLine = (i: number) => {
     setSelectedConsumables((prev) => prev.filter((_, idx) => idx !== i));
+    setErrors((errs) => {
+      const newErrs = { ...errs };
+      delete newErrs[`consommable_${i}`];
+      delete newErrs[`quantite_${i}`];
+      return newErrs;
+    });
   };
   const updateConsumableLine = (
     index: number,
@@ -263,16 +352,24 @@ export default function CombinedIncidentForms() {
             },
       ),
     );
+    setErrors((errs) => {
+      const newErrs = { ...errs };
+      delete newErrs[`consommable_${index}`];
+      delete newErrs[`quantite_${index}`];
+      return newErrs;
+    });
   };
 
   // ─── Soumission du rapport ─────────────────────────────────────────────────
 
   /**
-   * @param envoyer – si true, on met statut = SOUMIS et on crée BonsSortie
-   *                   si false, on reste Brouillon (statut par défaut), pas de notif.
+   * @param envoyer – si true → statut = SOUMIS et création BonsSortie
+   *                  si false → reste BROUILLON (aucune notif)
    */
   const submitRapport = async (envoyer: boolean) => {
     if (!incidentId) return;
+    if (!validateForm(envoyer)) return;
+
     // Préparer l’objet payload à envoyer au backend
     const payloadRapport: any = {
       incidentId,
@@ -295,7 +392,11 @@ export default function CombinedIncidentForms() {
         form.natureIntervention === "SOUS_TRAITANT"
           ? form.emailExterne
           : undefined,
-      ...(envoyer && { statut: "SOUMIS" }), // si on envoie, on passe statut = SOUMIS
+      telephoneExterne:
+        form.natureIntervention === "SOUS_TRAITANT"
+          ? form.telephoneExterne
+          : undefined,
+      ...(envoyer && { statut: "SOUMIS" }),
     };
 
     let rapportSaved: RapportExisting;
@@ -328,7 +429,7 @@ export default function CombinedIncidentForms() {
       rapportSaved = await res.json();
     }
 
-    // Si on “envoie” (statut = SOUMIS), créer autant de bons de sortie que de lignes comparables
+    // Si on “envoie” (statut = SOUMIS), créer les bons de sortie
     if (envoyer && selectedConsumables.length) {
       for (const line of selectedConsumables) {
         if (line.articleMagasinId && line.quantiteSortie > 0) {
@@ -348,6 +449,7 @@ export default function CombinedIncidentForms() {
           }
         }
       }
+      setIsSubmitted(true);
     }
 
     // Fermer modal, rafraîchir la page, repasser en vue “fiche”
@@ -368,26 +470,28 @@ export default function CombinedIncidentForms() {
 
   return (
     <DefaultLayout>
-      {/* ─── En-tête + Onglets ───────────────────────────────────────────────── */}
-      <div className="flex flex-col items-start justify-between p-8 md:flex-row md:items-center">
-        <h1 className="mb-4 text-3xl font-bold md:mb-0">Rapport d'incident</h1>
-        <div className="space-x-2">
+      {/* ─── En-tête + Onglets (modernisé) ─────────────────────────────────────── */}
+      <div className="flex flex-col items-start justify-between gap-4 bg-gray-50 p-8 md:flex-row md:items-center">
+        <h1 className="text-4xl font-extrabold text-gray-800">
+          Rapport d'incident
+        </h1>
+        <div className="flex space-x-3">
           <button
             onClick={() => setView("fiche")}
-            className={`rounded-lg border px-4 py-2 ${
+            className={`rounded-full px-5 py-2 font-medium transition ${
               view === "fiche"
-                ? "bg-indigo-600 text-white"
-                : "bg-white text-gray-700"
+                ? "bg-blue-600 text-white shadow-lg"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
             Fiche
           </button>
           <button
             onClick={() => setView("rapport")}
-            className={`rounded-lg border px-4 py-2 ${
+            className={`rounded-full px-5 py-2 font-medium transition ${
               view === "rapport"
-                ? "bg-indigo-600 text-white"
-                : "bg-white text-gray-700"
+                ? "bg-blue-600 text-white shadow-lg"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
             Rapport
@@ -395,19 +499,20 @@ export default function CombinedIncidentForms() {
         </div>
       </div>
 
-      <div className="space-y-6 p-8">
+      <div className="p-8">
         {view === "fiche" ? (
-          // ─── “Fiche” mode ───────────────────────────────────────────────────
-          <div className="grid gap-6 lg:grid-cols-2">
+          // ─── “Fiche” mode ─────────────────────────────────────────────────────────
+          <div className="grid gap-8 lg:grid-cols-2">
             <motion.div
-              className="rounded-lg bg-white p-6 shadow"
+              className="rounded-2xl bg-white p-6 shadow-lg"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <div className="mb-4 flex items-center text-lg font-semibold">
-                <FiUser className="mr-2 text-indigo-600" /> Identification
+              <div className="mb-5 flex items-center space-x-2 text-xl font-semibold text-gray-800">
+                <FiUser className="text-blue-600" />
+                <span>Identification</span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {[
                   { label: "Nom", value: incident.createur.nom },
                   { label: "Prénom", value: incident.createur.prenom },
@@ -415,41 +520,43 @@ export default function CombinedIncidentForms() {
                   { label: "Direction", value: incident.createur.direction },
                   { label: "Fonction", value: incident.createur.fonction },
                 ].map(({ label, value }) => (
-                  <div key={label}>
+                  <div key={label} className="space-y-1">
                     <div className="text-sm font-medium text-gray-600">
                       {label}
                     </div>
-                    <input readOnly value={value} className={inputBase} />
+                    <input
+                      readOnly
+                      value={value}
+                      className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-800"
+                    />
                   </div>
                 ))}
               </div>
             </motion.div>
 
             <motion.div
-              className="rounded-lg bg-white p-6 shadow"
+              className="rounded-2xl bg-white p-6 shadow-lg"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <div className="mb-4 flex items-center text-lg font-semibold">
-                <FiClipboard className="mr-2 text-indigo-600" /> Détails
+              <div className="mb-5 flex items-center space-x-2 text-xl font-semibold text-gray-800">
+                <FiClipboard className="text-blue-600" />
+                <span>Détails</span>
               </div>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <FiCalendar className="text-indigo-600" />
-                  <div>Date : {dateInter}</div>
-                  <FiClock className="ml-4 text-indigo-600" />
-                  <div>Heure : {timeInter}</div>
+              <div className="space-y-5">
+                <div className="flex items-center space-x-4 text-gray-700">
+                  <FiCalendar className="text-blue-600" />
+                  <span>Date : {dateInter}</span>
+                  <FiClock className="text-blue-600" />
+                  <span>Heure : {timeInter}</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {[
                     {
                       label: "Famille MI",
                       value: incident.equipement.familleMI,
                     },
-                    {
-                      label: "Type",
-                      value: incident.equipement.equipmentType,
-                    },
+                    { label: "Type", value: incident.equipement.equipmentType },
                     {
                       label: "N° de série",
                       value: incident.equipement.numeroSerie,
@@ -459,23 +566,27 @@ export default function CombinedIncidentForms() {
                       value: incident.equipement.emplacement.nom,
                     },
                   ].map(({ label, value }) => (
-                    <div key={label}>
+                    <div key={label} className="space-y-1">
                       <div className="text-sm font-medium text-gray-600">
                         {label}
                       </div>
-                      <input readOnly value={value} className={inputBase} />
+                      <input
+                        readOnly
+                        value={value}
+                        className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-800"
+                      />
                     </div>
                   ))}
                 </div>
-                <div>
+                <div className="space-y-1">
                   <div className="text-sm font-medium text-gray-600">État</div>
                   <input
                     readOnly
                     value={incident.equipement.etat}
-                    className="w-32 rounded border bg-gray-50 px-2 py-1 text-center"
+                    className="w-32 rounded-xl border border-gray-300 bg-gray-50 px-3 py-1 text-center text-gray-800"
                   />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <div className="text-sm font-medium text-gray-600">
                     Description
                   </div>
@@ -483,10 +594,10 @@ export default function CombinedIncidentForms() {
                     readOnly
                     defaultValue={incident.description}
                     rows={3}
-                    className={inputBase}
+                    className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-800"
                   />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <div className="text-sm font-medium text-gray-600">
                     Échéance
                   </div>
@@ -496,14 +607,14 @@ export default function CombinedIncidentForms() {
                     value={new Date(incident.echeance)
                       .toISOString()
                       .slice(0, 10)}
-                    className={inputBase + " w-48"}
+                    className="w-48 rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-800"
                   />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <div className="text-sm font-medium text-gray-600">
                     Pièces jointes
                   </div>
-                  <ul className="list-inside list-disc text-blue-600">
+                  <ul className="list-inside list-disc space-y-1 text-blue-600">
                     {incident.pieceJointePaths.length ? (
                       incident.pieceJointePaths.map((p) => (
                         <li key={p}>
@@ -523,13 +634,13 @@ export default function CombinedIncidentForms() {
                   </ul>
                 </div>
                 {existing && existing.bonSorties?.length > 0 && (
-                  <div>
+                  <div className="space-y-1">
                     <div className="text-sm font-medium text-gray-600">
                       Bons de sortie liés
                     </div>
-                    <ul className="space-y-1">
+                    <ul className="space-y-2">
                       {existing.bonSorties!.map((b) => (
-                        <li key={b.id} className="text-sm text-gray-700">
+                        <li key={b.id} className="text-gray-800">
                           {b.articleMagasin.designation} – Quantité :{" "}
                           {b.quantiteSortie}
                         </li>
@@ -541,47 +652,65 @@ export default function CombinedIncidentForms() {
             </motion.div>
           </div>
         ) : (
-          // ─── “Formulaire Rapport” mode ──────────────────────────────────────
+          // ─── “Formulaire Rapport” mode ─────────────────────────────────────────
           <motion.div
-            className="mx-auto max-w-2xl rounded-lg bg-white p-6 shadow"
+            className="mx-auto w-full max-w-3xl space-y-12 rounded-2xl bg-white p-10 shadow-xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h2 className="mb-4 text-2xl font-semibold">
+            <h2 className="mb-8 flex items-center text-3xl font-bold text-gray-800">
+              <FiClipboard className="mr-3 text-blue-600" />
               Rapport d’intervention
             </h2>
 
-            {/* Diagnostic de la panne */}
-            <div className="mb-6">
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Diagnostic de la panne
-              </label>
+            {/* Section 1: Diagnostic */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <FiClipboard className="text-blue-600" />
+                <h3 className="text-xl font-semibold text-gray-800">
+                  Diagnostic de la panne
+                </h3>
+              </div>
               <textarea
                 name="diagnosticPanne"
-                rows={5}
+                rows={4}
                 value={form.diagnosticPanne}
                 onChange={handleChange}
-                className={`${inputBase} min-h-[120px]`}
+                className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-5 py-3 text-gray-900 placeholder-gray-400 transition 
+                          focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                            isSubmitted ? "cursor-not-allowed opacity-60" : ""
+                          }`}
                 placeholder="Décris ici le diagnostic…"
+                disabled={isSubmitted}
               />
+              {errors.diagnosticPanne && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.diagnosticPanne}
+                </p>
+              )}
             </div>
 
-            {/* Nature de l’intervention */}
-            <div className="mb-6">
-              <div className="mb-2 block text-sm font-medium text-gray-700">
-                Nature de l’intervention
+            {/* Section 2: Nature Intervention */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <FiUser className="text-blue-600" />
+                <h3 className="text-xl font-semibold text-gray-800">
+                  Nature de l’intervention
+                </h3>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-8">
                 {(["INTERNE", "SOUS_TRAITANT"] as const).map((opt) => (
-                  <label key={opt} className="flex items-center">
+                  <label key={opt} className="flex items-center space-x-2">
                     <input
                       type="radio"
                       name="natureIntervention"
                       value={opt}
                       checked={form.natureIntervention === opt}
                       onChange={handleChange}
+                      disabled={isSubmitted}
+                      className="h-6 w-6 accent-blue-600"
                     />
-                    <span className="ml-2">
+                    <span className="text-gray-800">
                       {opt === "INTERNE" ? "Interne" : "Sous-traitant"}
                     </span>
                   </label>
@@ -589,20 +718,34 @@ export default function CombinedIncidentForms() {
               </div>
             </div>
 
-            {/* Infos externes (si SOUS-TRAITANT) */}
+            {/* Section 3: Infos Externes (Sous-traitant) */}
             {form.natureIntervention === "SOUS_TRAITANT" && (
-              <div className="mb-6 space-y-4">
+              <div className="space-y-5 rounded-2xl border-l-4 border-blue-100 bg-blue-50 px-8 py-6">
+                <h4 className="text-lg font-medium italic text-gray-700">
+                  Informations sur le technicien externe
+                </h4>
                 {[
-                  { name: "prenomExterne", label: "Prénom externe" },
-                  { name: "nomExterne", label: "Nom externe" },
+                  {
+                    name: "prenomExterne",
+                    label: "Prénom externe",
+                    icon: FiUser,
+                  },
+                  { name: "nomExterne", label: "Nom externe", icon: FiUser },
                   {
                     name: "emailExterne",
                     label: "Email externe",
+                    icon: FiMail,
                     type: "email",
                   },
-                ].map(({ name, label, type }) => (
-                  <div key={name}>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                  {
+                    name: "telephoneExterne",
+                    label: "Téléphone externe",
+                    icon: FiPhone,
+                  },
+                ].map(({ name, label, icon: Icon, type }) => (
+                  <div key={name} className="space-y-1">
+                    <label className="flex items-center text-sm font-medium text-gray-700">
+                      <Icon className="mr-2 text-blue-600" />
                       {label}
                     </label>
                     <input
@@ -610,22 +753,36 @@ export default function CombinedIncidentForms() {
                       name={name}
                       value={(form as any)[name]}
                       onChange={handleChange}
-                      className={inputBase}
+                      className={`w-full rounded-2xl border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 transition 
+                                focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                                  isSubmitted
+                                    ? "cursor-not-allowed opacity-60"
+                                    : ""
+                                }`}
                       placeholder={label}
+                      disabled={isSubmitted}
                     />
+                    {errors[name] && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors[name]}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Nature de la résolution */}
-            <div className="mb-6">
-              <div className="mb-2 block text-sm font-medium text-gray-700">
-                Nature de la résolution
+            {/* Section 4: Nature Résolution */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <FiCalendar className="text-blue-600" />
+                <h3 className="text-xl font-semibold text-gray-800">
+                  Nature de la résolution
+                </h3>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-8">
                 {(["IMMEDIATE", "A_PLANIFIER"] as const).map((opt) => (
-                  <label key={opt} className="flex items-center">
+                  <label key={opt} className="flex items-center space-x-2">
                     <input
                       type="radio"
                       name="natureResolution"
@@ -633,11 +790,13 @@ export default function CombinedIncidentForms() {
                       checked={form.natureResolution === opt}
                       onChange={handleChange}
                       disabled={
-                        form.natureIntervention === "SOUS_TRAITANT" &&
-                        opt === "IMMEDIATE"
+                        isSubmitted ||
+                        (form.natureIntervention === "SOUS_TRAITANT" &&
+                          opt === "IMMEDIATE")
                       }
+                      className="h-6 w-6 accent-blue-600"
                     />
-                    <span className="ml-2">
+                    <span className="text-gray-800">
                       {opt === "IMMEDIATE" ? "Immédiate" : "À planifier"}
                     </span>
                   </label>
@@ -645,235 +804,308 @@ export default function CombinedIncidentForms() {
               </div>
             </div>
 
-            {/* Dates (modifiables) */}
-            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+            {/* Section 5: Dates */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="flex items-center text-sm font-medium text-gray-700">
+                  <FiCalendar className="mr-2 text-blue-600" />
                   Date début
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   name="dateDebut"
                   value={form.dateDebut}
                   onChange={handleChange}
-                  className={inputBase}
+                  className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-900 placeholder-gray-400 transition 
+                            focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                              isSubmitted ? "cursor-not-allowed opacity-60" : ""
+                            }`}
+                  disabled={isSubmitted}
                 />
+                {errors.dateDebut && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.dateDebut}
+                  </p>
+                )}
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+              <div className="space-y-2">
+                <label className="flex items-center text-sm font-medium text-gray-700">
+                  <FiCalendar className="mr-2 text-blue-600" />
                   Date fin
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   name="dateFin"
                   value={form.dateFin}
                   onChange={handleChange}
-                  className={inputBase}
+                  className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-900 placeholder-gray-400 transition 
+                            focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                              isSubmitted ? "cursor-not-allowed opacity-60" : ""
+                            }`}
+                  disabled={isSubmitted}
                 />
+                {errors.dateFin && (
+                  <p className="mt-1 text-sm text-red-600">{errors.dateFin}</p>
+                )}
               </div>
             </div>
 
-            {/* Coût */}
-            <div className="mb-6">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Coût (€)
-              </label>
+            {/* Section 6: Durée */}
+            {form.dateDebut &&
+              form.dateFin &&
+              new Date(form.dateFin) >= new Date(form.dateDebut) && (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <FiClock className="text-blue-600" />
+                    <h4 className="text-sm font-medium text-gray-700">
+                      Durée (heures)
+                    </h4>
+                  </div>
+                  <input
+                    readOnly
+                    value={computeDurationHours(form.dateDebut, form.dateFin)}
+                    className="w-32 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-900"
+                  />
+                </div>
+              )}
+
+            {/* Section 7: Coût */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <FiClock className="text-blue-600" />
+                <h4 className="text-sm font-medium text-gray-700">Coût (DT)</h4>
+              </div>
               <input
                 type="number"
                 name="cout"
                 step="0.01"
                 value={form.cout}
                 onChange={handleChange}
-                className={inputBase}
+                className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-900 placeholder-gray-400 transition 
+                          focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                            isSubmitted ? "cursor-not-allowed opacity-60" : ""
+                          }`}
+                disabled={isSubmitted}
               />
             </div>
 
-            {/* Travail effectué */}
-            <div className="mb-6">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Travail effectué
-              </label>
+            {/* Section 8: Travail Effectué */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <FiClipboard className="text-blue-600" />
+                <h4 className="text-sm font-medium text-gray-700">
+                  Travail effectué
+                </h4>
+              </div>
               <textarea
                 name="travailEffectue"
-                rows={5}
+                rows={4}
                 value={form.travailEffectue}
                 onChange={handleChange}
-                className={`${inputBase} min-h-[120px]`}
+                className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-5 py-3 text-gray-900 placeholder-gray-400 transition 
+                          focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                            isSubmitted ? "cursor-not-allowed opacity-60" : ""
+                          }`}
                 placeholder="Décris ici le travail effectué…"
+                disabled={isSubmitted}
               />
+              {errors.travailEffectue && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.travailEffectue}
+                </p>
+              )}
             </div>
 
-            {/* ─── SECTION “Bon de sortie” ──────────────────────────────── */}
-            <div className="mb-6 rounded-lg border border-gray-200 p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                  <FiPlus className="text-indigo-600" /> Consommables
+            {/* Section 9: Consommables */}
+            <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-lg font-semibold text-gray-800">
+                  <FiPlus className="text-blue-600" />
+                  <span>Consommables</span>
                 </div>
-                <button
-                  onClick={addConsumableLine}
-                  className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-500"
-                >
-                  Ajouter une ligne
-                </button>
+                {!isSubmitted && (
+                  <button
+                    onClick={addConsumableLine}
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
+                  >
+                    Ajouter une ligne
+                  </button>
+                )}
               </div>
 
-              {selectedConsumables.map((line, idx) => {
-                // Toujours assurer qu’articles est un array
-                const allArticles: ArticleMagasin[] = Array.isArray(articles)
-                  ? articles
-                  : [];
+              {selectedConsumables.length > 0 ? (
+                selectedConsumables.map((line, idx) => {
+                  const allArticles: ArticleMagasin[] = Array.isArray(articles)
+                    ? articles
+                    : [];
+                  const availableArticles = filterTypeId
+                    ? allArticles.filter(
+                        (a) => a.typeConsommable.id === filterTypeId,
+                      )
+                    : allArticles;
+                  const selectedArticle = allArticles.find(
+                    (art) => art.id === line.articleMagasinId,
+                  );
+                  const maxQty = selectedArticle ? selectedArticle.quantite : 1;
 
-                // Si un filtre est appliqué, ne garder que ceux du type choisi
-                const availableArticles = filterTypeId
-                  ? allArticles.filter(
-                      (a) => a.typeConsommable.id === filterTypeId,
-                    )
-                  : allArticles;
+                  return (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-1 gap-6 rounded-2xl bg-white p-5 shadow-sm sm:grid-cols-4"
+                    >
+                      {/* Type consommable */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Type
+                        </label>
+                        <select
+                          name="typeConsommable"
+                          value={filterTypeId}
+                          onChange={(e) => setFilterTypeId(e.target.value)}
+                          className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-800 placeholder-gray-400 transition 
+                                    focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                                      isSubmitted
+                                        ? "cursor-not-allowed opacity-60"
+                                        : ""
+                                    }`}
+                          disabled={isSubmitted}
+                        >
+                          <option value="">-- Type consommable --</option>
+                          {types.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                // Trouver l’article sélectionné pour cette ligne pour le “maxQty”
-                const selectedArticle = allArticles.find(
-                  (art) => art.id === line.articleMagasinId,
-                );
-                const maxQty = selectedArticle ? selectedArticle.quantite : 1;
+                      {/* Désignation article */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Désignation
+                        </label>
+                        <select
+                          name="articleMagasinId"
+                          value={line.articleMagasinId}
+                          onChange={(e) =>
+                            updateConsumableLine(
+                              idx,
+                              "articleMagasinId",
+                              e.target.value,
+                            )
+                          }
+                          className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-800 placeholder-gray-400 transition 
+                                    focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                                      isSubmitted
+                                        ? "cursor-not-allowed opacity-60"
+                                        : ""
+                                    }`}
+                          disabled={isSubmitted}
+                        >
+                          <option value="">-- Sélectionner article --</option>
+                          {availableArticles.map((a) => (
+                            <option
+                              key={a.id}
+                              value={a.id}
+                              disabled={a.quantite === 0}
+                            >
+                              {a.designation} ({a.quantite} dispo)
+                            </option>
+                          ))}
+                        </select>
+                        {errors[`consommable_${idx}`] && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors[`consommable_${idx}`]}
+                          </p>
+                        )}
+                      </div>
 
-                return (
-                  <div
-                    key={idx}
-                    className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-4 md:gap-4"
-                  >
-                    {/* 1) Sélection du type consommable */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Type
-                      </label>
-                      <select
-                        name="typeConsommable"
-                        value={filterTypeId}
-                        onChange={(e) => setFilterTypeId(e.target.value)}
-                        className={`${inputBase} cursor-pointer`}
-                      >
-                        <option value="">-- Type consommable --</option>
-                        {types.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                      {/* Quantité à sortir */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Quantité
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={maxQty}
+                          name="quantiteSortie"
+                          value={line.quantiteSortie}
+                          onChange={(e) =>
+                            updateConsumableLine(
+                              idx,
+                              "quantiteSortie",
+                              Number(e.target.value),
+                            )
+                          }
+                          className={`w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2 text-gray-900 placeholder-gray-400 transition 
+                                    focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 ${
+                                      isSubmitted
+                                        ? "cursor-not-allowed opacity-60"
+                                        : ""
+                                    }`}
+                          disabled={isSubmitted}
+                        />
+                        {errors[`quantite_${idx}`] && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors[`quantite_${idx}`]}
+                          </p>
+                        )}
+                      </div>
 
-                    {/* 2) Sélection de l’article (designation) */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Désignation
-                      </label>
-                      <select
-                        name="articleMagasinId"
-                        value={line.articleMagasinId}
-                        onChange={(e) =>
-                          updateConsumableLine(
-                            idx,
-                            "articleMagasinId",
-                            e.target.value,
-                          )
-                        }
-                        className={`${inputBase} cursor-pointer`}
-                      >
-                        <option value="">-- Sélectionner article --</option>
-                        {availableArticles.map((a) => (
-                          <option
-                            key={a.id}
-                            value={a.id}
-                            disabled={a.quantite === 0}
+                      {/* Bouton Supprimer */}
+                      {!isSubmitted && (
+                        <div className="flex items-end justify-center">
+                          <button
+                            onClick={() => removeConsumableLine(idx)}
+                            className="rounded-full bg-red-600 p-2 text-white transition hover:bg-red-700"
                           >
-                            {a.designation} ({a.quantite} dispo)
-                          </option>
-                        ))}
-                      </select>
+                            <FiTrash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-
-                    {/* 3) Quantité à sortir */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Quantité
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={maxQty}
-                        name="quantiteSortie"
-                        value={line.quantiteSortie}
-                        onChange={(e) =>
-                          updateConsumableLine(
-                            idx,
-                            "quantiteSortie",
-                            Number(e.target.value),
-                          )
-                        }
-                        className={inputBase}
-                      />
-                    </div>
-
-                    {/* 4) Bouton “Supprimer” */}
-                    <div className="flex items-end">
-                      <button
-                        onClick={() => removeConsumableLine(idx)}
-                        className="rounded bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                      >
-                        <FiTrash2 />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {selectedConsumables.length === 0 && (
+                  );
+                })
+              ) : (
                 <p className="text-sm text-gray-500">
                   Aucun consommable sélectionné.
                 </p>
               )}
             </div>
 
-            {/* ─── Boutons “Sauvegarder (Brouillon)” & “Envoyer (Soumis)” ───────── */}
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={() => setView("fiche")}
-                className="rounded border px-4 py-2 text-gray-700 hover:bg-gray-100"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => {
-                  // “Sauvegarder” : on ne met pas statut = SOUMIS
-                  submitRapport(false);
-                }}
-                className="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600"
-              >
-                Sauvegarder (Brouillon)
-              </button>
-              <button
-                onClick={() => setShowModal(true)}
-                className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-              >
-                Envoyer (Soumis)
-              </button>
-            </div>
+            {/* Bouton Envoyer (Soumis) */}
+            {!isSubmitted && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="rounded-2xl bg-green-600 px-6 py-3 text-lg font-medium text-white transition hover:bg-green-700"
+                >
+                  Envoyer
+                </button>
+              </div>
+            )}
 
-            {/* ─── Modal de confirmation d’envoi ────────────────────────────────── */}
+            {/* Modal de confirmation d’envoi */}
             {showModal && (
-              <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-                <div className="w-full max-w-sm space-y-4 rounded-lg bg-white p-6">
-                  <h3 className="text-lg font-semibold">Confirmer l’envoi ?</h3>
-                  <p>Voulez-vous vraiment envoyer ce rapport ?</p>
+              <div className="fixed inset-0 flex items-center justify-center bg-black/50">
+                <div className="w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-2xl">
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    Confirmer l’envoi ?
+                  </h3>
+                  <p className="text-gray-600">
+                    Voulez-vous vraiment envoyer ce rapport ?
+                  </p>
                   <div className="flex justify-end gap-4">
                     <button
                       onClick={() => setShowModal(false)}
-                      className="rounded border px-4 py-2"
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-100"
                     >
                       Annuler
                     </button>
                     <button
                       onClick={() => submitRapport(true)}
-                      className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                      className="rounded-lg bg-green-600 px-5 py-2 text-white transition hover:bg-green-700"
                     >
                       Confirmer
                     </button>
