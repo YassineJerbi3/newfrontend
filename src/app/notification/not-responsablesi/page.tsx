@@ -25,6 +25,7 @@ import {
 } from "react-icons/fi";
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { useRouter } from "next/navigation"; // ← import de useRouter
 
 type NotificationType =
   | "incident"
@@ -49,6 +50,7 @@ interface NotificationItem {
     message?: string;
     createdAt: string;
     incidentId?: string;
+    // … d’autres champs (technicienPrenom, technicienNom, …)
   };
 }
 
@@ -59,22 +61,12 @@ interface User {
   roles: string;
 }
 
-/**
- * Small colored dot for unread indicator
- * Variant styles for priority badges
- */
 const PRIORITY_STYLES = {
   URGENT: { bg: "bg-red-500", text: "text-white" },
   NORMALE: { bg: "bg-yellow-500", text: "text-white" },
   BASSE: { bg: "bg-blue-500", text: "text-white" },
 } as const;
 
-/**
- * Configuration per notification type:
- * - icon: the icon component
- * - accent: a small accent color for borders and highlights
- * - label: display label
- */
 const TYPE_CONFIG: Record<
   NotificationType,
   { icon: JSX.Element; accent: string; label: string }
@@ -117,6 +109,7 @@ const TYPE_CONFIG: Record<
 };
 
 export default function NotificationResponsableSI() {
+  const router = useRouter(); // ← instancier useRouter
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [filterType, setFilterType] = useState<"" | NotificationItem["type"]>(
@@ -134,7 +127,7 @@ export default function NotificationResponsableSI() {
   );
   const [selectedTech, setSelectedTech] = useState<string>("");
 
-  // Fetch notifications from API
+  // Charge les notifications depuis l’API
   const loadNotifications = useCallback(() => {
     fetch("http://localhost:2000/notifications", { credentials: "include" })
       .then((res) => res.json())
@@ -163,7 +156,7 @@ export default function NotificationResponsableSI() {
       .catch(console.error);
   }, []);
 
-  // Fetch technicians from API
+  // Charge la liste des techniciens
   useEffect(() => {
     fetch("http://localhost:2000/users", { credentials: "include" })
       .then((res) => res.json())
@@ -173,7 +166,7 @@ export default function NotificationResponsableSI() {
       .catch(console.error);
   }, []);
 
-  // WebSocket: listen for new notifications
+  // Écoute des sockets pour nouvelle notification
   useEffect(() => {
     loadNotifications();
     const socket = getSocket();
@@ -220,7 +213,7 @@ export default function NotificationResponsableSI() {
     };
   }, [loadNotifications]);
 
-  // Mark a notification as read
+  // Marquer en lu
   const markAsRead = (e: MouseEvent, id: string) => {
     e.stopPropagation();
     fetch(`http://localhost:2000/notifications/${id}/read`, {
@@ -232,14 +225,14 @@ export default function NotificationResponsableSI() {
     );
   };
 
-  // Open the modal to assign a technician for an incident
+  // Ouvre le modal pour affecter un technicien
   const openAssignModal = (incidentId: string) => {
     setCurrentIncidentId(incidentId);
     setSelectedTech("");
     setModalOpen(true);
   };
 
-  // Confirm assignment of technician
+  // Confirme l’affectation
   const confirmAssign = () => {
     if (!currentIncidentId || !selectedTech) return;
     fetch(`http://localhost:2000/incidents/${currentIncidentId}/assign`, {
@@ -256,7 +249,7 @@ export default function NotificationResponsableSI() {
       .catch(console.error);
   };
 
-  // Group notifications by date and apply filters
+  // Regroupe et filtre par date
   const grouped = useMemo(() => {
     const filtered = notifications.filter((n) => {
       const dateStr = n.payload.dateCreation ?? n.payload.createdAt;
@@ -287,7 +280,7 @@ export default function NotificationResponsableSI() {
   return (
     <DefaultLayout>
       <div className="min-h-screen bg-gray-50 px-6 py-8">
-        {/* Header */}
+        {/* ─── Header ───────────────────────────────────────────────────────── */}
         <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-4xl font-extrabold text-gray-900">
             Notifications
@@ -301,10 +294,10 @@ export default function NotificationResponsableSI() {
           </span>
         </div>
 
-        {/* Filters */}
+        {/* ─── Filtres ───────────────────────────────────────────────────────── */}
         <div className="sticky top-[80px] z-20 mx-auto mb-8 max-w-5xl rounded-xl bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-4">
-            {/* Type */}
+            {/* Filtre Type */}
             <div className="flex flex-col">
               <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
                 <FiFilter size={16} /> Type
@@ -329,7 +322,7 @@ export default function NotificationResponsableSI() {
               </select>
             </div>
 
-            {/* Priorité */}
+            {/* Filtre Priorité */}
             <div className="flex flex-col">
               <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
                 <FiFlag size={16} /> Priorité
@@ -350,7 +343,7 @@ export default function NotificationResponsableSI() {
               </select>
             </div>
 
-            {/* Statut */}
+            {/* Filtre Statut */}
             <div className="flex flex-col">
               <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
                 <FiEye size={16} /> Statut
@@ -366,7 +359,7 @@ export default function NotificationResponsableSI() {
               </select>
             </div>
 
-            {/* Date */}
+            {/* Filtre Date */}
             <div className="flex flex-col">
               <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
                 <FiCalendar size={16} /> Date
@@ -379,7 +372,7 @@ export default function NotificationResponsableSI() {
               />
             </div>
 
-            {/* Reset */}
+            {/* Bouton Réinitialiser */}
             <button
               onClick={() => {
                 setFilterType("");
@@ -394,7 +387,7 @@ export default function NotificationResponsableSI() {
           </div>
         </div>
 
-        {/* Notification Groups */}
+        {/* ─── Groupement par date ───────────────────────────────────────────── */}
         <div className="mx-auto max-w-5xl space-y-10">
           {Object.keys(grouped).length === 0 && (
             <p className="text-center text-gray-500">Aucune notification.</p>
@@ -416,15 +409,34 @@ export default function NotificationResponsableSI() {
                     dateCreation,
                     message,
                     incidentId,
+                    technicienPrenom,
+                    technicienNom,
+                    natureResolution,
+                    natureIntervention,
                   } = n.payload;
+
                   const isStock =
                     n.type === "ALERTE_STOCK" ||
                     n.type === "DEPASSEMENT_STOCK_ALERT" ||
                     n.type === "STOCK_INDISPONIBLE";
+
                   const { icon, accent, label } = TYPE_CONFIG[n.type];
                   const priorityStyle = priorite
                     ? PRIORITY_STYLES[priorite]
                     : PRIORITY_STYLES.NORMALE;
+
+                  // Texte personnalisé pour “rapport-incident”
+                  let detailRapport = "";
+                  if (n.type === "rapport-incident") {
+                    const fullName = `${technicienPrenom} ${technicienNom}`;
+                    if (natureIntervention === "SOUS_TRAITANT") {
+                      detailRapport = `Le technicien ${fullName} a fait son diagnostic et a demandé une résolution sous-traitant.`;
+                    } else if (natureResolution === "IMMEDIATE") {
+                      detailRapport = `Le technicien ${fullName} a terminé le travail immédiatement après diagnostic.`;
+                    } else if (natureResolution === "A_PLANIFIER") {
+                      detailRapport = `Le technicien ${fullName}, après diagnostic, a décidé de planifier cet incident.`;
+                    }
+                  }
 
                   return (
                     <div
@@ -432,14 +444,20 @@ export default function NotificationResponsableSI() {
                       onClick={(e) => {
                         if (n.type === "incident" && incidentId) {
                           openAssignModal(incidentId);
+                        } else if (
+                          n.type === "rapport-incident" &&
+                          incidentId
+                        ) {
+                          // ← REDIRECTION vers la page /rapport/incidentsi/[id]
+                          router.push(`/rapport/incident-si/${incidentId}`);
                         } else {
                           markAsRead(e, n.id);
                         }
                       }}
                       className={`
-                        relative flex transform cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
-                        hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
-                      `}
+              relative flex transform cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
+              hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
+            `}
                     >
                       {/* Top Accent Bar */}
                       <div className={`h-1 w-full ${accent}`} />
@@ -457,38 +475,48 @@ export default function NotificationResponsableSI() {
                           </h3>
                         </div>
 
-                        {message ? (
-                          <p className="mt-2 text-sm text-gray-600">
-                            {message}
-                          </p>
+                        {n.type !== "rapport-incident" ? (
+                          message ? (
+                            <p className="mt-2 text-sm text-gray-600">
+                              {message}
+                            </p>
+                          ) : (
+                            <div className="mt-2 space-y-2 text-sm text-gray-600">
+                              {location && (
+                                <p className="flex items-center gap-1">
+                                  <FiMapPin
+                                    size={14}
+                                    className="text-gray-500"
+                                  />
+                                  <span>
+                                    <strong>Emplacement:</strong> {location}
+                                  </span>
+                                </p>
+                              )}
+                              {creator && (
+                                <p className="flex items-center gap-1">
+                                  <FiUser size={14} className="text-gray-500" />
+                                  <span>
+                                    <strong>Créateur:</strong> {creator}
+                                    {creatorRole && ` (${creatorRole})`}
+                                  </span>
+                                </p>
+                              )}
+                              {equipmentType && (
+                                <p className="flex items-center gap-1">
+                                  <FiBox size={14} className="text-gray-500" />
+                                  <span>
+                                    <strong>Équipement:</strong> {equipmentType}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          )
                         ) : (
-                          <div className="mt-2 space-y-2 text-sm text-gray-600">
-                            {location && (
-                              <p className="flex items-center gap-1">
-                                <FiMapPin size={14} className="text-gray-500" />
-                                <span>
-                                  <strong>Emplacement:</strong> {location}
-                                </span>
-                              </p>
-                            )}
-                            {creator && (
-                              <p className="flex items-center gap-1">
-                                <FiUser size={14} className="text-gray-500" />
-                                <span>
-                                  <strong>Créateur:</strong> {creator}
-                                  {creatorRole && ` (${creatorRole})`}
-                                </span>
-                              </p>
-                            )}
-                            {equipmentType && (
-                              <p className="flex items-center gap-1">
-                                <FiBox size={14} className="text-gray-500" />
-                                <span>
-                                  <strong>Équipement:</strong> {equipmentType}
-                                </span>
-                              </p>
-                            )}
-                          </div>
+                          // Pour “rapport-incident”, on affiche le texte personnalisé
+                          <p className="mt-2 text-sm text-gray-700">
+                            {detailRapport}
+                          </p>
                         )}
                       </div>
 
@@ -529,7 +557,7 @@ export default function NotificationResponsableSI() {
           ))}
         </div>
 
-        {/* Assign Technician Modal */}
+        {/* ─── Assign Technician Modal ───────────────────────────────────────── */}
         {modalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="z-10 w-80 rounded-xl bg-white p-6 shadow-lg">

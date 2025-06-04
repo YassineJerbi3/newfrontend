@@ -6,21 +6,79 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Link from "next/link";
 import {
   FiAlertTriangle,
+  FiClipboard,
   FiClock,
   FiEye,
   FiFilter,
   FiCalendar,
   FiRefreshCw,
+  FiCheckCircle,
+  FiXCircle,
 } from "react-icons/fi";
 
-interface Notification {
+type NotificationType =
+  | "incident_assign"
+  | "rapport-valide"
+  | "rapport-invalide";
+
+interface RawNotification {
   id: string;
   read: boolean;
+  type: NotificationType;
+  payload: any;
+  createdAt: string;
+}
+
+interface BaseNotification {
+  id: string;
+  read: boolean;
+  type: NotificationType;
+  createdAt: string;
+}
+
+interface IncidentAssignPayload {
   incidentId: string;
   equipmentType: string;
   location: string;
-  createdAt: string;
 }
+
+interface RapportValidePayload {
+  rapportId: string;
+  incidentId: string;
+  technicienPrenom: string;
+  technicienNom: string;
+}
+
+interface RapportInvalidePayload {
+  rapportId: string;
+  incidentId: string;
+  remarqueResponsable: string;
+  technicienPrenom: string;
+  technicienNom: string;
+}
+
+type NotificationItem =
+  | (BaseNotification & {
+      type: "incident_assign";
+      incidentId: string;
+      equipmentType: string;
+      location: string;
+    })
+  | (BaseNotification & {
+      type: "rapport-valide";
+      rapportId: string;
+      incidentId: string;
+      technicienPrenom: string;
+      technicienNom: string;
+    })
+  | (BaseNotification & {
+      type: "rapport-invalide";
+      rapportId: string;
+      incidentId: string;
+      remarqueResponsable: string;
+      technicienPrenom: string;
+      technicienNom: string;
+    });
 
 const ACCENT = {
   border: "border-blue-500",
@@ -29,32 +87,76 @@ const ACCENT = {
 } as const;
 
 export default function NotificationTechnicien() {
-  const [notes, setNotes] = useState<Notification[]>([]);
+  const [notes, setNotes] = useState<NotificationItem[]>([]);
   const [filterRead, setFilterRead] = useState<"" | "READ" | "UNREAD">("");
   const [filterDate, setFilterDate] = useState<string>("");
 
-  // Charger les notifications assignées à ce technicien
+  // Charger toutes les notifications qui concernent le technicien
   useEffect(() => {
     fetch("http://localhost:2000/notifications", {
       credentials: "include",
     })
       .then((r) => r.json())
-      .then((data: any[]) => {
-        const assigned = data
-          .filter((n) => n.type === "incident_assign")
-          .map((n) => ({
-            id: n.id,
-            read: n.read,
-            incidentId: n.payload.incidentId,
-            equipmentType: n.payload.equipmentType,
-            location: n.payload.location,
-            createdAt: n.createdAt,
-          }))
+      .then((data: RawNotification[]) => {
+        const mapped: NotificationItem[] = data
+          .filter((n) =>
+            ["incident_assign", "rapport-valide", "rapport-invalide"].includes(
+              n.type,
+            ),
+          )
+          .map((n) => {
+            switch (n.type) {
+              case "incident_assign": {
+                const p = n.payload as IncidentAssignPayload;
+                return {
+                  id: n.id,
+                  read: n.read,
+                  type: "incident_assign",
+                  createdAt: n.createdAt,
+                  incidentId: p.incidentId,
+                  equipmentType: p.equipmentType,
+                  location: p.location,
+                };
+              }
+              case "rapport-valide": {
+                const p = n.payload as RapportValidePayload;
+                return {
+                  id: n.id,
+                  read: n.read,
+                  type: "rapport-valide",
+                  createdAt: n.createdAt,
+                  rapportId: p.rapportId,
+                  incidentId: p.incidentId,
+                  technicienPrenom: p.technicienPrenom,
+                  technicienNom: p.technicienNom,
+                };
+              }
+              case "rapport-invalide": {
+                const p = n.payload as RapportInvalidePayload;
+                return {
+                  id: n.id,
+                  read: n.read,
+                  type: "rapport-invalide",
+                  createdAt: n.createdAt,
+                  rapportId: p.rapportId,
+                  incidentId: p.incidentId,
+                  remarqueResponsable: p.remarqueResponsable,
+                  technicienPrenom: p.technicienPrenom,
+                  technicienNom: p.technicienNom,
+                };
+              }
+              default:
+                // Type non géré
+                return null;
+            }
+          })
+          .filter((x): x is NotificationItem => x !== null)
           .sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           );
-        setNotes(assigned);
+
+        setNotes(mapped);
       })
       .catch(console.error);
   }, []);
@@ -83,7 +185,7 @@ export default function NotificationTechnicien() {
       return true;
     });
 
-    return filtered.reduce<Record<string, Notification[]>>((acc, n) => {
+    return filtered.reduce<Record<string, NotificationItem[]>>((acc, n) => {
       const dateLabel = new Date(n.createdAt).toLocaleDateString("fr-FR", {
         day: "2-digit",
         month: "2-digit",
@@ -158,7 +260,7 @@ export default function NotificationTechnicien() {
           </div>
         </div>
 
-        {/* Liste */}
+        {/* Liste groupée par date */}
         <div className="mx-auto max-w-5xl space-y-10">
           {Object.keys(grouped).length === 0 && (
             <p className="text-center text-gray-500">Aucune notification.</p>
@@ -170,66 +272,154 @@ export default function NotificationTechnicien() {
                 {date}
               </h2>
               <div className="flex flex-col gap-6">
-                {items.map((n) => (
-                  <Link
-                    key={n.id}
-                    href={`/rapport/incident/${n.incidentId}`}
-                    className={`block w-full rounded-xl border-l-4 bg-white ${ACCENT.border} p-6 shadow-md transition hover:bg-gray-50 ${
-                      n.read ? "opacity-70" : "opacity-100"
-                    }`}
-                  >
-                    {/* Header */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-xl font-semibold text-gray-900">
-                        <FiAlertTriangle /> <span>Incident</span>
-                      </div>
-                      <span
-                        className={`px-3 py-1 text-sm font-semibold ${ACCENT.badgeText} ${ACCENT.badgeBg} rounded-full`}
-                      >
-                        Assignée
-                      </span>
-                    </div>
+                {items.map((n) => {
+                  // Déterminer le contenu & le lien en fonction du type
+                  let title: string;
+                  let description: JSX.Element | string;
+                  let href: string;
+                  let Icon: JSX.Element;
+                  let badgeText: string;
+                  let badgeColor: string;
 
-                    {/* Contenu */}
-                    <div className="grid grid-cols-1 gap-3 text-gray-700 sm:grid-cols-2">
-                      <div className="flex items-center gap-2">
-                        <FiClock />
-                        <span>
-                          <strong>Notification :</strong>{" "}
-                          {new Date(n.createdAt).toLocaleTimeString("fr-FR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>
-                          <strong>Équipement :</strong> {n.equipmentType}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>
-                          <strong>Emplacement :</strong> {n.location}
-                        </span>
-                      </div>
-                    </div>
+                  switch (n.type) {
+                    case "incident_assign":
+                      title = "Incident assigné";
+                      Icon = <FiAlertTriangle className="text-blue-600" />;
+                      badgeText = "Assignée";
+                      badgeColor = `${ACCENT.badgeText} ${ACCENT.badgeBg}`;
+                      description = (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <FiClock />
+                            <span>
+                              Notification à{" "}
+                              {new Date(n.createdAt).toLocaleTimeString(
+                                "fr-FR",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              <strong>Équipement :</strong>{" "}
+                              {(n as any).equipmentType}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              <strong>Emplacement :</strong>{" "}
+                              {(n as any).location}
+                            </span>
+                          </div>
+                        </>
+                      );
+                      href = `/rapport/incident/${(n as any).incidentId}`;
+                      Icon = <FiAlertTriangle />;
+                      break;
 
-                    {/* Actions */}
-                    <div
-                      className="mt-4 flex items-center justify-end gap-4"
-                      onClick={(e) => e.stopPropagation()}
+                    case "rapport-valide":
+                      title = "Rapport validé";
+                      Icon = <FiCheckCircle className="text-green-600" />;
+                      badgeText = "Validé";
+                      badgeColor = "text-green-700 bg-green-100";
+                      description = (
+                        <div className="flex items-center gap-2">
+                          <FiClock />
+                          <span>
+                            Votre rapport a été validé par{" "}
+                            {(n as any).technicienPrenom}{" "}
+                            {(n as any).technicienNom} à{" "}
+                            {new Date(n.createdAt).toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            .
+                          </span>
+                        </div>
+                      );
+                      href = `/rapport/incident/${(n as any).incidentId}`;
+                      break;
+
+                    case "rapport-invalide":
+                      title = "Rapport invalidé";
+                      Icon = <FiXCircle className="text-red-600" />;
+                      badgeText = "Invalidé";
+                      badgeColor = "text-red-700 bg-red-100";
+                      description = (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <FiClock />
+                            <span>
+                              Votre rapport a été invalidé par{" "}
+                              {(n as any).technicienPrenom}{" "}
+                              {(n as any).technicienNom} à{" "}
+                              {new Date(n.createdAt).toLocaleTimeString(
+                                "fr-FR",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                              .
+                            </span>
+                          </div>
+                          <div className="mt-2 text-sm italic text-gray-600">
+                            Remarque : <em>{(n as any).remarqueResponsable}</em>
+                          </div>
+                        </>
+                      );
+                      href = `/rapport/incident/${(n as any).incidentId}`;
+                      break;
+
+                    default:
+                      return null;
+                  }
+
+                  return (
+                    <Link
+                      key={n.id}
+                      href={href}
+                      className={`block w-full rounded-xl border-l-4 bg-white ${ACCENT.border} p-6 shadow-md transition hover:bg-gray-50 ${
+                        n.read ? "opacity-70" : "opacity-100"
+                      }`}
                     >
-                      {!n.read && (
-                        <button
-                          onClick={(e) => markAsRead(e, n.id)}
-                          className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                      {/* En-tête */}
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-xl font-semibold text-gray-900">
+                          {Icon} <span>{title}</span>
+                        </div>
+                        <span
+                          className={`px-3 py-1 text-sm font-semibold ${badgeColor} rounded-full`}
                         >
-                          <FiEye /> Marquer lu
-                        </button>
-                      )}
-                    </div>
-                  </Link>
-                ))}
+                          {badgeText}
+                        </span>
+                      </div>
+
+                      {/* Contenu */}
+                      <div className="grid grid-cols-1 gap-3 text-gray-700 sm:grid-cols-2">
+                        {description}
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        className="mt-4 flex items-center justify-end gap-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {!n.read && (
+                          <button
+                            onClick={(e) => markAsRead(e, n.id)}
+                            className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                          >
+                            <FiEye /> Marquer lu
+                          </button>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}
