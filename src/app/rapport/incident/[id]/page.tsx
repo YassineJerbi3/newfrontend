@@ -396,16 +396,21 @@ export default function CombinedIncidentForms() {
         form.natureIntervention === "SOUS_TRAITANT"
           ? form.telephoneExterne
           : undefined,
-      ...(envoyer && { statut: "SOUMIS" }),
     };
+
     if (envoyer) {
-      // si c'est une mise à jour d'un rapport invalidé, on le repasse en A_CORRIGER
-      if (existing?.statut === "INVALIDE") {
+      // Si le rapport existant est déjà en A_PLANIFIER, MOD_PLANIFIER ou INVALIDE → on passe en A_CORRIGER
+      if (
+        existing &&
+        ["A_PLANIFIER", "MOD_PLANIFIER", "INVALIDE"].includes(existing.statut)
+      ) {
         payloadRapport.statut = "A_CORRIGER";
       } else {
+        // Sinon, première soumission ou autre cas → statut SOUMIS
         payloadRapport.statut = "SOUMIS";
       }
     }
+
     let rapportSaved: RapportExisting;
 
     if (existing) {
@@ -427,7 +432,10 @@ export default function CombinedIncidentForms() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(payloadRapport),
+        body: JSON.stringify({
+          ...payloadRapport,
+          statut: "SOUMIS",
+        }),
       });
       if (!res.ok) {
         console.error("Erreur POST rapport", await res.text());
@@ -436,7 +444,7 @@ export default function CombinedIncidentForms() {
       rapportSaved = await res.json();
     }
 
-    // Si on “envoie” (statut = SOUMIS), créer les bons de sortie
+    // Si on “envoie” (statut = A_CORRIGER ou SOUMIS), créer les bons de sortie
     if (envoyer && selectedConsumables.length) {
       for (const line of selectedConsumables) {
         if (line.articleMagasinId && line.quantiteSortie > 0) {

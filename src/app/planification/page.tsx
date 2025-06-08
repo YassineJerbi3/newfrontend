@@ -1,3 +1,4 @@
+// src/app/rapport/planification/MyCalendar.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -48,7 +49,6 @@ const eventStyleGetter = (event: Evenement) => {
       : event.priority === "Medium"
         ? "#d97706"
         : "#047857";
-
   return {
     style: {
       backgroundColor: bgColor,
@@ -113,7 +113,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           →
         </button>
       </div>
-
       <div className="relative">
         <span
           onClick={handleTitleClick}
@@ -125,7 +124,7 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           <div className="absolute left-1/2 top-full z-30 mt-2 w-[280px] -translate-x-1/2 transform rounded-xl bg-white p-4 shadow-2xl">
             <DatePicker
               selected={currentDate}
-              onChange={(date: Date) => handleDateChange(date)}
+              onChange={handleDateChange}
               dateFormat="MMMM yyyy"
               showMonthYearPicker
               inline
@@ -134,7 +133,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           </div>
         )}
       </div>
-
       <div className="flex space-x-3">
         {views.map((v) => (
           <button
@@ -194,15 +192,14 @@ const EventModal: React.FC<EventModalProps> = ({
       alert("Tous les champs sont obligatoires.");
       return;
     }
-    const newEvent: Evenement = {
+    onSave({
       id: eventData?.id || Date.now().toString(),
       type: "rapport",
       title,
       priority,
       start,
       end: start,
-    };
-    onSave(newEvent);
+    });
     onClose();
   };
 
@@ -245,8 +242,8 @@ const EventModal: React.FC<EventModalProps> = ({
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nom du rapport"
+                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -271,7 +268,7 @@ const EventModal: React.FC<EventModalProps> = ({
                   </label>
                   <DatePicker
                     selected={start}
-                    onChange={(date: Date) => setStart(date)}
+                    onChange={(d) => setStart(d!)}
                     dateFormat="yyyy-MM-dd"
                     className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -352,26 +349,40 @@ const MyCalendar: React.FC = () => {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedEvent, setSelectedEvent] = useState<Evenement | null>(null);
 
+  function asArray(d: any): any[] {
+    if (Array.isArray(d)) return d;
+    if (d && Array.isArray(d.rapports)) return d.rapports;
+    return [];
+  }
+
   const loadToPlanifier = async () => {
     const res = await fetch(
       "http://localhost:2000/rapports/nature/a-planifier",
-      { credentials: "include" },
+      {
+        credentials: "include",
+      },
     );
     const data = await res.json();
+    const list = asArray(data);
     setAvailableEvents(
-      data.map((r: any) => {
-        let prio: Evenement["priority"] = "Medium";
-        if (r.incident?.priorite === "URGENT") prio = "Urgent";
-        if (r.incident?.priorite === "BASSE") prio = "Bas";
-        return {
-          id: r.id,
-          type: "rapport",
-          title: `Rapport #${r.id}`,
-          priority: prio,
-          start: new Date(),
-          end: new Date(),
-        };
-      }),
+      list
+        .filter(
+          (r: any) =>
+            r.natureResolution === "A_PLANIFIER" && !r.datePlanification,
+        )
+        .map((r: any) => {
+          let prio: Evenement["priority"] = "Medium";
+          if (r.incident?.priorite === "URGENT") prio = "Urgent";
+          if (r.incident?.priorite === "BASSE") prio = "Bas";
+          return {
+            id: r.id,
+            type: "rapport",
+            title: `Rapport #${r.id}`,
+            priority: prio,
+            start: new Date(),
+            end: new Date(),
+          };
+        }),
     );
   };
 
@@ -380,22 +391,30 @@ const MyCalendar: React.FC = () => {
       credentials: "include",
     });
     const data = await res.json();
+    const list = asArray(data);
+
     setScheduledEvents(
-      data.map((r: any) => {
-        let prio: Evenement["priority"] = "Medium";
-        if (r.incident?.priorite === "URGENT") prio = "Urgent";
-        if (r.incident?.priorite === "BASSE") prio = "Bas";
-        const [year, month, day] = r.datePlanification.split("-").map(Number);
-        const planifDate = new Date(year, month - 1, day);
-        return {
-          id: r.id,
-          type: "rapport",
-          title: `Rapport #${r.id}`,
-          priority: prio,
-          start: planifDate,
-          end: planifDate,
-        };
-      }),
+      list
+        // Only include those with a planning date AND with natureResolution = A_PLANIFIER
+        .filter(
+          (r: any) =>
+            r.datePlanification && r.natureResolution === "A_PLANIFIER",
+        )
+        .map((r: any) => {
+          let prio: Evenement["priority"] = "Medium";
+          if (r.incident?.priorite === "URGENT") prio = "Urgent";
+          if (r.incident?.priorite === "BASSE") prio = "Bas";
+          // On génère directement la Date à partir de l'ISO
+          const planifDate = new Date(r.datePlanification);
+          return {
+            id: r.id,
+            type: "rapport",
+            title: `Rapport #${r.id}`,
+            priority: prio,
+            start: planifDate,
+            end: planifDate,
+          };
+        }),
     );
   };
 
@@ -409,13 +428,11 @@ const MyCalendar: React.FC = () => {
     setSelectedEvent(ev);
     setModalOpen(true);
   };
-
   const openEditModal = (ev: Evenement) => {
     setModalMode("edit");
     setSelectedEvent(ev);
     setModalOpen(true);
   };
-
   const closeModal = () => {
     setModalOpen(false);
     setSelectedEvent(null);
@@ -427,7 +444,7 @@ const MyCalendar: React.FC = () => {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        datePlanification: ev.start.toISOString().split("T")[0],
+        datePlanification: ev.start.toISOString().slice(0, 10),
       }),
     });
     await loadToPlanifier();
@@ -436,9 +453,11 @@ const MyCalendar: React.FC = () => {
   };
 
   const handleDeleteEvent = async (id: string) => {
-    await fetch(`http://localhost:2000/rapports/${id}/planification`, {
-      method: "DELETE",
+    await fetch(`http://localhost:2000/rapports/${id}/planifier`, {
+      method: "POST",
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ datePlanification: null }),
     });
     await loadToPlanifier();
     await loadPlanned();

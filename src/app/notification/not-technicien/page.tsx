@@ -5,21 +5,22 @@ import React, { useState, useEffect, useMemo, MouseEvent } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Link from "next/link";
 import {
-  FiAlertTriangle,
-  FiClipboard,
-  FiClock,
   FiEye,
-  FiFilter,
-  FiCalendar,
   FiRefreshCw,
+  FiCalendar,
+  FiClock,
   FiCheckCircle,
   FiXCircle,
+  FiAlertTriangle,
 } from "react-icons/fi";
 
 type NotificationType =
   | "incident_assign"
   | "rapport-valide"
-  | "rapport-invalide";
+  | "rapport-invalide"
+  | "rapport-a-planifier"
+  | "rapport-mod-planifier"
+  | "rapport-non-planifie";
 
 interface RawNotification {
   id: string;
@@ -36,25 +37,10 @@ interface BaseNotification {
   createdAt: string;
 }
 
-interface IncidentAssignPayload {
-  incidentId: string;
-  equipmentType: string;
-  location: string;
-}
-
-interface RapportValidePayload {
+interface RapportPlanifPayload {
   rapportId: string;
   incidentId: string;
-  technicienPrenom: string;
-  technicienNom: string;
-}
-
-interface RapportInvalidePayload {
-  rapportId: string;
-  incidentId: string;
-  remarqueResponsable: string;
-  technicienPrenom: string;
-  technicienNom: string;
+  datePlanification?: string;
 }
 
 type NotificationItem =
@@ -78,20 +64,61 @@ type NotificationItem =
       remarqueResponsable: string;
       technicienPrenom: string;
       technicienNom: string;
+    })
+  | (BaseNotification & {
+      type: "rapport-a-planifier" | "rapport-mod-planifier";
+      rapportId: string;
+      incidentId: string;
+      datePlanification: string;
+    })
+  | (BaseNotification & {
+      type: "rapport-non-planifie";
+      rapportId: string;
+      incidentId: string;
     });
 
-const ACCENT = {
-  border: "border-blue-500",
-  badgeBg: "bg-blue-100",
-  badgeText: "text-blue-600",
-} as const;
+const TYPE_CONFIG: Record<
+  NotificationType,
+  { icon: JSX.Element; accent: string; label: string }
+> = {
+  incident_assign: {
+    icon: <FiAlertTriangle size={20} />,
+    accent: "border-blue-500 text-blue-500",
+    label: "Incident assigné",
+  },
+  "rapport-valide": {
+    icon: <FiCheckCircle size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Rapport validé",
+  },
+  "rapport-invalide": {
+    icon: <FiXCircle size={20} />,
+    accent: "border-red-500 text-red-500",
+    label: "Rapport invalidé",
+  },
+  "rapport-a-planifier": {
+    icon: <FiCalendar size={20} />,
+    accent: "border-indigo-500 text-indigo-500",
+    label: "Planification ajoutée",
+  },
+  "rapport-mod-planifier": {
+    icon: <FiRefreshCw size={20} />,
+    accent: "border-yellow-500 text-yellow-500",
+    label: "Planification modifiée",
+  },
+  "rapport-non-planifie": {
+    icon: <FiXCircle size={20} />,
+    accent: "border-gray-500 text-gray-500",
+    label: "Planification annulée",
+  },
+};
 
 export default function NotificationTechnicien() {
   const [notes, setNotes] = useState<NotificationItem[]>([]);
+  const [filterType, setFilterType] = useState<"" | NotificationType>("");
   const [filterRead, setFilterRead] = useState<"" | "READ" | "UNREAD">("");
   const [filterDate, setFilterDate] = useState<string>("");
 
-  // Charger toutes les notifications qui concernent le technicien
   useEffect(() => {
     fetch("http://localhost:2000/notifications", {
       credentials: "include",
@@ -100,31 +127,38 @@ export default function NotificationTechnicien() {
       .then((data: RawNotification[]) => {
         const mapped: NotificationItem[] = data
           .filter((n) =>
-            ["incident_assign", "rapport-valide", "rapport-invalide"].includes(
-              n.type,
-            ),
+            [
+              "incident_assign",
+              "rapport-valide",
+              "rapport-invalide",
+              "rapport-a-planifier",
+              "rapport-mod-planifier",
+              "rapport-non-planifie",
+            ].includes(n.type),
           )
           .map((n) => {
+            const base: BaseNotification = {
+              id: n.id,
+              read: n.read,
+              type: n.type,
+              createdAt: n.createdAt,
+            };
             switch (n.type) {
               case "incident_assign": {
-                const p = n.payload as IncidentAssignPayload;
+                const p = n.payload;
                 return {
-                  id: n.id,
-                  read: n.read,
+                  ...base,
                   type: "incident_assign",
-                  createdAt: n.createdAt,
                   incidentId: p.incidentId,
                   equipmentType: p.equipmentType,
                   location: p.location,
                 };
               }
               case "rapport-valide": {
-                const p = n.payload as RapportValidePayload;
+                const p = n.payload;
                 return {
-                  id: n.id,
-                  read: n.read,
+                  ...base,
                   type: "rapport-valide",
-                  createdAt: n.createdAt,
                   rapportId: p.rapportId,
                   incidentId: p.incidentId,
                   technicienPrenom: p.technicienPrenom,
@@ -132,12 +166,10 @@ export default function NotificationTechnicien() {
                 };
               }
               case "rapport-invalide": {
-                const p = n.payload as RapportInvalidePayload;
+                const p = n.payload;
                 return {
-                  id: n.id,
-                  read: n.read,
+                  ...base,
                   type: "rapport-invalide",
-                  createdAt: n.createdAt,
                   rapportId: p.rapportId,
                   incidentId: p.incidentId,
                   remarqueResponsable: p.remarqueResponsable,
@@ -145,23 +177,37 @@ export default function NotificationTechnicien() {
                   technicienNom: p.technicienNom,
                 };
               }
-              default:
-                // Type non géré
-                return null;
+              case "rapport-a-planifier":
+              case "rapport-mod-planifier": {
+                const p = n.payload as RapportPlanifPayload;
+                return {
+                  ...base,
+                  type: n.type,
+                  rapportId: p.rapportId,
+                  incidentId: p.incidentId,
+                  datePlanification: p.datePlanification!,
+                };
+              }
+              case "rapport-non-planifie": {
+                const p = n.payload as RapportPlanifPayload;
+                return {
+                  ...base,
+                  type: "rapport-non-planifie",
+                  rapportId: p.rapportId,
+                  incidentId: p.incidentId,
+                };
+              }
             }
           })
-          .filter((x): x is NotificationItem => x !== null)
           .sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           );
-
         setNotes(mapped);
       })
       .catch(console.error);
   }, []);
 
-  // Marquer comme lu
   const markAsRead = (e: MouseEvent, id: string) => {
     e.stopPropagation();
     fetch(`http://localhost:2000/notifications/${id}/read`, {
@@ -173,9 +219,9 @@ export default function NotificationTechnicien() {
     );
   };
 
-  // Filtrage & regroupement par date
   const grouped = useMemo(() => {
     const filtered = notes.filter((n) => {
+      if (filterType && n.type !== filterType) return false;
       if (filterRead === "READ" && !n.read) return false;
       if (filterRead === "UNREAD" && n.read) return false;
       if (filterDate) {
@@ -184,7 +230,6 @@ export default function NotificationTechnicien() {
       }
       return true;
     });
-
     return filtered.reduce<Record<string, NotificationItem[]>>((acc, n) => {
       const dateLabel = new Date(n.createdAt).toLocaleDateString("fr-FR", {
         day: "2-digit",
@@ -194,17 +239,17 @@ export default function NotificationTechnicien() {
       (acc[dateLabel] ||= []).push(n);
       return acc;
     }, {});
-  }, [notes, filterRead, filterDate]);
+  }, [notes, filterType, filterRead, filterDate]);
 
   return (
     <DefaultLayout>
       <div className="min-h-screen bg-gray-50 px-6 py-8">
         {/* Header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-5xl font-extrabold text-gray-900">
+          <h1 className="text-4xl font-extrabold text-gray-900">
             Notifications
           </h1>
-          <span className="mt-2 text-gray-700 sm:mt-0">
+          <span className="text-gray-600">
             {new Date().toLocaleDateString("fr-FR", {
               day: "2-digit",
               month: "2-digit",
@@ -213,20 +258,42 @@ export default function NotificationTechnicien() {
           </span>
         </div>
 
-        {/* Filtres */}
-        <div className="sticky top-[90px] z-20 mx-auto mb-10 max-w-5xl rounded-2xl border border-white/30 bg-white/20 px-6 py-4 shadow-lg backdrop-blur-lg">
-          <div className="flex flex-wrap gap-6">
+        {/* Filters */}
+        <div className="sticky top-[80px] z-20 mx-auto mb-8 max-w-5xl rounded-xl bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-end gap-4">
+            {/* Type */}
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiAlertTriangle size={16} /> Type
+              </label>
+              <select
+                value={filterType}
+                onChange={(e) =>
+                  setFilterType(e.target.value as NotificationType)
+                }
+                className="w-48 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+              >
+                <option value="">Tous</option>
+                <option value="incident_assign">Incident</option>
+                <option value="rapport-valide">Validé</option>
+                <option value="rapport-invalide">Invalidé</option>
+                <option value="rapport-a-planifier">Planifié</option>
+                <option value="rapport-mod-planifier">Modifié</option>
+                <option value="rapport-non-planifie">Annulé</option>
+              </select>
+            </div>
+
             {/* Statut */}
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FiEye /> Statut
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiEye size={16} /> Statut
               </label>
               <select
                 value={filterRead}
                 onChange={(e) =>
                   setFilterRead(e.target.value as "" | "READ" | "UNREAD")
                 }
-                className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-green-200"
+                className="w-32 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-green-400 focus:ring-1 focus:ring-green-200"
               >
                 <option value="">Tous</option>
                 <option value="UNREAD">Non lus</option>
@@ -235,193 +302,142 @@ export default function NotificationTechnicien() {
             </div>
 
             {/* Date */}
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FiCalendar /> Date
+            <div className="flex flex-col">
+              <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <FiCalendar size={16} /> Date
               </label>
               <input
                 type="date"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
-                className="w-full rounded-full bg-white/60 p-3 text-gray-800 shadow-inner focus:ring-2 focus:ring-purple-200"
+                className="w-40 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-purple-400 focus:ring-1 focus:ring-purple-200"
               />
             </div>
 
             {/* Reset */}
             <button
               onClick={() => {
+                setFilterType("");
                 setFilterRead("");
                 setFilterDate("");
               }}
-              className="flex items-center gap-2 rounded-full bg-[#30486d] px-5 py-3 font-bold text-white shadow transition hover:bg-[#050f26]"
+              className="ml-auto flex items-center gap-1 rounded-md bg-gray-800 px-4 py-1 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-105"
             >
-              <FiRefreshCw /> Réinitialiser
+              <FiRefreshCw size={16} /> Réinitialiser
             </button>
           </div>
         </div>
 
-        {/* Liste groupée par date */}
+        {/* Grouped Notifications */}
         <div className="mx-auto max-w-5xl space-y-10">
           {Object.keys(grouped).length === 0 && (
             <p className="text-center text-gray-500">Aucune notification.</p>
           )}
-
           {Object.entries(grouped).map(([date, items]) => (
-            <div key={date}>
-              <h2 className="mb-4 text-3xl font-semibold text-gray-800">
+            <section key={date}>
+              <h2 className="mb-4 text-2xl font-semibold text-gray-800">
                 {date}
               </h2>
-              <div className="flex flex-col gap-6">
+              <div className="grid auto-rows-auto gap-6">
                 {items.map((n) => {
-                  // Déterminer le contenu & le lien en fonction du type
-                  let title: string;
-                  let description: JSX.Element | string;
-                  let href: string;
-                  let Icon: JSX.Element;
-                  let badgeText: string;
-                  let badgeColor: string;
+                  const cfg = TYPE_CONFIG[n.type];
+                  return (
+                    <Link
+                      key={n.id}
+                      href={`/rapport/incident/${"incidentId" in n ? n.incidentId : ""}`}
+                      className={`
+                        relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
+                        hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
+                      `}
+                    >
+                      {/* Accent bar */}
+                      <div className={`h-1 w-full ${cfg.accent}`} />
 
-                  switch (n.type) {
-                    case "incident_assign":
-                      title = "Incident assigné";
-                      Icon = <FiAlertTriangle className="text-blue-600" />;
-                      badgeText = "Assignée";
-                      badgeColor = `${ACCENT.badgeText} ${ACCENT.badgeBg}`;
-                      description = (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <FiClock />
-                            <span>
-                              Notification à{" "}
-                              {new Date(n.createdAt).toLocaleTimeString(
-                                "fr-FR",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )}
-                            </span>
+                      {/* Content */}
+                      <div className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${cfg.accent} bg-white`}
+                          >
+                            {cfg.icon}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span>
-                              <strong>Équipement :</strong>{" "}
-                              {(n as any).equipmentType}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span>
-                              <strong>Emplacement :</strong>{" "}
-                              {(n as any).location}
-                            </span>
-                          </div>
-                        </>
-                      );
-                      href = `/rapport/incident/${(n as any).incidentId}`;
-                      Icon = <FiAlertTriangle />;
-                      break;
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {cfg.label}
+                          </h3>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-700">
+                          {(() => {
+                            switch (n.type) {
+                              case "incident_assign":
+                                return (
+                                  <>
+                                    <p>
+                                      Équipement : {(n as any).equipmentType}
+                                    </p>
+                                    <p>Emplacement : {(n as any).location}</p>
+                                  </>
+                                );
+                              case "rapport-valide":
+                                return (
+                                  <p>
+                                    Validé par {(n as any).technicienPrenom}{" "}
+                                    {(n as any).technicienNom}.
+                                  </p>
+                                );
+                              case "rapport-invalide":
+                                return (
+                                  <>
+                                    <p>
+                                      Invalidé par {(n as any).technicienPrenom}{" "}
+                                      {(n as any).technicienNom}.
+                                    </p>
+                                    <p className="italic">
+                                      Remarque :{" "}
+                                      {(n as any).remarqueResponsable}
+                                    </p>
+                                  </>
+                                );
+                              case "rapport-a-planifier":
+                              case "rapport-mod-planifier":
+                                return (
+                                  <p>
+                                    Date planifiée :{" "}
+                                    {new Date(
+                                      (n as any).datePlanification,
+                                    ).toLocaleDateString("fr-FR")}
+                                  </p>
+                                );
+                              case "rapport-non-planifie":
+                                return <p>Planification annulée.</p>;
+                              default:
+                                return null;
+                            }
+                          })()}
+                        </div>
+                      </div>
 
-                    case "rapport-valide":
-                      title = "Rapport validé";
-                      Icon = <FiCheckCircle className="text-green-600" />;
-                      badgeText = "Validé";
-                      badgeColor = "text-green-700 bg-green-100";
-                      description = (
-                        <div className="flex items-center gap-2">
-                          <FiClock />
+                      {/* Footer */}
+                      <div className="flex items-center justify-end border-t border-gray-200 px-5 py-3">
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                          <FiClock size={12} />
                           <span>
-                            Votre rapport a été validé par{" "}
-                            {(n as any).technicienPrenom}{" "}
-                            {(n as any).technicienNom} à{" "}
                             {new Date(n.createdAt).toLocaleTimeString("fr-FR", {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
-                            .
                           </span>
                         </div>
-                      );
-                      href = `/rapport/incident/${(n as any).incidentId}`;
-                      break;
-
-                    case "rapport-invalide":
-                      title = "Rapport invalidé";
-                      Icon = <FiXCircle className="text-red-600" />;
-                      badgeText = "Invalidé";
-                      badgeColor = "text-red-700 bg-red-100";
-                      description = (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <FiClock />
-                            <span>
-                              Votre rapport a été invalidé par{" "}
-                              {(n as any).technicienPrenom}{" "}
-                              {(n as any).technicienNom} à{" "}
-                              {new Date(n.createdAt).toLocaleTimeString(
-                                "fr-FR",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )}
-                              .
-                            </span>
-                          </div>
-                          <div className="mt-2 text-sm italic text-gray-600">
-                            Remarque : <em>{(n as any).remarqueResponsable}</em>
-                          </div>
-                        </>
-                      );
-                      href = `/rapport/incident/${(n as any).incidentId}`;
-                      break;
-
-                    default:
-                      return null;
-                  }
-
-                  return (
-                    <Link
-                      key={n.id}
-                      href={href}
-                      className={`block w-full rounded-xl border-l-4 bg-white ${ACCENT.border} p-6 shadow-md transition hover:bg-gray-50 ${
-                        n.read ? "opacity-70" : "opacity-100"
-                      }`}
-                    >
-                      {/* En-tête */}
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-xl font-semibold text-gray-900">
-                          {Icon} <span>{title}</span>
-                        </div>
-                        <span
-                          className={`px-3 py-1 text-sm font-semibold ${badgeColor} rounded-full`}
-                        >
-                          {badgeText}
-                        </span>
                       </div>
 
-                      {/* Contenu */}
-                      <div className="grid grid-cols-1 gap-3 text-gray-700 sm:grid-cols-2">
-                        {description}
-                      </div>
-
-                      {/* Actions */}
-                      <div
-                        className="mt-4 flex items-center justify-end gap-4"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {!n.read && (
-                          <button
-                            onClick={(e) => markAsRead(e, n.id)}
-                            className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-                          >
-                            <FiEye /> Marquer lu
-                          </button>
-                        )}
-                      </div>
+                      {/* Unread indicator */}
+                      {!n.read && (
+                        <div className="absolute right-3 top-3 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                      )}
                     </Link>
                   );
                 })}
               </div>
-            </div>
+            </section>
           ))}
         </div>
       </div>

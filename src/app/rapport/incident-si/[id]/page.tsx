@@ -57,7 +57,14 @@ interface RapportExisting {
   dateFin?: string;
   cout?: number;
   bonSorties?: BonSortieExisting[];
-  statut: "SOUMIS" | "A_PLANIFIER" | "INVALIDE" | "VALIDE";
+  statut:
+    | "SOUMIS"
+    | "A_PLANIFIER"
+    | "INVALIDE"
+    | "VALIDE"
+    | "A_CORRIGER"
+    | "NON_PLANIFIE"
+    | "MOD_PLANIFIER";
   remarqueResponsable?: string;
 }
 
@@ -156,6 +163,12 @@ export default function RapportPage() {
       router.refresh();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handlePlanifier = () => {
+    if (rapport) {
+      router.push(`/planification`);
     }
   };
 
@@ -530,50 +543,62 @@ export default function RapportPage() {
                 </div>
               )}
 
-              {/* ─── Boutons “Valider” / “Invalider” ──────────────────────────── */}
-              {["SOUMIS", "A_PLANIFIER", "A_CORRIGER"].includes(
-                rapport.statut,
-              ) && (
-                <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <button
-                      onClick={handleValidate}
-                      className="flex items-center gap-1 rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-                    >
-                      <FiCheck /> Valider
-                    </button>
-                    <button
-                      onClick={() => setShowInvalidateField(true)}
-                      className="flex items-center gap-1 rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-                    >
-                      <FiX /> Invalider
-                    </button>
-                  </div>
+              {/* ─── Actions selon statut et natureResolution ───────────────────── */}
+              <section className="mt-6">
+                {rapport.statut === "SOUMIS" &&
+                rapport.natureResolution === "A_PLANIFIER" ? (
+                  <button
+                    onClick={handlePlanifier}
+                    className="flex items-center gap-1 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                  >
+                    <FiCalendar /> Planifier
+                  </button>
+                ) : (
+                  (rapport.statut === "A_CORRIGER" ||
+                    (rapport.statut === "SOUMIS" &&
+                      rapport.natureResolution === "IMMEDIATE")) && (
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <button
+                          onClick={handleValidate}
+                          className="flex items-center gap-1 rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                        >
+                          <FiCheck /> Valider
+                        </button>
+                        <button
+                          onClick={() => setShowInvalidateField(true)}
+                          className="flex items-center gap-1 rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                        >
+                          <FiX /> Invalider
+                        </button>
+                      </div>
 
-                  {showInvalidateField && (
-                    <div className="space-y-2">
-                      <textarea
-                        value={remarque}
-                        onChange={(e) => setRemarque(e.target.value)}
-                        placeholder="Remarque pour le technicien…"
-                        rows={3}
-                        className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-700"
-                      />
-                      <button
-                        onClick={handleInvalidate}
-                        disabled={!remarque.trim()}
-                        className={`flex items-center gap-1 rounded px-4 py-2 text-white ${
-                          !remarque.trim()
-                            ? "cursor-not-allowed bg-gray-400"
-                            : "bg-red-600 hover:bg-red-700"
-                        }`}
-                      >
-                        <FiX /> Confirmer Invalidation
-                      </button>
+                      {showInvalidateField && (
+                        <div className="space-y-2">
+                          <textarea
+                            value={remarque}
+                            onChange={(e) => setRemarque(e.target.value)}
+                            placeholder="Remarque pour le technicien…"
+                            rows={3}
+                            className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-700"
+                          />
+                          <button
+                            onClick={handleInvalidate}
+                            disabled={!remarque.trim()}
+                            className={`flex items-center gap-1 rounded px-4 py-2 text-white ${
+                              !remarque.trim()
+                                ? "cursor-not-allowed bg-gray-400"
+                                : "bg-red-600 hover:bg-red-700"
+                            }`}
+                          >
+                            <FiX /> Confirmer Invalidation
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  )
+                )}
+              </section>
             </>
           )}
         </section>
