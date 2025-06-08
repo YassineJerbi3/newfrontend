@@ -531,8 +531,9 @@ export default function RapportPage() {
               )}
 
               {/* ─── Boutons “Valider” / “Invalider” ──────────────────────────── */}
-              {(rapport.statut === "SOUMIS" ||
-                rapport.statut === "A_PLANIFIER") && (
+              {["SOUMIS", "A_PLANIFIER", "A_CORRIGER"].includes(
+                rapport.statut,
+              ) && (
                 <div className="space-y-4">
                   <div className="flex gap-4">
                     <button

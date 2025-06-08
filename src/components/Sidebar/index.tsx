@@ -10,32 +10,33 @@ import ClickOutside from "@/components/ClickOutside";
 import useLocalStorage from "@/hooks/useLocalStorage";
 import { useAuth } from "@/hooks/AuthProvider";
 import {
-  FaTachometerAlt,
-  FaTools,
-  FaBug,
-  FaCogs,
-  FaPaperPlane,
-  FaWarehouse,
-  FaPlus,
-  FaMapMarkerAlt,
-  FaBell,
-  FaCalendarAlt,
   FaChartLine,
-  FaBoxes,
+  FaTasks,
+  FaExclamationCircle,
   FaDesktop,
+  FaEnvelope,
+  FaBoxes,
+  FaPlusSquare,
+  FaMapPin,
+  FaBell,
+  FaCalendarCheck,
+  FaChalkboardTeacher,
+  FaBuilding,
+  FaWarehouse,
+  FaClipboardList,
+  FaArrowCircleDown,
+  FaArrowCircleUp,
+  FaCubes,
   FaUsers,
   FaUserPlus,
-  FaUniversity,
-  FaListAlt,
-  FaFileAlt,
+  FaTools,
 } from "react-icons/fa";
-
-import { FaBuilding } from "react-icons/fa";
 
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 }
+
 // Définition de l’interface MenuItem
 interface MenuItem {
   label: string;
@@ -52,49 +53,49 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
       {
         label: "Tableau de bord",
         route: "/",
-        icon: <FaTachometerAlt size={18} />,
+        icon: <FaChartLine size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Intervention",
-        icon: <FaTools size={18} />,
+        icon: <FaTasks size={18} />,
         roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
         children: [
           {
             label: "Incident",
             route: "/intervention/incident",
-            icon: <FaBug size={18} />,
+            icon: <FaExclamationCircle size={18} />,
             roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
           },
           {
             label: "Problème applicatif",
             route: "/intervention/applicatif",
-            icon: <FaCogs size={18} />,
+            icon: <FaDesktop size={18} />,
             roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
           },
           {
             label: "Demande de publication",
             route: "/intervention/demande",
-            icon: <FaPaperPlane size={18} />,
+            icon: <FaEnvelope size={18} />,
             roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
           },
         ],
       },
       {
         label: "Inventaire",
-        icon: <FaWarehouse size={18} />,
+        icon: <FaBoxes size={18} />,
         roles: ["RESPONSABLE SI"],
         children: [
           {
             label: "Ajouter Équipement",
             route: "/inventaire/equipement",
-            icon: <FaPlus size={18} />,
+            icon: <FaPlusSquare size={18} />,
             roles: ["RESPONSABLE SI"],
           },
           {
             label: "Ajouter Emplacement",
             route: "/inventaire/placement",
-            icon: <FaMapMarkerAlt size={18} />,
+            icon: <FaMapPin size={18} />,
             roles: ["RESPONSABLE SI"],
           },
         ],
@@ -120,14 +121,14 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
       {
         label: "Planification",
         route: "/planification",
-        icon: <FaCalendarAlt size={18} />,
-        roles: ["RESPONSABLE SI", "TECHNICIEN"],
+        icon: <FaCalendarCheck size={18} />,
+        roles: ["RESPONSABLE SI"],
       },
       {
-        label: "Suivi",
-        route: "/suivre-intervention",
-        icon: <FaChartLine size={18} />,
-        roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF", "TECHNICIEN"],
+        label: "Calendrier des Tâches",
+        route: "/planification-tech",
+        icon: <FaCalendarCheck size={18} />,
+        roles: ["TECHNICIEN"],
       },
     ],
   },
@@ -137,13 +138,13 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
       {
         label: "Classes",
         route: "/classes-edit",
-        icon: <FaUniversity size={18} />,
+        icon: <FaChalkboardTeacher size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
         label: "Classes",
         route: "/classes",
-        icon: <FaUniversity size={18} />,
+        icon: <FaChalkboardTeacher size={18} />,
         roles: ["PROFESSOR"],
       },
       {
@@ -165,25 +166,25 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
     menuItems: [
       {
         label: "Gestion de stock",
-        icon: <FaBoxes size={18} />,
+        icon: <FaWarehouse size={18} />,
         roles: ["RESPONSABLE SI"],
         children: [
           {
             label: "Liste du stock",
             route: "/depot",
-            icon: <FaListAlt size={18} />,
+            icon: <FaClipboardList size={18} />,
             roles: ["RESPONSABLE SI"],
           },
           {
             label: "Bon d'entrée",
             route: "/depot/entree",
-            icon: <FaFileAlt size={18} />,
+            icon: <FaArrowCircleDown size={18} />,
             roles: ["RESPONSABLE SI"],
           },
           {
             label: "Bon de sortie",
             route: "/depot/sortie",
-            icon: <FaFileAlt size={18} />,
+            icon: <FaArrowCircleUp size={18} />,
             roles: ["RESPONSABLE SI"],
           },
         ],
@@ -196,7 +197,7 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
       {
         label: "Liste des équipements",
         route: "/equipements",
-        icon: <FaBoxes size={18} />,
+        icon: <FaCubes size={18} />,
         roles: ["RESPONSABLE SI"],
       },
       {
@@ -233,14 +234,15 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     "dashboard",
   );
   const { user } = useAuth();
+
   useEffect(() => {
     const style = document.createElement("style");
     style.innerHTML = `
-    @keyframes hueShift {
-      0%, 100% { filter: hue-rotate(0deg); }
-      50%      { filter: hue-rotate(20deg); }
-    }
-  `;
+      @keyframes hueShift {
+        0%, 100% { filter: hue-rotate(0deg); }
+        50%      { filter: hue-rotate(20deg); }
+      }
+    `;
     document.head.appendChild(style);
     return () => {
       document.head.removeChild(style);
@@ -282,9 +284,11 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       typeof window !== "undefined"
         ? window.localStorage.getItem("sidebarScroll")
         : null;
-    if (scrollRef.current && stored)
+    if (scrollRef.current && stored) {
       scrollRef.current.scrollTop = parseInt(stored, 10);
+    }
   }, []);
+
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     window.localStorage.setItem(
       "sidebarScroll",
@@ -296,14 +300,14 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     <ClickOutside onClick={() => setSidebarOpen(false)}>
       <aside
         className={`
-        fixed left-0 top-0 z-50 flex h-screen w-72 transform
-        flex-col overflow-y-hidden bg-gradient-to-b from-[#01050a]
-        via-[#041021] to-[#082043]
-        text-gray-100 shadow-[0_4px_30px_rgba(0,0,0,0.7)] transition-transform duration-300
-        ease-in-out
-        lg:translate-x-0
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-      `}
+          fixed left-0 top-0 z-50 flex h-screen w-72 transform
+          flex-col overflow-y-hidden bg-gradient-to-b from-[#01050a]
+          via-[#041021] to-[#082043]
+          text-gray-100 shadow-[0_4px_30px_rgba(0,0,0,0.7)] transition-transform duration-300
+          ease-in-out
+          lg:translate-x-0
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-800 px-6 py-5">
@@ -344,12 +348,12 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
             <div key={gi} className="mb-6 last:mb-8">
               <h3
                 className="
-        mb-3 flex items-center
-        border-l-2 border-blue-500 pl-2 text-xs
-        font-semibold
-        uppercase tracking-wider
-        text-gray-400
-      "
+                  mb-3 flex items-center
+                  border-l-2 border-blue-500 pl-2 text-xs
+                  font-semibold
+                  uppercase tracking-wider
+                  text-gray-400
+                "
               >
                 {group.name}
               </h3>

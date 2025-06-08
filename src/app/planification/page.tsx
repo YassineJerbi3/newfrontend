@@ -1,71 +1,68 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
-import { Calendar, momentLocalizer, ToolbarProps } from "react-big-calendar";
+import {
+  Calendar,
+  momentLocalizer,
+  ToolbarProps,
+  EventProps,
+} from "react-big-calendar";
 import moment from "moment";
 import DatePicker from "react-datepicker";
 import Modal from "react-modal";
+import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
-// Setup calendar localizer
 const localizer = momentLocalizer(moment);
 
-// ----------------------------------------------------------------------
-// Evenement Types and Initial Data
-// ----------------------------------------------------------------------
 export interface Evenement {
-  id: number;
-  type: "incident" | "demande" | "rapport" | "applicatif";
+  id: string;
+  type: "rapport";
   title: string;
   priority: "Urgent" | "Medium" | "Bas";
-  technician?: string;
-  start?: Date;
-  end?: Date;
-  progress?: number;
+  start: Date;
+  end: Date;
 }
 
-const initialEvenements: Evenement[] = [
-  { id: 1, type: "incident", title: "Incident", priority: "Urgent" },
-  { id: 2, type: "demande", title: "Demande", priority: "Medium" },
-  { id: 3, type: "rapport", title: "Rapport d'incident", priority: "Urgent" },
-  { id: 4, type: "applicatif", title: "Applicatif", priority: "Bas" },
-];
+const typeIcon = (ev: Evenement) => (ev.type === "rapport" ? "📝" : "");
 
-// ----------------------------------------------------------------------
-// Icon Helpers
-// ----------------------------------------------------------------------
-const typeIcon = (ev: Evenement) => {
-  switch (ev.type) {
-    case "incident":
-      return "🔧";
-    case "demande":
-      return "📩";
-    case "rapport":
-      return "📝";
-    case "applicatif":
-      return "💻";
-    default:
-      return "";
-  }
-};
-
-const priorityIcon = (ev: Evenement) => {
-  switch (ev.priority) {
+const priorityColor = (p: Evenement["priority"]) => {
+  switch (p) {
     case "Urgent":
-      return "🚨";
+      return "bg-red-700 text-white";
     case "Medium":
-      return "💡";
+      return "bg-yellow-500 text-gray-800";
     case "Bas":
-      return "📉";
+      return "bg-green-600 text-white";
     default:
-      return "";
+      return "bg-gray-300 text-black";
   }
 };
 
-// ----------------------------------------------------------------------
-// Custom Toolbar for Calendar
-// ----------------------------------------------------------------------
+const eventStyleGetter = (event: Evenement) => {
+  const bgColor =
+    event.priority === "Urgent"
+      ? "#b91c1c"
+      : event.priority === "Medium"
+        ? "#d97706"
+        : "#047857";
+
+  return {
+    style: {
+      backgroundColor: bgColor,
+      borderRadius: "1.25rem",
+      border: "none",
+      color: "#ffffff",
+      padding: "6px 8px",
+      fontSize: "0.85rem",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+      transition: "transform 0.2s",
+    },
+  };
+};
+
 interface CustomToolbarProps extends ToolbarProps {
   currentDate: Date;
   onDateChange: (date: Date) => void;
@@ -84,6 +81,7 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   onView,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
+
   const handleTitleClick = () => setShowPicker(true);
   const handleDateChange = (date: Date) => {
     setShowPicker(false);
@@ -92,83 +90,63 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        padding: "10px",
-        background: "#f0f0f0",
-        borderRadius: "5px",
-        marginBottom: "10px",
-        position: "relative",
-      }}
-    >
-      {/* Navigation Buttons */}
-      <div style={{ flex: "0 0 auto" }}>
+    <div className="sticky top-0 z-20 mb-4 flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 px-6 py-3 text-white shadow-md backdrop-blur-sm">
+      <div className="flex space-x-3">
         <button
           onClick={() => onNavigate("PREV")}
-          style={{ padding: "5px 10px", marginRight: "5px" }}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 transition hover:bg-opacity-30"
+          aria-label="Précédent"
         >
-          Back
+          ←
         </button>
         <button
           onClick={() => onNavigate("TODAY")}
-          style={{ padding: "5px 10px", marginRight: "5px" }}
+          className="rounded-full bg-white bg-opacity-25 px-4 py-2 text-sm font-medium transition hover:bg-opacity-35"
         >
-          Today
+          Aujourd’hui
         </button>
         <button
           onClick={() => onNavigate("NEXT")}
-          style={{ padding: "5px 10px" }}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 transition hover:bg-opacity-30"
+          aria-label="Suivant"
         >
-          Next
+          →
         </button>
       </div>
 
-      {/* Clickable Title */}
-      <div style={{ flex: "1 1 auto", textAlign: "center" }}>
+      <div className="relative">
         <span
           onClick={handleTitleClick}
-          style={{ fontSize: "1.2rem", fontWeight: "bold", cursor: "pointer" }}
+          className="cursor-pointer select-none text-xl font-semibold"
         >
           {label}
         </span>
         {showPicker && (
-          <div
-            style={{
-              position: "absolute",
-              top: "40px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 1000,
-            }}
-          >
+          <div className="absolute left-1/2 top-full z-30 mt-2 w-[280px] -translate-x-1/2 transform rounded-xl bg-white p-4 shadow-2xl">
             <DatePicker
               selected={currentDate}
               onChange={(date: Date) => handleDateChange(date)}
               dateFormat="MMMM yyyy"
               showMonthYearPicker
               inline
+              className="w-full rounded-lg border border-gray-200 focus:outline-none"
             />
           </div>
         )}
       </div>
 
-      {/* View Buttons */}
-      <div style={{ flex: "0 0 auto" }}>
+      <div className="flex space-x-3">
         {views.map((v) => (
           <button
             key={v}
             onClick={() => onView(v)}
-            style={{
-              margin: "0 5px",
-              padding: "5px 10px",
-              border: v === view ? "2px solid #333" : "1px solid #ddd",
-              background: v === view ? "#ddd" : "#fff",
-              cursor: "pointer",
-            }}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              v === view
+                ? "bg-white text-blue-700"
+                : "bg-white bg-opacity-20 text-white hover:bg-opacity-30"
+            }`}
           >
-            {v}
+            {v.charAt(0).toUpperCase() + v.slice(1)}
           </button>
         ))}
       </div>
@@ -176,16 +154,13 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   );
 };
 
-// ----------------------------------------------------------------------
-// Modal for Creating/Editing an Event
-// ----------------------------------------------------------------------
 interface EventModalProps {
   isOpen: boolean;
   mode: "create" | "edit";
   eventData: Evenement | null;
   onClose: () => void;
   onSave: (ev: Evenement) => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: string) => void;
 }
 
 const EventModal: React.FC<EventModalProps> = ({
@@ -197,42 +172,35 @@ const EventModal: React.FC<EventModalProps> = ({
   onDelete,
 }) => {
   const [title, setTitle] = useState(eventData?.title || "");
-  const [priority, setPriority] = useState(eventData?.priority || "Urgent");
+  const [priority, setPriority] = useState<Evenement["priority"]>(
+    eventData?.priority || "Medium",
+  );
   const [start, setStart] = useState<Date>(eventData?.start || new Date());
-  const [end, setEnd] = useState<Date>(eventData?.end || new Date());
-  const [technician, setTechnician] = useState(eventData?.technician || "");
-  const technicianOptions = ["Technician A", "Technician B", "Technician C"];
 
   useEffect(() => {
     if (eventData) {
       setTitle(eventData.title);
       setPriority(eventData.priority);
-      setStart(eventData.start || new Date());
-      setEnd(eventData.end || new Date());
-      setTechnician(eventData.technician || "");
+      setStart(eventData.start);
     } else {
       setTitle("");
-      setPriority("Urgent");
+      setPriority("Medium");
       setStart(new Date());
-      setEnd(new Date());
-      setTechnician("");
     }
   }, [eventData]);
 
   const handleSave = () => {
-    if (!title || !priority || !start || !end || !technician) {
+    if (!title || !priority || !start) {
       alert("Tous les champs sont obligatoires.");
       return;
     }
     const newEvent: Evenement = {
-      id: eventData?.id || Date.now(),
-      type: eventData?.type || "incident",
+      id: eventData?.id || Date.now().toString(),
+      type: "rapport",
       title,
       priority,
-      technician,
       start,
-      end,
-      progress: eventData?.progress || 0,
+      end: start,
     };
     onSave(newEvent);
     onClose();
@@ -250,199 +218,195 @@ const EventModal: React.FC<EventModalProps> = ({
       isOpen={isOpen}
       onRequestClose={onClose}
       ariaHideApp={false}
-      style={{
-        overlay: {
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0,0,0,0.5)",
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "center",
-          paddingTop: "20px",
-          zIndex: 1000,
-        },
-        content: {
-          background: "#fff",
-          padding: "20px",
-          borderRadius: "5px",
-          width: "400px",
-          maxWidth: "90%",
-          outline: "none",
-        },
-      }}
+      overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[85px] z-40"
+      className="outline-none"
     >
-      <h2 style={{ textAlign: "center", marginBottom: "1rem" }}>
-        {mode === "create" ? "Planifier l'événement" : "Modifier l'événement"}
-      </h2>
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Titre :</label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{ width: "100%", padding: "5px" }}
-        />
-      </div>
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Priorité :</label>
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          style={{ width: "100%", padding: "5px" }}
-        >
-          <option value="Urgent">Urgent</option>
-          <option value="Medium">Medium</option>
-          <option value="Bas">Bas</option>
-        </select>
-      </div>
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Date de début :</label>
-        <DatePicker
-          selected={start}
-          onChange={(date: Date) => setStart(date)}
-          showTimeSelect
-          dateFormat="Pp"
-          style={{ width: "100%" }}
-        />
-      </div>
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Date de fin :</label>
-        <DatePicker
-          selected={end}
-          onChange={(date: Date) => setEnd(date)}
-          showTimeSelect
-          dateFormat="Pp"
-          style={{ width: "100%" }}
-        />
-      </div>
-      <div style={{ marginBottom: "1rem" }}>
-        <label>Technicien associé :</label>
-        <select
-          value={technician}
-          onChange={(e) => setTechnician(e.target.value)}
-          style={{ width: "100%", padding: "5px" }}
-        >
-          <option value="">-- Sélectionner --</option>
-          {technicianOptions.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
-      {mode === "edit" && (
-        <div style={{ marginBottom: "1rem" }}>
-          <label>Progression :</label>
-          <div
-            style={{
-              background: "#ddd",
-              borderRadius: "5px",
-              overflow: "hidden",
-              marginTop: "5px",
-            }}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="relative mx-4 w-full max-w-md rounded-3xl bg-white/80 shadow-2xl backdrop-blur-xl"
           >
-            <div
-              style={{
-                width: `${eventData?.progress || 0}%`,
-                background: "blue",
-                height: "10px",
-              }}
-            />
-          </div>
-        </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        {mode === "edit" && (
-          <button
-            onClick={handleDelete}
-            style={{ background: "red", color: "#fff", padding: "5px 10px" }}
-          >
-            Supprimer
-          </button>
+            <div className="p-5">
+              <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
+                {mode === "create"
+                  ? "Planifier un rapport"
+                  : "Modifier la planification"}
+              </h2>
+              <div className="space-y-5">
+                <div>
+                  <label className="text-md mb-1 block font-medium text-gray-700">
+                    Titre
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nom du rapport"
+                  />
+                </div>
+                <div>
+                  <label className="text-md mb-1 block font-medium text-gray-700">
+                    Priorité
+                  </label>
+                  <select
+                    value={priority}
+                    onChange={(e) =>
+                      setPriority(e.target.value as Evenement["priority"])
+                    }
+                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Urgent">Urgent</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Bas">Bas</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-md mb-1 block font-medium text-gray-700">
+                    Date de planification
+                  </label>
+                  <DatePicker
+                    selected={start}
+                    onChange={(date: Date) => setStart(date)}
+                    dateFormat="yyyy-MM-dd"
+                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                {mode === "edit" && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleDelete}
+                    className="rounded-3xl bg-gradient-to-r from-red-700 to-red-500 px-5 py-2 text-white shadow-md transition hover:opacity-90"
+                  >
+                    Annuler planification
+                  </motion.button>
+                )}
+                <div className="ml-auto flex space-x-4">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={onClose}
+                    className="rounded-3xl bg-gray-200 px-5 py-2 text-gray-800 shadow transition hover:bg-gray-300"
+                  >
+                    Annuler
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSave}
+                    className="rounded-3xl bg-gradient-to-r from-blue-800 to-blue-600 px-5 py-2 text-white shadow-md transition hover:opacity-90"
+                  >
+                    Valider
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
-        <button
-          onClick={onClose}
-          style={{ background: "gray", color: "#fff", padding: "5px 10px" }}
-        >
-          Annuler
-        </button>
-        <button
-          onClick={handleSave}
-          style={{ background: "blue", color: "#fff", padding: "5px 10px" }}
-        >
-          {mode === "create" ? "Ajouter" : "Sauvegarder"}
-        </button>
-      </div>
+      </AnimatePresence>
     </Modal>
   );
 };
 
-// ----------------------------------------------------------------------
-// List Event Component
-// ----------------------------------------------------------------------
-interface ListEventProps {
-  event: Evenement;
-  onClick: () => void;
-}
-
-const ListEvent: React.FC<ListEventProps> = ({ event, onClick }) => (
-  <div
+const ListEvent: React.FC<{ event: Evenement; onClick: () => void }> = ({
+  event,
+  onClick,
+}) => (
+  <motion.div
     onClick={onClick}
-    style={{
-      marginBottom: "1rem",
-      padding: "10px",
-      border: "1px solid #ddd",
-      borderRadius: "5px",
-      background: "#fff",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-    }}
+    whileHover={{ scale: 1.02, boxShadow: "0 8px 20px rgba(0,0,0,0.08)" }}
+    whileTap={{ scale: 0.98 }}
+    className="mb-4 flex cursor-pointer items-center space-x-4 rounded-3xl bg-white p-4 shadow-sm transition hover:shadow-lg"
   >
-    <div style={{ marginRight: "10px", fontSize: "1.5rem" }}>
-      {typeIcon(event)}
-    </div>
-    <div>
-      <h3 style={{ margin: 0, fontWeight: "bold" }}>
-        {event.title}{" "}
-        <span style={{ marginLeft: "5px" }}>{priorityIcon(event)}</span>
+    <div className="text-3xl">{typeIcon(event)}</div>
+    <div className="flex-1">
+      <h3 className="flex items-center text-lg font-semibold">
+        {event.title}
+        <span
+          className={`ml-3 inline-block h-4 w-4 rounded-full ${priorityColor(
+            event.priority,
+          )}`}
+          title={event.priority}
+        />
       </h3>
-      <p style={{ margin: 0 }}>{event.type}</p>
+      <p className="mt-1 text-sm text-gray-500">
+        Cliquez pour choisir une date
+      </p>
     </div>
-  </div>
+  </motion.div>
 );
 
-// ----------------------------------------------------------------------
-// Main Component: List on Left, Calendar on Right
-// ----------------------------------------------------------------------
-const MyCalendar = () => {
-  const [date, setDate] = useState<Date>(new Date());
-  const [view, setView] = useState("month");
-  const [availableEvents, setAvailableEvents] =
-    useState<Evenement[]>(initialEvenements);
+const MyCalendar: React.FC = () => {
+  const [date, setDate] = useState(new Date());
+  const [view, setView] = useState<"month" | "week">("month");
+  const [availableEvents, setAvailableEvents] = useState<Evenement[]>([]);
   const [scheduledEvents, setScheduledEvents] = useState<Evenement[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedEvent, setSelectedEvent] = useState<Evenement | null>(null);
 
-  const handleNavigate = (newDate: Date, action?: string) => {
-    if (newDate instanceof Date) setDate(newDate);
+  const loadToPlanifier = async () => {
+    const res = await fetch(
+      "http://localhost:2000/rapports/nature/a-planifier",
+      { credentials: "include" },
+    );
+    const data = await res.json();
+    setAvailableEvents(
+      data.map((r: any) => {
+        let prio: Evenement["priority"] = "Medium";
+        if (r.incident?.priorite === "URGENT") prio = "Urgent";
+        if (r.incident?.priorite === "BASSE") prio = "Bas";
+        return {
+          id: r.id,
+          type: "rapport",
+          title: `Rapport #${r.id}`,
+          priority: prio,
+          start: new Date(),
+          end: new Date(),
+        };
+      }),
+    );
   };
-  const handleDateChange = (newDate: Date) => setDate(newDate);
-  const handleViewChange = (newView: string) => setView(newView);
+
+  const loadPlanned = async () => {
+    const res = await fetch("http://localhost:2000/rapports/planifies", {
+      credentials: "include",
+    });
+    const data = await res.json();
+    setScheduledEvents(
+      data.map((r: any) => {
+        let prio: Evenement["priority"] = "Medium";
+        if (r.incident?.priorite === "URGENT") prio = "Urgent";
+        if (r.incident?.priorite === "BASSE") prio = "Bas";
+        const [year, month, day] = r.datePlanification.split("-").map(Number);
+        const planifDate = new Date(year, month - 1, day);
+        return {
+          id: r.id,
+          type: "rapport",
+          title: `Rapport #${r.id}`,
+          priority: prio,
+          start: planifDate,
+          end: planifDate,
+        };
+      }),
+    );
+  };
+
+  useEffect(() => {
+    loadToPlanifier();
+    loadPlanned();
+  }, []);
 
   const openCreateModal = (ev: Evenement) => {
-    const newEv: Evenement = {
-      ...ev,
-      start: new Date(),
-      end: new Date(Date.now() + 3600000),
-      progress: 0,
-    };
     setModalMode("create");
-    setSelectedEvent(newEv);
+    setSelectedEvent(ev);
     setModalOpen(true);
   };
 
@@ -457,83 +421,96 @@ const MyCalendar = () => {
     setSelectedEvent(null);
   };
 
-  const handleSaveEvent = (ev: Evenement) => {
-    if (modalMode === "create") {
-      setScheduledEvents([...scheduledEvents, ev]);
-      setAvailableEvents(availableEvents.filter((e) => e.id !== ev.id));
-    } else {
-      setScheduledEvents(scheduledEvents.map((e) => (e.id === ev.id ? ev : e)));
-    }
+  const handleSaveEvent = async (ev: Evenement) => {
+    await fetch(`http://localhost:2000/rapports/${ev.id}/planifier`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        datePlanification: ev.start.toISOString().split("T")[0],
+      }),
+    });
+    await loadToPlanifier();
+    await loadPlanned();
+    closeModal();
   };
 
-  const handleDeleteEvent = (id: number) => {
-    const ev = scheduledEvents.find((e) => e.id === id);
-    if (ev) {
-      setScheduledEvents(scheduledEvents.filter((e) => e.id !== id));
-      setAvailableEvents([
-        ...availableEvents,
-        { ...ev, start: undefined, end: undefined },
-      ]);
-    }
+  const handleDeleteEvent = async (id: string) => {
+    await fetch(`http://localhost:2000/rapports/${id}/planification`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    await loadToPlanifier();
+    await loadPlanned();
+    closeModal();
   };
 
   return (
     <DefaultLayout>
-      <div style={{ display: "flex", height: "100vh", background: "#fafafa" }}>
-        {/* Left: scrollable list */}
-        <div
-          style={{
-            flex: 1,
-            height: "100vh",
-            padding: "20px",
-            overflowY: "auto",
-            borderRight: "1px solid #ddd",
-          }}
-        >
-          <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-            Liste des événements
+      <div className="flex h-screen bg-gradient-to-b from-blue-50 to-white">
+        <div className="w-1/3 overflow-y-auto rounded-tr-3xl bg-white/70 p-6 shadow-inner backdrop-blur-sm">
+          <h2 className="mb-6 text-center text-2xl font-extrabold text-blue-800">
+            Rapports à planifier
           </h2>
-          {availableEvents.map((ev) => (
-            <ListEvent
-              key={ev.id}
-              event={ev}
-              onClick={() => openCreateModal(ev)}
-            />
-          ))}
+          {availableEvents.length === 0 ? (
+            <p className="text-center text-gray-500">
+              Aucun rapport à planifier
+            </p>
+          ) : (
+            availableEvents.map((ev) => (
+              <ListEvent
+                key={ev.id}
+                event={ev}
+                onClick={() => openCreateModal(ev)}
+              />
+            ))
+          )}
         </div>
 
-        {/* Right: fixed calendar */}
-        <div
-          style={{
-            flex: 2,
-            height: "100vh",
-            padding: "20px",
-            overflow: "hidden",
-          }}
-        >
+        <div className="flex-1 p-6">
           <Calendar
             localizer={localizer}
             date={date}
             view={view}
-            onView={handleViewChange}
-            onNavigate={handleNavigate}
+            onView={(v) => setView(v as any)}
+            onNavigate={(d) => d instanceof Date && setDate(d)}
             defaultView="month"
             views={["month", "week"]}
             events={scheduledEvents}
-            style={{ height: "100%" }}
+            style={{
+              height: "100%",
+              borderRadius: "1.5rem",
+              overflow: "hidden",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+            }}
             components={{
               toolbar: (props) => (
                 <CustomToolbar
                   {...props}
                   currentDate={date}
-                  onDateChange={handleDateChange}
+                  onDateChange={setDate}
                   view={view}
                   views={["month", "week"]}
-                  onView={handleViewChange}
+                  onView={(v) => setView(v as any)}
                 />
               ),
+              event: (props: EventProps<Evenement>) => {
+                const { event, title } = props;
+                return (
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    className="flex items-center space-x-1 pl-3"
+                  >
+                    <span className="text-base">{typeIcon(event)}</span>
+                    <span className="truncate text-sm font-semibold text-white">
+                      {title}
+                    </span>
+                  </motion.div>
+                );
+              },
             }}
-            onSelectEvent={(ev: Evenement) => openEditModal(ev)}
+            eventPropGetter={(e) => eventStyleGetter(e as Evenement)}
+            onSelectEvent={openEditModal}
           />
         </div>
 
@@ -544,7 +521,7 @@ const MyCalendar = () => {
             eventData={selectedEvent}
             onClose={closeModal}
             onSave={handleSaveEvent}
-            onDelete={modalMode === "edit" ? handleDeleteEvent : undefined}
+            onDelete={handleDeleteEvent}
           />
         )}
       </div>

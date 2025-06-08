@@ -176,8 +176,8 @@ export default function CombinedIncidentForms() {
               })),
             );
           }
-          // Si le rapport est déjà soumis ou validé, passer en lecture seule
-          if (data.statut === "SOUMIS" || data.statut === "VALIDE") {
+          // Après : on bloque aussi pour A_CORRIGER
+          if (["SOUMIS", "VALIDE", "A_CORRIGER"].includes(data.statut)) {
             setIsSubmitted(true);
           }
         }
@@ -364,7 +364,7 @@ export default function CombinedIncidentForms() {
 
   /**
    * @param envoyer – si true → statut = SOUMIS et création BonsSortie
-   *                  si false → reste BROUILLON (aucune notif)
+   
    */
   const submitRapport = async (envoyer: boolean) => {
     if (!incidentId) return;
@@ -398,7 +398,14 @@ export default function CombinedIncidentForms() {
           : undefined,
       ...(envoyer && { statut: "SOUMIS" }),
     };
-
+    if (envoyer) {
+      // si c'est une mise à jour d'un rapport invalidé, on le repasse en A_CORRIGER
+      if (existing?.statut === "INVALIDE") {
+        payloadRapport.statut = "A_CORRIGER";
+      } else {
+        payloadRapport.statut = "SOUMIS";
+      }
+    }
     let rapportSaved: RapportExisting;
 
     if (existing) {

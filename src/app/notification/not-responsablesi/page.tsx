@@ -22,6 +22,7 @@ import {
   FiClock,
   FiUser,
   FiMapPin,
+  FiEdit2,
 } from "react-icons/fi";
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
@@ -32,6 +33,7 @@ type NotificationType =
   | "applicatif"
   | "demande"
   | "rapport-incident"
+  | "rapport-a-corriger" // ← add this
   | "ALERTE_STOCK"
   | "DEPASSEMENT_STOCK_ALERT"
   | "STOCK_INDISPONIBLE";
@@ -90,6 +92,11 @@ const TYPE_CONFIG: Record<
     icon: <FiFlag size={20} />,
     accent: "border-indigo-500 text-indigo-500",
     label: "Rapport",
+  },
+  "rapport-a-corriger": {
+    icon: <FiEdit2 size={20} />,
+    accent: "border-red-600 text-red-600",
+    label: "À Corriger",
   },
   ALERTE_STOCK: {
     icon: <FiBox size={20} />,
@@ -199,6 +206,7 @@ export default function NotificationResponsableSI() {
     socket.on("incident", handler);
     socket.on("incident_assign", handler);
     socket.on("rapport-incident", handler);
+    socket.on("rapport-a-corriger", handler);
     socket.on("ALERTE_STOCK", handler);
     socket.on("DEPASSEMENT_STOCK_ALERT", handler);
     socket.on("STOCK_INDISPONIBLE", handler);
@@ -424,9 +432,9 @@ export default function NotificationResponsableSI() {
                   const priorityStyle = priorite
                     ? PRIORITY_STYLES[priorite]
                     : PRIORITY_STYLES.NORMALE;
-
-                  // Texte personnalisé pour “rapport-incident”
+                  // juste au-dessus de votre JSX, dans le .map(n => { … })
                   let detailRapport = "";
+
                   if (n.type === "rapport-incident") {
                     const fullName = `${technicienPrenom} ${technicienNom}`;
                     if (natureIntervention === "SOUS_TRAITANT") {
@@ -436,6 +444,11 @@ export default function NotificationResponsableSI() {
                     } else if (natureResolution === "A_PLANIFIER") {
                       detailRapport = `Le technicien ${fullName}, après diagnostic, a décidé de planifier cet incident.`;
                     }
+                  } else if (n.type === "rapport-a-corriger") {
+                    const fullName = `${technicienPrenom} ${technicienNom}`;
+                    detailRapport =
+                      `Le technicien ${fullName} a corrigé le rapport suite à un rejet. ` +
+                      `Merci de le relire et de le valider ou d’apporter de nouvelles corrections.`;
                   }
 
                   return (
@@ -445,10 +458,11 @@ export default function NotificationResponsableSI() {
                         if (n.type === "incident" && incidentId) {
                           openAssignModal(incidentId);
                         } else if (
-                          n.type === "rapport-incident" &&
+                          (n.type === "rapport-incident" ||
+                            n.type === "rapport-a-corriger") &&
                           incidentId
                         ) {
-                          // ← REDIRECTION vers la page /rapport/incidentsi/[id]
+                          // REDIRECTION vers la page /rapport/incident-si/[id]
                           router.push(`/rapport/incident-si/${incidentId}`);
                         } else {
                           markAsRead(e, n.id);
@@ -475,48 +489,46 @@ export default function NotificationResponsableSI() {
                           </h3>
                         </div>
 
-                        {n.type !== "rapport-incident" ? (
-                          message ? (
-                            <p className="mt-2 text-sm text-gray-600">
-                              {message}
-                            </p>
-                          ) : (
-                            <div className="mt-2 space-y-2 text-sm text-gray-600">
-                              {location && (
-                                <p className="flex items-center gap-1">
-                                  <FiMapPin
-                                    size={14}
-                                    className="text-gray-500"
-                                  />
-                                  <span>
-                                    <strong>Emplacement:</strong> {location}
-                                  </span>
-                                </p>
-                              )}
-                              {creator && (
-                                <p className="flex items-center gap-1">
-                                  <FiUser size={14} className="text-gray-500" />
-                                  <span>
-                                    <strong>Créateur:</strong> {creator}
-                                    {creatorRole && ` (${creatorRole})`}
-                                  </span>
-                                </p>
-                              )}
-                              {equipmentType && (
-                                <p className="flex items-center gap-1">
-                                  <FiBox size={14} className="text-gray-500" />
-                                  <span>
-                                    <strong>Équipement:</strong> {equipmentType}
-                                  </span>
-                                </p>
-                              )}
-                            </div>
-                          )
-                        ) : (
-                          // Pour “rapport-incident”, on affiche le texte personnalisé
+                        {n.type === "rapport-incident" ||
+                        n.type === "rapport-a-corriger" ? (
+                          // Pour “rapport-incident” ou “à corriger”, on affiche le texte personnalisé
                           <p className="mt-2 text-sm text-gray-700">
                             {detailRapport}
                           </p>
+                        ) : message ? (
+                          // Sinon, si on a un message, on l’affiche
+                          <p className="mt-2 text-sm text-gray-600">
+                            {message}
+                          </p>
+                        ) : (
+                          // Enfin, le rendu par défaut pour les autres types
+                          <div className="mt-2 space-y-2 text-sm text-gray-600">
+                            {location && (
+                              <p className="flex items-center gap-1">
+                                <FiMapPin size={14} className="text-gray-500" />
+                                <span>
+                                  <strong>Emplacement:</strong> {location}
+                                </span>
+                              </p>
+                            )}
+                            {creator && (
+                              <p className="flex items-center gap-1">
+                                <FiUser size={14} className="text-gray-500" />
+                                <span>
+                                  <strong>Créateur:</strong> {creator}
+                                  {creatorRole && ` (${creatorRole})`}
+                                </span>
+                              </p>
+                            )}
+                            {equipmentType && (
+                              <p className="flex items-center gap-1">
+                                <FiBox size={14} className="text-gray-500" />
+                                <span>
+                                  <strong>Équipement:</strong> {equipmentType}
+                                </span>
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
 
