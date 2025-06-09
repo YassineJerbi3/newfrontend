@@ -58,6 +58,7 @@ export default function AddEquipementPage() {
   const [postesDispo, setPostesDispo] = useState<Poste[]>([]);
   const [allEquipements, setAllEquipements] = useState<EquipementMinimal[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null); // <-- message de succès
 
   // form data
   const [formData, setFormData] = useState({
@@ -214,6 +215,7 @@ export default function AddEquipementPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null); // on réinitialise le succès
 
     if (!formData.emplacementId) {
       setError("Veuillez sélectionner un emplacement.");
@@ -268,6 +270,7 @@ export default function AddEquipementPage() {
         dateMiseService: new Date().toISOString().slice(0, 10),
         maintenanceRecords: [],
       });
+      setSuccess("Équipement ajouté avec succès !");
     } catch (err: any) {
       setError(err.message);
     }
@@ -329,15 +332,13 @@ export default function AddEquipementPage() {
             </div>
             <div className="p-8">
               <div className="mb-6 flex gap-4">
-                {["Tous", "BUREAU", "CLASSE"].map((val) => (
+                {/* on n'affiche plus "Tous" */}
+                {["BUREAU", "CLASSE"].map((val) => (
                   <button
                     key={val}
                     type="button"
-                    onClick={() =>
-                      setFilterType(val === "Tous" ? "" : (val as any))
-                    }
+                    onClick={() => setFilterType(val as any)}
                     className={`flex-1 rounded-full py-2 font-medium transition ${
-                      (filterType === "" && val === "Tous") ||
                       filterType === val
                         ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow"
                         : "bg-white text-gray-700 hover:bg-blue-50"
@@ -533,7 +534,6 @@ export default function AddEquipementPage() {
           </section>
 
           {/* — Message d’erreur — */}
-          {error && <div className="text-center text-red-600">{error}</div>}
 
           <button
             type="submit"
@@ -542,6 +542,9 @@ export default function AddEquipementPage() {
             Ajouter l’équipement
           </button>
         </form>
+        {/* — Message d’erreur et de succès — */}
+        {error && <div className="text-center text-red-600">{error}</div>}
+        {success && <div className="text-center text-green-600">{success}</div>}
       </div>
     </DefaultLayout>
   );
