@@ -1,4 +1,3 @@
-// src/app/rapport/mes-planifications/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,19 +9,28 @@ import {
 } from "react-big-calendar";
 import moment from "moment";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import { useRouter } from "next/navigation";
+import { FiCheckCircle, FiAlertCircle, FiClock } from "react-icons/fi";
 
 const localizer = momentLocalizer(moment);
 
-const typeIcon = (type: string) => (type === "rapport" ? "📝" : "");
 const eventStyleGetter = (event: any) => {
-  const bgColor =
-    event.priority === "Urgent"
-      ? "#b91c1c"
-      : event.priority === "Medium"
-        ? "#d97706"
-        : "#047857";
+  let bgColor: string, icon: JSX.Element;
+  if (event.statut === "VALIDE") {
+    bgColor = "#10B981";
+    icon = <FiCheckCircle />;
+  } else if (event.priority === "Urgent") {
+    bgColor = "#2563EB";
+    icon = <FiAlertCircle />;
+  } else if (event.priority === "Medium") {
+    bgColor = "#3B82F6";
+    icon = <FiClock />;
+  } else {
+    bgColor = "#60A5FA";
+    icon = <FiClock />;
+  }
   return {
     style: {
       backgroundColor: bgColor,
@@ -32,17 +40,17 @@ const eventStyleGetter = (event: any) => {
       padding: "6px 8px",
       fontSize: "0.85rem",
       boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-      transition: "transform 0.2s",
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
     },
+    icon,
   };
 };
 
 interface CustomToolbarProps extends ToolbarProps {
   currentDate: Date;
   onDateChange: (date: Date) => void;
-  view: string;
-  views: string[];
-  onView: (view: string) => void;
 }
 
 const CustomToolbar: React.FC<CustomToolbarProps> = ({
@@ -50,17 +58,28 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   onNavigate,
   currentDate,
   onDateChange,
-  view,
-  views,
 }) => {
-  const [showPicker, setShowPicker] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [year, setYear] = useState(currentDate.getFullYear());
+  const [month, setMonth] = useState(currentDate.getMonth());
+
+  useEffect(() => {
+    setYear(currentDate.getFullYear());
+    setMonth(currentDate.getMonth());
+  }, [currentDate]);
+
+  const years = Array.from(
+    { length: 21 },
+    (_, i) => currentDate.getFullYear() - 10 + i,
+  );
+  const months = moment.months();
 
   return (
-    <div className="sticky top-0 z-20 mb-4 flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 px-6 py-3 text-white shadow-md backdrop-blur-sm">
+    <div className="sticky top-0 z-20 mb-4 flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 px-6 py-3 text-white shadow-md">
+      {/* Navigation gauche */}
       <div className="flex space-x-3">
         <button
           onClick={() => onNavigate("PREV")}
-          aria-label="Précédent"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 transition hover:bg-opacity-30"
         >
           ←
@@ -70,103 +89,123 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
             onNavigate("TODAY");
             onDateChange(new Date());
           }}
-          className="rounded-full bg-white bg-opacity-25 px-4 py-2 text-sm font-medium transition hover:bg-opacity-35"
+          className="rounded-full bg-white bg-opacity-25 px-4 py-2 text-sm font-medium hover:bg-opacity-35"
         >
           Aujourd’hui
         </button>
         <button
           onClick={() => onNavigate("NEXT")}
-          aria-label="Suivant"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 transition hover:bg-opacity-30"
         >
           →
         </button>
       </div>
 
+      {/* Label centré + sélecteur */}
       <div className="relative">
         <span
-          onClick={() => setShowPicker(true)}
+          onClick={() => setOpen(!open)}
           className="cursor-pointer select-none text-xl font-semibold"
         >
           {label}
         </span>
-        {showPicker && (
-          <div className="absolute left-1/2 top-full z-30 mt-2 w-[280px] -translate-x-1/2 transform rounded-xl bg-white p-4 shadow-2xl">
-            <input
-              type="month"
-              value={moment(currentDate).format("YYYY-MM")}
-              onChange={(e) => {
-                const [year, month] = e.target.value.split("-");
-                onDateChange(new Date(Number(year), Number(month) - 1));
-                setShowPicker(false);
-              }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none"
-            />
+        {open && (
+          <div className="absolute left-1/2 top-full mt-2 w-64 -translate-x-1/2 rounded-lg bg-white p-4 shadow-lg">
+            <div className="mb-3 flex justify-between">
+              <select
+                value={month}
+                onChange={(e) => setMonth(Number(e.target.value))}
+                className="w-1/2 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm text-gray-800 focus:outline-none"
+              >
+                {months.map((m, i) => (
+                  <option key={i} value={i}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                className="w-1/2 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm text-gray-800 focus:outline-none"
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-md bg-gray-200 px-3 py-1 text-sm hover:bg-gray-300"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  onDateChange(new Date(year, month, 1));
+                  setOpen(false);
+                }}
+                className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+              >
+                OK
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="flex space-x-3">
-        {views.map((v) => (
-          <button
-            key={v}
-            onClick={() => onView(v)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              v === view
-                ? "bg-white text-blue-700"
-                : "bg-white bg-opacity-20 text-white hover:bg-opacity-30"
-            }`}
-          >
-            {v.charAt(0).toUpperCase() + v.slice(1)}
-          </button>
-        ))}
-      </div>
+      {/* Espace vide à droite */}
+      <div style={{ width: 120 }} />
     </div>
   );
 };
 
 const CalendarOnlyPage: React.FC = () => {
   const [date, setDate] = useState(new Date());
-  const [view, setView] = useState<"month" | "week">("month");
   const [events, setEvents] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(
           "http://localhost:2000/rapports/mes-planifies",
-          { credentials: "include" },
+          {
+            credentials: "include",
+          },
         );
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("API error", res.status, text);
-          setError(`Erreur serveur : ${res.status}`);
-          return;
-        }
-        const data = await res.json();
-        // Ne mappe que si c'est un tableau
-        const list = Array.isArray(data) ? data : [];
-        const evts = list.map((r: any) => {
-          const planif = new Date(r.datePlanification);
-          return {
-            id: r.id,
-            title: `Rapport #${r.id}`,
-            start: planif,
-            end: planif,
-            priority:
-              r.incident.priorite === "URGENT"
-                ? "Urgent"
-                : r.incident.priorite === "BASSE"
-                  ? "Bas"
-                  : "Medium",
-            type: "rapport",
-          };
-        });
-        setEvents(evts);
-      } catch (err) {
-        console.error("Fetch failed:", err);
-        setError("Impossible de charger vos planifications");
+        if (!res.ok) throw new Error(`Erreur ${res.status}`);
+        const list = await res.json();
+        setEvents(
+          list.map((r: any) => {
+            const d = new Date(r.datePlanification);
+            return {
+              id: r.id,
+              start: d,
+              end: d,
+              priority:
+                r.incident.priorite === "URGENT"
+                  ? "Urgent"
+                  : r.incident.priorite === "BASSE"
+                    ? "Bas"
+                    : "Medium",
+              statut: r.statut,
+              title: "Incident",
+              incident: r.incident,
+              equipement: r.incident.equipement,
+              emplacement: r.incident.equipement.emplacement,
+              dateIncident: r.incident.dateCreation,
+              datePlanification: d,
+              diagnostic: r.diagnosticPanne,
+            };
+          }),
+        );
+      } catch (e) {
+        setError((e as Error).message);
       }
     })();
   }, []);
@@ -180,7 +219,7 @@ const CalendarOnlyPage: React.FC = () => {
           </div>
         )}
         <div className="flex-1">
-          {events.length === 0 && !error ? (
+          {!events.length && !error ? (
             <p className="mt-10 text-center text-gray-500">
               Aucune planification trouvée.
             </p>
@@ -188,11 +227,11 @@ const CalendarOnlyPage: React.FC = () => {
             <Calendar
               localizer={localizer}
               date={date}
-              view={view}
-              onView={(v) => setView(v as "month" | "week")}
+              view="month"
               onNavigate={(d) => d instanceof Date && setDate(d)}
               defaultView="month"
-              views={["month", "week"]}
+              views={["month"]}
+              popup
               events={events}
               style={{
                 height: "100%",
@@ -206,31 +245,120 @@ const CalendarOnlyPage: React.FC = () => {
                     {...props}
                     currentDate={date}
                     onDateChange={setDate}
-                    view={view}
-                    views={["month", "week"]}
-                    onView={(v) => setView(v as "month" | "week")}
                   />
                 ),
                 event: (props: EventProps<any>) => {
-                  const { event, title } = props;
+                  const { event } = props;
+                  const { style, icon } = eventStyleGetter(event);
                   return (
-                    <motion.div
-                      whileHover={{ scale: 1.03 }}
-                      className="flex items-center space-x-1 pl-3"
-                    >
-                      <span className="text-base">{typeIcon(event.type)}</span>
-                      <span className="truncate text-sm font-semibold text-white">
-                        {title}
-                      </span>
-                    </motion.div>
+                    <div style={style}>
+                      {icon}
+                      <span className="truncate">{event.title}</span>
+                    </div>
                   );
                 },
               }}
-              eventPropGetter={(e) => eventStyleGetter(e as any)}
-              onSelectEvent={() => {}}
+              onSelectEvent={(e) => setSelectedEvent(e)}
             />
           )}
         </div>
+
+        {/* Modal glassmorphique original */}
+        <AnimatePresence>
+          {selectedEvent && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedEvent(null)}
+            >
+              <motion.div
+                className="relative w-full max-w-md rounded-3xl bg-white bg-opacity-60 p-8 shadow-xl backdrop-blur-xl"
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 50, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="absolute right-4 top-4 text-2xl text-gray-600 hover:text-gray-900"
+                >
+                  ✕
+                </button>
+                <h2 className="mb-4 text-xl font-semibold text-blue-700">
+                  Détails de la planification
+                </h2>
+                {selectedEvent.statut === "VALIDE" && (
+                  <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+                    ✔ Validé
+                  </p>
+                )}
+                {(selectedEvent.statut === "A_PLANIFIER" ||
+                  selectedEvent.statut === "MOD_PLANIFIER") && (
+                  <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-800">
+                    ⏱ Disponible dans{" "}
+                    {Math.max(
+                      0,
+                      Math.ceil(
+                        (selectedEvent.datePlanification.getTime() -
+                          Date.now()) /
+                          (1000 * 60 * 60 * 24),
+                      ),
+                    )}{" "}
+                    jour(s)
+                  </p>
+                )}
+                <div className="space-y-3 text-gray-700">
+                  <p>
+                    <strong>Équipement :</strong>{" "}
+                    {selectedEvent.equipement.equipmentType}
+                  </p>
+                  <p>
+                    <strong>Emplacement :</strong>{" "}
+                    {selectedEvent.emplacement.nom}
+                  </p>
+                  <p>
+                    <strong>Date de l'incident :</strong>{" "}
+                    {moment(selectedEvent.dateIncident).format(
+                      "DD/MM/YYYY HH:mm",
+                    )}
+                  </p>
+                  <p>
+                    <strong>Date de planification :</strong>{" "}
+                    {moment(selectedEvent.datePlanification).format(
+                      "DD/MM/YYYY",
+                    )}
+                  </p>
+                  <p>
+                    <strong>Diagnostic :</strong>{" "}
+                    {selectedEvent.diagnostic || "Aucun diagnostic"}
+                  </p>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    className={`rounded-full px-4 py-2 font-semibold text-white transition ${
+                      Date.now() >= selectedEvent.datePlanification.getTime()
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "cursor-not-allowed bg-gray-400"
+                    }`}
+                    disabled={
+                      Date.now() < selectedEvent.datePlanification.getTime()
+                    }
+                    onClick={() =>
+                      Date.now() >= selectedEvent.datePlanification.getTime() &&
+                      router.push(
+                        `/rapport/incident/${selectedEvent.incident.id}`,
+                      )
+                    }
+                  >
+                    Voir le rapport
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </DefaultLayout>
   );

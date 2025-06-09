@@ -344,11 +344,21 @@ export default function NotificationTechnicien() {
                   return (
                     <Link
                       key={n.id}
-                      href={`/rapport/incident/${"incidentId" in n ? n.incidentId : ""}`}
+                      href={
+                        n.type === "incident_assign" ||
+                        n.type === "rapport-valide" ||
+                        n.type === "rapport-invalide"
+                          ? `/rapport/incident/${(n as any).incidentId}`
+                          : n.type === "rapport-a-planifier" ||
+                              n.type === "rapport-mod-planifier" ||
+                              n.type === "rapport-non-planifie"
+                            ? "/planification-tech"
+                            : "#"
+                      }
                       className={`
-                        relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
-                        hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
-                      `}
+    relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
+    hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
+  `}
                     >
                       {/* Accent bar */}
                       <div className={`h-1 w-full ${cfg.accent}`} />

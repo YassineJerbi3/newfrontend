@@ -22,46 +22,30 @@ export interface Evenement {
   id: string;
   type: "rapport";
   title: string;
-  priority: "Urgent" | "Medium" | "Bas";
   start: Date;
   end: Date;
+  incident: any;
+  equipement: any;
+  emplacement: { type: string; nom: string; poste?: string };
+  technicien?: { nom: string; prenom: string };
+  datePlanification: Date | null;
+  diagnostic?: string;
+  statut: "VALIDE" | "A_PLANIFIER";
+  dateValidation?: string;
 }
 
-const typeIcon = (ev: Evenement) => (ev.type === "rapport" ? "📝" : "");
-
-const priorityColor = (p: Evenement["priority"]) => {
-  switch (p) {
-    case "Urgent":
-      return "bg-red-700 text-white";
-    case "Medium":
-      return "bg-yellow-500 text-gray-800";
-    case "Bas":
-      return "bg-green-600 text-white";
-    default:
-      return "bg-gray-300 text-black";
-  }
-};
-
-const eventStyleGetter = (event: Evenement) => {
-  const bgColor =
-    event.priority === "Urgent"
-      ? "#b91c1c"
-      : event.priority === "Medium"
-        ? "#d97706"
-        : "#047857";
-  return {
-    style: {
-      backgroundColor: bgColor,
-      borderRadius: "1.25rem",
-      border: "none",
-      color: "#ffffff",
-      padding: "6px 8px",
-      fontSize: "0.85rem",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-      transition: "transform 0.2s",
-    },
-  };
-};
+// style dynamique selon statut
+const eventStyleGetter = (event: Evenement) => ({
+  style: {
+    backgroundColor:
+      event.statut === "VALIDE" ? "#047857" /* vert */ : "#1E3A8A" /* bleu */,
+    borderRadius: "1.25rem",
+    color: "#fff",
+    padding: "6px 8px",
+    fontSize: "0.85rem",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+  },
+});
 
 interface CustomToolbarProps extends ToolbarProps {
   currentDate: Date;
@@ -70,7 +54,6 @@ interface CustomToolbarProps extends ToolbarProps {
   views: string[];
   onView: (view: string) => void;
 }
-
 const CustomToolbar: React.FC<CustomToolbarProps> = ({
   label,
   onNavigate,
@@ -81,229 +64,200 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   onView,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
-
-  const handleTitleClick = () => setShowPicker(true);
-  const handleDateChange = (date: Date) => {
-    setShowPicker(false);
-    onDateChange(date);
-    onNavigate(date, "DATE");
-  };
-
   return (
-    <div className="sticky top-0 z-20 mb-4 flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 px-6 py-3 text-white shadow-md backdrop-blur-sm">
+    <div className="sticky top-0 z-20 mb-4 flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 px-6 py-3 text-white shadow-md">
       <div className="flex space-x-3">
         <button
           onClick={() => onNavigate("PREV")}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 transition hover:bg-opacity-30"
-          aria-label="Précédent"
+          className="h-10 w-10 rounded-full bg-white bg-opacity-20 hover:bg-opacity-30"
         >
           ←
         </button>
         <button
-          onClick={() => onNavigate("TODAY")}
-          className="rounded-full bg-white bg-opacity-25 px-4 py-2 text-sm font-medium transition hover:bg-opacity-35"
+          onClick={() => {
+            onNavigate("TODAY");
+            onDateChange(new Date());
+          }}
+          className="rounded-full bg-white bg-opacity-25 px-4 py-2 text-sm font-medium hover:bg-opacity-35"
         >
           Aujourd’hui
         </button>
         <button
           onClick={() => onNavigate("NEXT")}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 transition hover:bg-opacity-30"
-          aria-label="Suivant"
+          className="h-10 w-10 rounded-full bg-white bg-opacity-20 hover:bg-opacity-30"
         >
           →
         </button>
       </div>
       <div className="relative">
         <span
-          onClick={handleTitleClick}
+          onClick={() => setShowPicker(!showPicker)}
           className="cursor-pointer select-none text-xl font-semibold"
         >
           {label}
         </span>
         {showPicker && (
-          <div className="absolute left-1/2 top-full z-30 mt-2 w-[280px] -translate-x-1/2 transform rounded-xl bg-white p-4 shadow-2xl">
+          <div className="absolute left-1/2 top-full mt-2 w-64 -translate-x-1/2 rounded-lg bg-white p-4 shadow-lg">
             <DatePicker
               selected={currentDate}
-              onChange={handleDateChange}
+              onChange={(d) => {
+                onDateChange(d!);
+                setShowPicker(false);
+              }}
               dateFormat="MMMM yyyy"
               showMonthYearPicker
               inline
-              className="w-full rounded-lg border border-gray-200 focus:outline-none"
+              className="w-full rounded-md border border-gray-300 p-2 focus:outline-none"
             />
           </div>
         )}
       </div>
-      <div className="flex space-x-3">
-        {views.map((v) => (
-          <button
-            key={v}
-            onClick={() => onView(v)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              v === view
-                ? "bg-white text-blue-700"
-                : "bg-white bg-opacity-20 text-white hover:bg-opacity-30"
-            }`}
-          >
-            {v.charAt(0).toUpperCase() + v.slice(1)}
-          </button>
-        ))}
-      </div>
+      <button
+        onClick={() => onView("month")}
+        className={`rounded-full px-4 py-2 text-sm font-medium ${
+          view === "month"
+            ? "bg-white text-blue-700"
+            : "bg-white bg-opacity-20 text-white hover:bg-opacity-30"
+        }`}
+      >
+        Month
+      </button>
     </div>
   );
 };
 
 interface EventModalProps {
   isOpen: boolean;
-  mode: "create" | "edit";
-  eventData: Evenement | null;
+  eventData: Evenement;
+  context: "list" | "calendar";
   onClose: () => void;
   onSave: (ev: Evenement) => void;
-  onDelete?: (id: string) => void;
+  onDelete: (id: string) => void;
 }
-
 const EventModal: React.FC<EventModalProps> = ({
   isOpen,
-  mode,
   eventData,
+  context,
   onClose,
   onSave,
   onDelete,
 }) => {
-  const [title, setTitle] = useState(eventData?.title || "");
-  const [priority, setPriority] = useState<Evenement["priority"]>(
-    eventData?.priority || "Medium",
+  const [datePlanif, setDatePlanif] = useState<Date>(
+    eventData.datePlanification || new Date(),
   );
-  const [start, setStart] = useState<Date>(eventData?.start || new Date());
-
   useEffect(() => {
-    if (eventData) {
-      setTitle(eventData.title);
-      setPriority(eventData.priority);
-      setStart(eventData.start);
-    } else {
-      setTitle("");
-      setPriority("Medium");
-      setStart(new Date());
-    }
+    setDatePlanif(eventData.datePlanification || new Date());
   }, [eventData]);
-
-  const handleSave = () => {
-    if (!title || !priority || !start) {
-      alert("Tous les champs sont obligatoires.");
-      return;
-    }
-    onSave({
-      id: eventData?.id || Date.now().toString(),
-      type: "rapport",
-      title,
-      priority,
-      start,
-      end: start,
-    });
-    onClose();
-  };
-
-  const handleDelete = () => {
-    if (onDelete && eventData) {
-      onDelete(eventData.id);
-      onClose();
-    }
-  };
 
   return (
     <Modal
       isOpen={isOpen}
       onRequestClose={onClose}
       ariaHideApp={false}
-      overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[85px] z-40"
+      overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
       className="outline-none"
     >
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -50, scale: 0.9 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="relative mx-4 w-full max-w-md rounded-3xl bg-white/80 shadow-2xl backdrop-blur-xl"
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ duration: 0.2 }}
+            className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-5">
-              <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
-                {mode === "create"
-                  ? "Planifier un rapport"
-                  : "Modifier la planification"}
-              </h2>
-              <div className="space-y-5">
-                <div>
-                  <label className="text-md mb-1 block font-medium text-gray-700">
-                    Titre
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Nom du rapport"
-                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-md mb-1 block font-medium text-gray-700">
-                    Priorité
-                  </label>
-                  <select
-                    value={priority}
-                    onChange={(e) =>
-                      setPriority(e.target.value as Evenement["priority"])
-                    }
-                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Urgent">Urgent</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Bas">Bas</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-md mb-1 block font-medium text-gray-700">
-                    Date de planification
-                  </label>
-                  <DatePicker
-                    selected={start}
-                    onChange={(d) => setStart(d!)}
-                    dateFormat="yyyy-MM-dd"
-                    className="w-full rounded-3xl border border-blue-200 px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="mt-6 flex items-center justify-between">
-                {mode === "edit" && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleDelete}
-                    className="rounded-3xl bg-gradient-to-r from-red-700 to-red-500 px-5 py-2 text-white shadow-md transition hover:opacity-90"
-                  >
-                    Annuler planification
-                  </motion.button>
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
+            >
+              ✕
+            </button>
+            <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
+              Détails de la planification
+            </h2>
+
+            {/* Badge toujours affiché si validé */}
+            {eventData.statut === "VALIDE" && (
+              <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+                ✔ Validé
+              </p>
+            )}
+
+            <div className="space-y-3 text-gray-700">
+              <p>
+                <strong>Équipement :</strong>{" "}
+                {eventData.equipement.equipmentType}
+              </p>
+              <p>
+                <strong>N° de série :</strong>{" "}
+                {eventData.equipement.numeroSerie}
+              </p>
+              <p>
+                <strong>Emplacement :</strong> {eventData.emplacement.nom}
+              </p>
+              {eventData.emplacement.type === "classe" &&
+                eventData.emplacement.poste && (
+                  <p>
+                    <strong>Poste :</strong> {eventData.emplacement.poste}
+                  </p>
                 )}
-                <div className="ml-auto flex space-x-4">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={onClose}
-                    className="rounded-3xl bg-gray-200 px-5 py-2 text-gray-800 shadow transition hover:bg-gray-300"
-                  >
-                    Annuler
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleSave}
-                    className="rounded-3xl bg-gradient-to-r from-blue-800 to-blue-600 px-5 py-2 text-white shadow-md transition hover:opacity-90"
-                  >
-                    Valider
-                  </motion.button>
-                </div>
+              {eventData.technicien && (
+                <p>
+                  <strong>Technicien :</strong> {eventData.technicien.prenom}{" "}
+                  {eventData.technicien.nom}
+                </p>
+              )}
+              {eventData.dateValidation && (
+                <p>
+                  <strong>Date validation :</strong>{" "}
+                  {moment(eventData.dateValidation).format("DD/MM/YYYY HH:mm")}
+                </p>
+              )}
+              <div>
+                <strong>Date planification :</strong>{" "}
+                <DatePicker
+                  selected={datePlanif}
+                  onChange={(d) => setDatePlanif(d!)}
+                  dateFormat="yyyy-MM-dd"
+                  className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
+                />
               </div>
+              {eventData.diagnostic && (
+                <p>
+                  <strong>Diagnostic :</strong> {eventData.diagnostic}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-4">
+              {context === "calendar" && eventData.statut !== "VALIDE" && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onDelete(eventData.id)}
+                  className="rounded-3xl bg-red-600 px-5 py-2 text-white shadow-md hover:bg-red-700"
+                >
+                  Annuler planif.
+                </motion.button>
+              )}
+              {context === "list" && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() =>
+                    onSave({
+                      ...eventData,
+                      datePlanification: datePlanif,
+                      start: datePlanif,
+                      end: datePlanif,
+                    })
+                  }
+                  className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
+                >
+                  Valider
+                </motion.button>
+              )}
             </div>
           </motion.div>
         )}
@@ -320,69 +274,55 @@ const ListEvent: React.FC<{ event: Evenement; onClick: () => void }> = ({
     onClick={onClick}
     whileHover={{ scale: 1.02, boxShadow: "0 8px 20px rgba(0,0,0,0.08)" }}
     whileTap={{ scale: 0.98 }}
-    className="mb-4 flex cursor-pointer items-center space-x-4 rounded-3xl bg-white p-4 shadow-sm transition hover:shadow-lg"
+    className="mb-4 flex cursor-pointer items-center space-x-4 rounded-3xl bg-white p-4 shadow-sm"
   >
-    <div className="text-3xl">{typeIcon(event)}</div>
-    <div className="flex-1">
-      <h3 className="flex items-center text-lg font-semibold">
-        {event.title}
-        <span
-          className={`ml-3 inline-block h-4 w-4 rounded-full ${priorityColor(
-            event.priority,
-          )}`}
-          title={event.priority}
-        />
-      </h3>
-      <p className="mt-1 text-sm text-gray-500">
-        Cliquez pour choisir une date
+    <div className="flex-1 space-y-1">
+      <h3 className="text-lg font-semibold text-gray-800">Incident</h3>
+      <p className="text-sm text-gray-600">
+        {event.equipement.equipmentType} — {event.emplacement.nom}
       </p>
+      {event.technicien && (
+        <p className="text-sm text-gray-600">
+          Technicien: {event.technicien.prenom} {event.technicien.nom}
+        </p>
+      )}
     </div>
+    <div className="text-xl">{event.statut === "VALIDE" ? "✅" : "❌"}</div>
   </motion.div>
 );
 
 const MyCalendar: React.FC = () => {
   const [date, setDate] = useState(new Date());
-  const [view, setView] = useState<"month" | "week">("month");
   const [availableEvents, setAvailableEvents] = useState<Evenement[]>([]);
   const [scheduledEvents, setScheduledEvents] = useState<Evenement[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const [selectedEvent, setSelectedEvent] = useState<Evenement | null>(null);
-
-  function asArray(d: any): any[] {
-    if (Array.isArray(d)) return d;
-    if (d && Array.isArray(d.rapports)) return d.rapports;
-    return [];
-  }
+  const [modalEvent, setModalEvent] = useState<Evenement | null>(null);
+  const [modalContext, setModalContext] = useState<"list" | "calendar">("list");
 
   const loadToPlanifier = async () => {
     const res = await fetch(
       "http://localhost:2000/rapports/nature/a-planifier",
-      {
-        credentials: "include",
-      },
+      { credentials: "include" },
     );
     const data = await res.json();
-    const list = asArray(data);
     setAvailableEvents(
-      list
-        .filter(
-          (r: any) =>
-            r.natureResolution === "A_PLANIFIER" && !r.datePlanification,
-        )
-        .map((r: any) => {
-          let prio: Evenement["priority"] = "Medium";
-          if (r.incident?.priorite === "URGENT") prio = "Urgent";
-          if (r.incident?.priorite === "BASSE") prio = "Bas";
-          return {
-            id: r.id,
-            type: "rapport",
-            title: `Rapport #${r.id}`,
-            priority: prio,
-            start: new Date(),
-            end: new Date(),
-          };
-        }),
+      data.map((r: any) => ({
+        id: r.id,
+        type: "rapport",
+        title: r.incident.description,
+        start: new Date(),
+        end: new Date(),
+        incident: r.incident,
+        equipement: r.incident.equipement,
+        emplacement: r.incident.equipement.emplacement,
+        technicien: r.technicien
+          ? { nom: r.technicien.nom, prenom: r.technicien.prenom }
+          : undefined,
+        datePlanification: null,
+        diagnostic: r.diagnosticPanne,
+        statut: r.statut,
+        dateValidation: r.dateValidation,
+      })),
     );
   };
 
@@ -391,30 +331,24 @@ const MyCalendar: React.FC = () => {
       credentials: "include",
     });
     const data = await res.json();
-    const list = asArray(data);
-
     setScheduledEvents(
-      list
-        // Only include those with a planning date AND with natureResolution = A_PLANIFIER
-        .filter(
-          (r: any) =>
-            r.datePlanification && r.natureResolution === "A_PLANIFIER",
-        )
-        .map((r: any) => {
-          let prio: Evenement["priority"] = "Medium";
-          if (r.incident?.priorite === "URGENT") prio = "Urgent";
-          if (r.incident?.priorite === "BASSE") prio = "Bas";
-          // On génère directement la Date à partir de l'ISO
-          const planifDate = new Date(r.datePlanification);
-          return {
-            id: r.id,
-            type: "rapport",
-            title: `Rapport #${r.id}`,
-            priority: prio,
-            start: planifDate,
-            end: planifDate,
-          };
-        }),
+      data.map((r: any) => ({
+        id: r.id,
+        type: "rapport",
+        title: r.incident.description,
+        start: new Date(r.datePlanification),
+        end: new Date(r.datePlanification),
+        incident: r.incident,
+        equipement: r.incident.equipement,
+        emplacement: r.incident.equipement.emplacement,
+        technicien: r.technicien
+          ? { nom: r.technicien.nom, prenom: r.technicien.prenom }
+          : undefined,
+        datePlanification: new Date(r.datePlanification),
+        diagnostic: r.diagnosticPanne,
+        statut: r.statut,
+        dateValidation: r.dateValidation,
+      })),
     );
   };
 
@@ -423,28 +357,20 @@ const MyCalendar: React.FC = () => {
     loadPlanned();
   }, []);
 
-  const openCreateModal = (ev: Evenement) => {
-    setModalMode("create");
-    setSelectedEvent(ev);
+  const openModal = (ev: Evenement, context: "list" | "calendar") => {
+    setModalEvent(ev);
+    setModalContext(context);
     setModalOpen(true);
   };
-  const openEditModal = (ev: Evenement) => {
-    setModalMode("edit");
-    setSelectedEvent(ev);
-    setModalOpen(true);
-  };
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedEvent(null);
-  };
+  const closeModal = () => setModalOpen(false);
 
-  const handleSaveEvent = async (ev: Evenement) => {
+  const handleSave = async (ev: Evenement) => {
     await fetch(`http://localhost:2000/rapports/${ev.id}/planifier`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        datePlanification: ev.start.toISOString().slice(0, 10),
+        datePlanification: ev.datePlanification?.toISOString(),
       }),
     });
     await loadToPlanifier();
@@ -452,7 +378,7 @@ const MyCalendar: React.FC = () => {
     closeModal();
   };
 
-  const handleDeleteEvent = async (id: string) => {
+  const handleDelete = async (id: string) => {
     await fetch(`http://localhost:2000/rapports/${id}/planifier`, {
       method: "POST",
       credentials: "include",
@@ -467,9 +393,13 @@ const MyCalendar: React.FC = () => {
   return (
     <DefaultLayout>
       <div className="flex h-screen bg-gradient-to-b from-blue-50 to-white">
-        <div className="w-1/3 overflow-y-auto rounded-tr-3xl bg-white/70 p-6 shadow-inner backdrop-blur-sm">
+        {/* Liste à planifier */}
+        <div
+          className="w-1/3 overflow-y-auto rounded-tr-3xl bg-white/70 p-6 backdrop-blur-sm"
+          style={{ maxHeight: "calc(100vh - 90px)" }}
+        >
           <h2 className="mb-6 text-center text-2xl font-extrabold text-blue-800">
-            Rapports à planifier
+            Incidents à planifier
           </h2>
           {availableEvents.length === 0 ? (
             <p className="text-center text-gray-500">
@@ -480,26 +410,27 @@ const MyCalendar: React.FC = () => {
               <ListEvent
                 key={ev.id}
                 event={ev}
-                onClick={() => openCreateModal(ev)}
+                onClick={() => openModal(ev, "list")}
               />
             ))
           )}
         </div>
 
+        {/* Calendrier mois seul */}
         <div className="flex-1 p-6">
           <Calendar
             localizer={localizer}
             date={date}
-            view={view}
-            onView={(v) => setView(v as any)}
+            view="month"
+            views={["month"]}
             onNavigate={(d) => d instanceof Date && setDate(d)}
             defaultView="month"
-            views={["month", "week"]}
             events={scheduledEvents}
+            popup
+            tooltipAccessor={() => ""}
             style={{
               height: "100%",
               borderRadius: "1.5rem",
-              overflow: "hidden",
               boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
             }}
             components={{
@@ -508,39 +439,42 @@ const MyCalendar: React.FC = () => {
                   {...props}
                   currentDate={date}
                   onDateChange={setDate}
-                  view={view}
-                  views={["month", "week"]}
-                  onView={(v) => setView(v as any)}
+                  view="month"
+                  views={["month"]}
+                  onView={() => {}}
                 />
               ),
               event: (props: EventProps<Evenement>) => {
-                const { event, title } = props;
+                const { event } = props;
+                const { style } = eventStyleGetter(event);
                 return (
                   <motion.div
                     whileHover={{ scale: 1.03 }}
                     className="flex items-center space-x-1 pl-3"
+                    style={style}
+                    title=""
                   >
-                    <span className="text-base">{typeIcon(event)}</span>
-                    <span className="truncate text-sm font-semibold text-white">
-                      {title}
+                    <span
+                      className={`${event.statut === "VALIDE" ? "text-green-200" : "text-blue-200"} text-sm font-semibold`}
+                    >
+                      Incident {event.statut === "VALIDE" ? "✅" : "❌"}
                     </span>
                   </motion.div>
                 );
               },
             }}
-            eventPropGetter={(e) => eventStyleGetter(e as Evenement)}
-            onSelectEvent={openEditModal}
+            onSelectEvent={(e) => openModal(e as Evenement, "calendar")}
           />
         </div>
 
-        {modalOpen && selectedEvent && (
+        {modalOpen && modalEvent && (
           <EventModal
             isOpen={modalOpen}
-            mode={modalMode}
-            eventData={selectedEvent}
+            eventData={modalEvent}
+            context={modalContext}
             onClose={closeModal}
-            onSave={handleSaveEvent}
-            onDelete={handleDeleteEvent}
+            onSave={handleSave}
+            onDelete={handleDelete}
           />
         )}
       </div>
