@@ -49,7 +49,7 @@ type EquipementMinimal = {
 export default function AddEquipementPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 
-  // emplacements, users, postes…
+  // états
   const [bureaux, setBureaux] = useState<Emplacement[]>([]);
   const [classesList, setClassesList] = useState<Emplacement[]>([]);
   const [filterType, setFilterType] = useState<"" | "BUREAU" | "CLASSE">("");
@@ -69,14 +69,14 @@ export default function AddEquipementPage() {
     equipmentType: EquipmentType.IMPRIMANTE as keyof typeof EquipmentType,
     emplacementId: "",
     posteId: "",
-    utilisateur: UtilisateurType.ENSEIGNANT as keyof typeof UtilisateurType,
+    utilisateur: "" as keyof typeof UtilisateurType | "",
     userId: "",
     etat: EquipementEtat.FONCTIONNEL as keyof typeof EquipementEtat,
     dateMiseService: new Date().toISOString().slice(0, 10),
     maintenanceRecords: [] as { type: string; description: string }[],
   });
 
-  // 1) Charger les emplacements
+  // 1) Charger emplacements
   useEffect(() => {
     fetch(`${API}/emplacements/bureaux`)
       .then((r) => (r.ok ? r.json() : []))
@@ -88,7 +88,7 @@ export default function AddEquipementPage() {
       .catch(() => setClassesList([]));
   }, [API]);
 
-  // 2) Charger les users de bureau si besoin
+  // 2) Charger users si BUREAU
   useEffect(() => {
     if (filterType === "BUREAU" && formData.emplacementId) {
       fetch(`${API}/users?emplacementId=${formData.emplacementId}`)
@@ -104,7 +104,7 @@ export default function AddEquipementPage() {
     }
   }, [filterType, formData.emplacementId, API]);
 
-  // 3) Charger les postes de l’emplacement choisi
+  // 3) Charger postes & équipements pour l’emplacement
   useEffect(() => {
     if (!formData.emplacementId) {
       setPostes([]);
@@ -115,7 +115,6 @@ export default function AddEquipementPage() {
       .then((list: Poste[]) => setPostes(list))
       .catch(() => setPostes([]));
 
-    // et en même temps on charge tous les équipements de cet emplacement
     fetch(`${API}/equipements?emplacementId=${formData.emplacementId}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((list: any[]) =>
@@ -132,7 +131,7 @@ export default function AddEquipementPage() {
       .catch(() => setAllEquipements([]));
   }, [formData.emplacementId, API]);
 
-  // 4) Filtrer les postes disponibles selon utilisateur et équipement
+  // 4) Filtrer postes dispo
   useEffect(() => {
     const { equipmentType, utilisateur } = formData;
     if (
@@ -144,8 +143,6 @@ export default function AddEquipementPage() {
     }
     setPostesDispo(
       postes
-        // 1️⃣ selon le contexte : si on est en BUREAU, on garde tous les postes,
-        //    sinon on applique le filtre enseignant/étudiant
         .filter((p) =>
           filterType === "BUREAU"
             ? true
@@ -153,7 +150,6 @@ export default function AddEquipementPage() {
               ? p.numero === null
               : p.numero !== null,
         )
-        // 2️⃣ et s’ils n’ont pas déjà un équipement de ce type
         .filter((p) => {
           const types = allEquipements
             .filter((e) => e.posteId === p.id)
@@ -164,18 +160,17 @@ export default function AddEquipementPage() {
   }, [
     formData.equipmentType,
     formData.utilisateur,
-    filterType, // ← on ajoute filterType au deps
+    filterType,
     postes,
     allEquipements,
   ]);
 
-  // 5) Groupement des emplacements pour l’affichage
+  // 5) Groupement emplacements pour le select
   const options = useMemo(() => {
     if (filterType === "BUREAU") return bureaux;
     if (filterType === "CLASSE") return classesList;
     return [...bureaux, ...classesList];
   }, [bureaux, classesList, filterType]);
-
   const grouped = useMemo(() => {
     return options
       .sort((a, b) => a.nom.localeCompare(b.nom, undefined, { numeric: true }))
@@ -219,27 +214,45 @@ export default function AddEquipementPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
     if (!formData.emplacementId) {
       setError("Veuillez sélectionner un emplacement.");
       return;
     }
+
+    // Préparer le payload en supprimant les champs vides
+    const payload: any = { ...formData };
+    if (!payload.userId) delete payload.userId;
+    if (!payload.utilisateur) delete payload.utilisateur;
+    if (!payload.posteId) delete payload.posteId;
+
     try {
       const res = await fetch(`${API}/equipements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       const result = await res.json();
+
       if (!res.ok) {
+        // 409 Conflict => on distingue codeInventaire vs poste déjà utilisé
         if (res.status === 409) {
-          setError(
-            `Ce poste a déjà un équipement de type ${formData.equipmentType}`,
-          );
-          return;
+          const msg: string = result.message || "";
+          if (msg.includes("Inventaire")) {
+            setError("Code inventaire déjà utilisé.");
+            return;
+          }
+          if (msg.includes("poste")) {
+            setError(
+              `Ce poste a déjà un équipement de type ${formData.equipmentType}.`,
+            );
+            return;
+          }
         }
         throw new Error(result.message || "Erreur serveur");
       }
-      // reset
+
+      // Reset form
       setFormData({
         familleMI: "",
         designation: "",
@@ -249,7 +262,7 @@ export default function AddEquipementPage() {
         equipmentType: EquipmentType.IMPRIMANTE,
         emplacementId: "",
         posteId: "",
-        utilisateur: UtilisateurType.ENSEIGNANT,
+        utilisateur: "",
         userId: "",
         etat: EquipementEtat.FONCTIONNEL,
         dateMiseService: new Date().toISOString().slice(0, 10),
@@ -263,21 +276,18 @@ export default function AddEquipementPage() {
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-2xl space-y-12 p-8">
-        {/* Titre principal */}
         <h1 className="text-center text-4xl font-extrabold text-gray-900">
           Ajouter un Nouvel Équipement
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-12">
-          {/* ==== Informations de base ==== */}
+          {/* — Informations de base — */}
           <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
             <div className="bg-blue-50 py-3 text-center">
               <h2 className="text-xl font-semibold text-blue-700">
                 Informations de base
               </h2>
             </div>
-            {/* Body */}
             <div className="grid grid-cols-1 gap-6 p-8 sm:grid-cols-2">
               {[
                 { icon: "📦", label: "Famille MI", name: "familleMI" },
@@ -310,17 +320,14 @@ export default function AddEquipementPage() {
             </div>
           </section>
 
-          {/* ==== Emplacement & Utilisateur ==== */}
+          {/* — Emplacement & Utilisateur — */}
           <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
             <div className="bg-blue-50 py-3 text-center">
               <h2 className="text-xl font-semibold text-blue-700">
                 Emplacement & Utilisateur
               </h2>
             </div>
-            {/* Body */}
             <div className="p-8">
-              {/* Filtre */}
               <div className="mb-6 flex gap-4">
                 {["Tous", "BUREAU", "CLASSE"].map((val) => (
                   <button
@@ -379,7 +386,6 @@ export default function AddEquipementPage() {
                       name={name}
                       value={(formData as any)[name]}
                       onChange={handleChange}
-                      required
                       className="flex-1 bg-transparent text-gray-900 focus:outline-none"
                     >
                       <option value="">{label}</option>
@@ -395,15 +401,13 @@ export default function AddEquipementPage() {
             </div>
           </section>
 
-          {/* ==== Détails Équipement ==== */}
+          {/* — Détails Équipement — */}
           <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
             <div className="bg-blue-50 py-3 text-center">
               <h2 className="text-xl font-semibold text-blue-700">
                 Détails Équipement
               </h2>
             </div>
-            {/* Body */}
             <div className="grid grid-cols-1 gap-6 p-8 sm:grid-cols-2">
               {[
                 {
@@ -441,7 +445,6 @@ export default function AddEquipementPage() {
                 </div>
               ))}
 
-              {/* Date mise en service */}
               <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 transition focus-within:ring-2 focus-within:ring-blue-300 hover:shadow-md">
                 <span className="text-2xl">📅</span>
                 <input
@@ -454,7 +457,6 @@ export default function AddEquipementPage() {
                 />
               </div>
 
-              {/* Poste (optionnel) */}
               {(formData.equipmentType === EquipmentType.ECRAN ||
                 formData.equipmentType === EquipmentType.UNITE_CENTRALE) &&
                 formData.emplacementId && (
@@ -480,15 +482,13 @@ export default function AddEquipementPage() {
             </div>
           </section>
 
-          {/* ==== Maintenance Préventive ==== */}
+          {/* — Maintenance Préventive — */}
           <section className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
             <div className="bg-blue-50 py-3 text-center">
               <h2 className="text-xl font-semibold text-blue-700">
                 Maintenance Préventive
               </h2>
             </div>
-            {/* Body */}
             <div className="space-y-4 p-8">
               {formData.maintenanceRecords.map((m, i) => (
                 <div key={i} className="flex gap-4">
@@ -532,10 +532,9 @@ export default function AddEquipementPage() {
             </div>
           </section>
 
-          {/* Message d’erreur */}
+          {/* — Message d’erreur — */}
           {error && <div className="text-center text-red-600">{error}</div>}
 
-          {/* ==== Bouton final ==== */}
           <button
             type="submit"
             className="mx-auto block rounded-full bg-gradient-to-r from-blue-600 to-blue-800 px-12 py-4 text-2xl font-bold text-white shadow-2xl transition hover:from-blue-700 hover:to-blue-900"
