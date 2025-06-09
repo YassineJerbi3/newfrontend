@@ -95,31 +95,32 @@ export default function LoginPage() {
   // Login submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorField(null);
+    // Remise à zéro des erreurs
+    setErrorField("general");
     setErrorMsg("");
+
     const res = await fetch("http://localhost:2000/auth/login", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
+
+    // Si échec, on affiche toujours le même message
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      const m = j.message || "Erreur de connexion";
-      if (/email/i.test(m)) setErrorField("email");
-      else if (/pass/i.test(m)) setErrorField("password");
-      else setErrorField("general");
-      setErrorMsg(m);
+      setErrorMsg("Échec de la connexion");
       return;
     }
+
+    // Si succès, on récupère le profil et on redirige
     const me = await fetch("http://localhost:2000/auth/me", {
       credentials: "include",
     });
     if (!me.ok) {
-      setErrorField("general");
       setErrorMsg("Impossible de récupérer le profil");
       return;
     }
+
     login(await me.json());
     router.push("/acceuil");
   };

@@ -11,6 +11,7 @@ import {
 import moment from "moment";
 import DatePicker from "react-datepicker";
 import Modal from "react-modal";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
@@ -34,11 +35,9 @@ export interface Evenement {
   dateValidation?: string;
 }
 
-// style dynamique selon statut
 const eventStyleGetter = (event: Evenement) => ({
   style: {
-    backgroundColor:
-      event.statut === "VALIDE" ? "#047857" /* vert */ : "#1E3A8A" /* bleu */,
+    backgroundColor: event.statut === "VALIDE" ? "#047857" : "#1E3A8A",
     borderRadius: "1.25rem",
     color: "#fff",
     padding: "6px 8px",
@@ -60,7 +59,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   currentDate,
   onDateChange,
   view,
-  views,
   onView,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
@@ -89,6 +87,7 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           →
         </button>
       </div>
+
       <div className="relative">
         <span
           onClick={() => setShowPicker(!showPicker)}
@@ -112,6 +111,7 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           </div>
         )}
       </div>
+
       <button
         onClick={() => onView("month")}
         className={`rounded-full px-4 py-2 text-sm font-medium ${
@@ -177,7 +177,6 @@ const EventModal: React.FC<EventModalProps> = ({
               Détails de la planification
             </h2>
 
-            {/* Badge toujours affiché si validé */}
             {eventData.statut === "VALIDE" && (
               <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
                 ✔ Validé
@@ -241,6 +240,7 @@ const EventModal: React.FC<EventModalProps> = ({
                   Annuler planif.
                 </motion.button>
               )}
+
               {context === "list" && (
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -257,6 +257,15 @@ const EventModal: React.FC<EventModalProps> = ({
                 >
                   Valider
                 </motion.button>
+              )}
+
+              {eventData.statut === "VALIDE" && (
+                <Link
+                  href={`/rapport/incident-si/${eventData.incident.id}`}
+                  className="rounded-3xl bg-green-600 px-5 py-2 text-white shadow-md hover:bg-green-700"
+                >
+                  Voir le rapport
+                </Link>
               )}
             </div>
           </motion.div>
@@ -393,7 +402,7 @@ const MyCalendar: React.FC = () => {
   return (
     <DefaultLayout>
       <div className="flex h-screen bg-gradient-to-b from-blue-50 to-white">
-        {/* Liste à planifier */}
+        {/* Liste */}
         <div
           className="w-1/3 overflow-y-auto rounded-tr-3xl bg-white/70 p-6 backdrop-blur-sm"
           style={{ maxHeight: "calc(100vh - 90px)" }}
@@ -416,7 +425,7 @@ const MyCalendar: React.FC = () => {
           )}
         </div>
 
-        {/* Calendrier mois seul */}
+        {/* Calendrier */}
         <div className="flex-1 p-6">
           <Calendar
             localizer={localizer}

@@ -81,20 +81,27 @@ export default function SettingsPage() {
   // ========== Profile fields (nom, prenom) ==========
   const saveField = async (field: keyof UserData, value: string) => {
     setMessage(null);
+
+    // validation côté client : non vide
+    if (value.trim() === "") {
+      setMessage(`Le champ ${field} ne peut pas être vide.`);
+      return false;
+    }
+
     const res = await fetch("http://localhost:2000/users/me/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ [field]: value }),
     });
+    const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setMessage("Erreur : " + (err.message || res.statusText));
+      setMessage("Erreur : " + (payload.message || res.statusText));
       return false;
     }
     setData((prev) => ({ ...prev, [field]: value }));
     setMessage("Mise à jour réussie !");
-    return true; // stay in edit mode until user cancels
+    return true;
   };
 
   // ========== Email change ==========
@@ -106,6 +113,13 @@ export default function SettingsPage() {
   };
   const sendEmailChange = async () => {
     setEmailModalMsg(null);
+
+    // validation côté client
+    if (newEmail.trim() === "" || currentPassword.trim() === "") {
+      setEmailModalMsg("Email et mot de passe actuel sont requis.");
+      return;
+    }
+
     const res = await fetch("http://localhost:2000/users/me/email", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -129,14 +143,10 @@ export default function SettingsPage() {
     setShowPasswordModal(true);
   };
   const requestCode = async () => {
-    // clear message only on resend
     if (resetStep === "verify") setPwModalMsg(null);
     const res = await fetch(
       "http://localhost:2000/users/me/password/request-code",
-      {
-        method: "POST",
-        credentials: "include",
-      },
+      { method: "POST", credentials: "include" },
     );
     if (!res.ok) {
       setPwModalMsg("Impossible de générer le code");
@@ -144,12 +154,7 @@ export default function SettingsPage() {
     }
     const json = await res.json();
     setExpiresAt(new Date(json.expiresAt));
-    if (resetStep === "request") {
-      setResetStep("verify");
-    } else {
-      setPwModalMsg("Nouveau code envoyé");
-      setResetStep("verify");
-    }
+    setResetStep("verify");
   };
   const verifyCode = async () => {
     setPwModalMsg(null);
@@ -159,7 +164,7 @@ export default function SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ code: resetCode }),
+        body: JSON.stringify({ code: resetCode.trim() }),
       },
     );
     const payload = await res.json().catch(() => ({}));
@@ -171,10 +176,24 @@ export default function SettingsPage() {
   };
   const savePassword = async () => {
     setPwModalMsg(null);
+
+    // validation côté client
+    if (
+      passwords.password.trim() === "" ||
+      passwords.confirmPassword.trim() === ""
+    ) {
+      setPwModalMsg("Les deux champs mot de passe sont requis.");
+      return;
+    }
+    if (passwords.password.length < 8) {
+      setPwModalMsg("Le mot de passe doit faire au moins 8 caractères.");
+      return;
+    }
     if (passwords.password !== passwords.confirmPassword) {
       setPwModalMsg("Les mots de passe ne correspondent pas.");
       return;
     }
+
     const res = await fetch("http://localhost:2000/users/me/password", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -241,6 +260,7 @@ export default function SettingsPage() {
                   />
                 ))}
               </div>
+
               {/* Email */}
               <div className="flex items-center justify-between border-t p-6">
                 <div>
@@ -279,7 +299,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Email Modal */}
       {showEmailModal && (
         <Modal title="Changer l’email" onClose={() => setShowEmailModal(false)}>
           {emailModalMsg && (
@@ -318,6 +338,7 @@ export default function SettingsPage() {
         </Modal>
       )}
 
+      {/* Password Modal */}
       {showPasswordModal && (
         <Modal
           title="Changer le mot de passe"
@@ -413,7 +434,7 @@ export default function SettingsPage() {
   );
 }
 
-// ─── Subcomponents ───────────────────────────────────────────────────────────
+// ─── Subcomponents ───
 
 function EditableField({
   label,
@@ -422,80 +443,77 @@ function EditableField({
 }: {
   label: string;
   value: string;
-  onSave: (v: string) => void;
+  onSave: (v: string) => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setV(value);
+  }, [value]);
+
+  const handleSave = async () => {
+    if (v.trim() === "") {
+      setError(`${label} ne peut pas être vide.`);
+      return;
+    }
+    setError(null);
+    const ok = await onSave(v);
+    if (ok) {
+      setEditing(false);
+    }
+  };
 
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-sm uppercase text-gray-500">{label}</div>
-        {editing ? (
-          <input
-            type="text"
-            value={v}
-            onChange={(e) => setV(e.target.value)}
-            className="mt-1 w-64 rounded-lg border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        ) : (
-          <div className="mt-1 w-64 truncate text-lg text-gray-700">
-            {value}
-          </div>
-        )}
-      </div>
-      <div>
-        {editing ? (
-          <>
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm uppercase text-gray-500">{label}</div>
+          {editing ? (
+            <input
+              type="text"
+              value={v}
+              onChange={(e) => setV(e.target.value)}
+              className="mt-1 w-64 rounded-lg border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          ) : (
+            <div className="mt-1 w-64 truncate text-lg text-gray-700">
+              {value}
+            </div>
+          )}
+        </div>
+        <div>
+          {editing ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="mr-2 rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+              >
+                Sauvegarder
+              </button>
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setError(null);
+                  setV(value);
+                }}
+                className="rounded bg-gray-300 px-3 py-1 hover:bg-gray-400"
+              >
+                Annuler
+              </button>
+            </>
+          ) : (
             <button
-              onClick={() => onSave(v)}
-              className="mr-2 rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+              onClick={() => setEditing(true)}
+              className="rounded bg-blue-100 px-3 py-1 text-blue-600 hover:bg-blue-200"
             >
-              Sauvegarder
+              Modifier
             </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="rounded bg-gray-300 px-3 py-1 hover:bg-gray-400"
-            >
-              Annuler
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded bg-blue-100 px-3 py-1 text-blue-600 hover:bg-blue-200"
-          >
-            Modifier
-          </button>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
-function ActionRow({
-  label,
-  value,
-  actionLabel,
-  onAction,
-}: {
-  label: string;
-  value: string;
-  actionLabel: string;
-  onAction: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-sm uppercase text-gray-500">{label}</div>
-        <div className="mt-1 w-64 truncate text-lg text-gray-700">{value}</div>
-      </div>
-      <button
-        onClick={onAction}
-        className="rounded-lg bg-blue-100 px-4 py-1 text-blue-600 hover:bg-blue-200"
-      >
-        {actionLabel}
-      </button>
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

@@ -30,18 +30,19 @@ export default function DemandeInterventionForm() {
     fonction: "",
     direction: "",
     emplacementId: "",
-    typeObject: "", // on envoie le type d’équipement ici
+    typeObject: "",
     equipementId: "",
     priorite: "",
-    etat: "",
+    etatEquipement: "", // renamed field
     description: "",
-    pieceJointe: [] as File[], // plusieurs fichiers
+    pieceJointe: [] as File[],
     echeance: "",
   });
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
     {},
   );
   const [echeanceError, setEcheanceError] = useState("");
+  const [submitError, setSubmitError] = useState<string>("");
 
   const prioriteOptions = [
     { value: "URGENT", label: "Urgent" },
@@ -49,10 +50,9 @@ export default function DemandeInterventionForm() {
     { value: "BASSE", label: "Basse" },
   ];
   const etatOptions = [
-    { value: "EN_ARRET", label: "En arrêt" },
-    { value: "EN_MARCHE", label: "En marche" },
+    { value: "EN_MARCHE", label: "En marche" }, // match backend enum
+    { value: "ARRET", label: "En arrêt" },
   ];
-  const [submitError, setSubmitError] = useState<string>("");
 
   const [emplacements, setEmplacements] = useState<Emplacement[]>([]);
   const [allEquipements, setAllEquipements] = useState<Equipement[]>([]);
@@ -65,7 +65,7 @@ export default function DemandeInterventionForm() {
 
   // 1) charger user courant
   useEffect(() => {
-    fetch("http://localhost:2000/users/me", { credentials: "include" })
+    fetch("http://localhost:2000/auth/me", { credentials: "include" })
       .then((r) => r.json())
       .then((u: User) =>
         setFormData((f) => ({
@@ -87,7 +87,7 @@ export default function DemandeInterventionForm() {
       .catch(console.error);
   }, []);
 
-  // 3) charger tous les équipements de l’emplacement sélectionné
+  // 3) charger équipements de l’emplacement
   useEffect(() => {
     if (!formData.emplacementId) {
       setAllEquipements([]);
@@ -114,7 +114,7 @@ export default function DemandeInterventionForm() {
       .catch(console.error);
   }, [formData.emplacementId]);
 
-  // 4) filtrer les équipements quand on choisit un type
+  // 4) filtrer par type
   useEffect(() => {
     if (!formData.typeObject) {
       setFilteredEquipements([]);
@@ -130,7 +130,6 @@ export default function DemandeInterventionForm() {
     setSelectedEquipement(null);
   }, [formData.typeObject, allEquipements]);
 
-  // simuler upload progress
   const simulateUpload = (file: File) => {
     let prog = 0;
     const iv = setInterval(() => {
@@ -147,7 +146,6 @@ export default function DemandeInterventionForm() {
   ) => {
     const { name, value, files } = e.target as any;
 
-    // 1) pièces‑jointes multiples
     if (name === "pieceJointe" && files) {
       const filesArray = Array.from(files) as File[];
       filesArray.forEach(simulateUpload);
@@ -155,43 +153,33 @@ export default function DemandeInterventionForm() {
       return;
     }
 
-    // 2) type d’équipement
     if (name === "typeObject") {
       const filtered = allEquipements.filter(
         (eq) => eq.equipmentType === value,
       );
-      setFormData((f) => ({
-        ...f,
-        typeObject: value,
-        equipementId: "",
-      }));
+      setFormData((f) => ({ ...f, typeObject: value, equipementId: "" }));
       setFilteredEquipements(filtered);
       setSelectedEquipement(null);
       return;
     }
 
-    // 3) sélection d’équipement
     if (name === "equipementId") {
       const eq = filteredEquipements.find((e) => e.id === value) || null;
       setSelectedEquipement(eq);
     }
 
-    // 4) reset erreur échéance
     if (name === "echeance") {
       setEcheanceError("");
     }
 
-    // 5) tous les autres champs
     setFormData((f) => ({ ...f, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // → reset de l’erreur de soumission
     setSubmitError("");
 
-    // validation échéance selon priorité
+    // validation échéance
     const today = new Date();
     const echeanceDate = new Date(formData.echeance);
     let minDays = 0;
@@ -220,19 +208,18 @@ export default function DemandeInterventionForm() {
       return;
     }
 
-    // construction de la FormData
+    // FormData construction
     const payload = new FormData();
     payload.append("equipementId", formData.equipementId);
     payload.append("priorite", formData.priorite);
     payload.append("description", formData.description);
     payload.append("typeObject", formData.typeObject);
-    payload.append("etat", formData.etat);
+    payload.append("etatEquipement", formData.etatEquipement); // send new field
     payload.append("echeance", formData.echeance);
     formData.pieceJointe.forEach((file) => {
       payload.append("pieceJointe", file);
     });
 
-    // envoi
     fetch("http://localhost:2000/incidents", {
       method: "POST",
       credentials: "include",
@@ -241,11 +228,10 @@ export default function DemandeInterventionForm() {
       .then(async (res) => {
         if (!res.ok) {
           const errorBody = await res.json();
-          // on affiche le message venant du back (BadRequestException.message)
           setSubmitError(errorBody.message || "Erreur inconnue");
           return;
         }
-        // succès → reset du form
+        // reset
         setSubmitError("");
         setFormData((f) => ({
           nom: f.nom,
@@ -256,7 +242,7 @@ export default function DemandeInterventionForm() {
           typeObject: "",
           equipementId: "",
           priorite: "",
-          etat: "",
+          etatEquipement: "",
           description: "",
           pieceJointe: [],
           echeance: "",
@@ -270,6 +256,7 @@ export default function DemandeInterventionForm() {
         setSubmitError("Erreur réseau, réessayez plus tard");
       });
   };
+
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-6xl p-8">
@@ -281,7 +268,7 @@ export default function DemandeInterventionForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-10">
-          {/** IDENTITÉ **/}
+          {/* IDENTITÉ */}
           <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-1/2 before:-translate-x-1/2 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-4 before:py-1 before:text-sm before:font-semibold before:text-white before:content-['IDENTITÉ']">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {["nom", "prenom", "fonction", "direction"].map((field) => (
@@ -302,10 +289,9 @@ export default function DemandeInterventionForm() {
             </div>
           </div>
 
-          {/** ÉQUIPEMENT **/}
+          {/* ÉQUIPEMENT */}
           <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-1/2 before:-translate-x-1/2 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-4 before:py-1 before:text-sm before:font-semibold before:text-white before:content-['ÉQUIPEMENT']">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {/* Emplacement */}
               <div className="flex flex-col">
                 <label className="mb-2 text-sm font-medium uppercase text-gray-700">
                   Emplacement
@@ -326,7 +312,6 @@ export default function DemandeInterventionForm() {
                 </select>
               </div>
 
-              {/* Type */}
               <div className="flex flex-col">
                 <label className="mb-2 text-sm font-medium uppercase text-gray-700">
                   Type
@@ -347,7 +332,6 @@ export default function DemandeInterventionForm() {
                 </select>
               </div>
 
-              {/* Famille MI */}
               <div className="flex flex-col">
                 <label className="mb-2 text-sm font-medium uppercase text-gray-700">
                   Famille MI
@@ -369,7 +353,6 @@ export default function DemandeInterventionForm() {
                 </select>
               </div>
 
-              {/* N° de série */}
               {selectedEquipement && (
                 <div className="col-span-full">
                   <label className="mb-2 text-sm font-medium uppercase text-gray-700">
@@ -386,9 +369,8 @@ export default function DemandeInterventionForm() {
             </div>
           </div>
 
-          {/** PRIORITÉ & ÉTAT **/}
+          {/* PRIORITÉ & ÉTAT */}
           <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-            {/* Priorité */}
             <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-10 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-3 before:py-1 before:text-xs before:font-semibold before:text-white before:content-['PRIORITÉ']">
               <div className="flex flex-wrap gap-8">
                 {prioriteOptions.map(({ value, label }) => (
@@ -414,7 +396,6 @@ export default function DemandeInterventionForm() {
               </div>
             </div>
 
-            {/* État */}
             <div className="relative rounded-2xl bg-white p-8 shadow-2xl before:absolute before:-top-4 before:left-10 before:bg-gradient-to-r before:from-blue-500 before:to-blue-700 before:px-3 before:py-1 before:text-xs before:font-semibold before:text-white before:content-['ÉTAT']">
               <div className="flex flex-wrap gap-8">
                 {etatOptions.map(({ value, label }) => (
@@ -425,9 +406,9 @@ export default function DemandeInterventionForm() {
                     <span className="relative flex h-6 w-6 items-center justify-center">
                       <input
                         type="radio"
-                        name="etat"
+                        name="etatEquipement"
                         value={value}
-                        checked={formData.etat === value}
+                        checked={formData.etatEquipement === value}
                         onChange={handleChange}
                         required
                         className="peer absolute h-full w-full cursor-pointer opacity-0"
@@ -441,9 +422,8 @@ export default function DemandeInterventionForm() {
             </div>
           </div>
 
-          {/** DESCRIPTION & ATTACHEMENTS **/}
+          {/* DESCRIPTION & ATTACHMENTS */}
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-            {/* Description */}
             <div className="flex flex-col space-y-2">
               <label className="text-sm font-medium uppercase text-gray-700">
                 Description
@@ -458,7 +438,6 @@ export default function DemandeInterventionForm() {
                 className="rounded-lg border border-gray-300 bg-gray-50 px-5 py-4 placeholder-gray-400 transition focus:border-blue-500 focus:ring-4 focus:ring-blue-200"
               />
             </div>
-            {/* Pièce jointe */}
             <div className="flex flex-col space-y-2">
               <label className="text-sm font-medium uppercase text-gray-700">
                 Pièce jointe
@@ -471,21 +450,22 @@ export default function DemandeInterventionForm() {
                   onChange={handleChange}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 />
-
                 <p className="text-gray-500">
                   Cliquez ou glissez un fichier ici
                 </p>
               </div>
-              {formData.pieceJointe && (
+              {formData.pieceJointe.length > 0 && (
                 <div className="flex justify-between text-sm text-gray-700">
-                  <span>{formData.pieceJointe.name}</span>
-                  <span>{uploadProgress[formData.pieceJointe.name] ?? 0}%</span>
+                  <span>{formData.pieceJointe[0].name}</span>
+                  <span>
+                    {uploadProgress[formData.pieceJointe[0].name] ?? 0}%
+                  </span>
                 </div>
               )}
             </div>
           </div>
 
-          {/** ÉCHÉANCE & SUBMIT **/}
+          {/* ÉCHÉANCE & SUBMIT */}
           <div className="grid grid-cols-1 items-end gap-8 md:grid-cols-2">
             <div className="flex flex-col space-y-2">
               <label className="text-sm font-medium uppercase text-gray-700">
@@ -514,14 +494,9 @@ export default function DemandeInterventionForm() {
               Envoyer ma demande
             </button>
           </div>
+
           {submitError && (
-            <div
-              className="
-      mt-4 flex items-start space-x-2
-      rounded-lg border border-red-200
-      bg-red-50 p-3
-    "
-            >
+            <div className="mt-4 flex items-start space-x-2 rounded-lg border border-red-200 bg-red-50 p-3">
               <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-600" />
               <p className="text-sm font-medium text-red-800">{submitError}</p>
             </div>

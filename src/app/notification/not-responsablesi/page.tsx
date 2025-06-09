@@ -26,14 +26,14 @@ import {
 } from "react-icons/fi";
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { useRouter } from "next/navigation"; // ← import de useRouter
+import { useRouter } from "next/navigation";
 
 type NotificationType =
   | "incident"
   | "applicatif"
   | "demande"
   | "rapport-incident"
-  | "rapport-a-corriger" // ← add this
+  | "rapport-a-corriger"
   | "ALERTE_STOCK"
   | "DEPASSEMENT_STOCK_ALERT"
   | "STOCK_INDISPONIBLE";
@@ -52,7 +52,11 @@ interface NotificationItem {
     message?: string;
     createdAt: string;
     incidentId?: string;
-    // … d’autres champs (technicienPrenom, technicienNom, …)
+    technicianId?: string; // ← ajouté
+    technicienPrenom?: string;
+    technicienNom?: string;
+    natureResolution?: string;
+    natureIntervention?: string;
   };
 }
 
@@ -116,7 +120,7 @@ const TYPE_CONFIG: Record<
 };
 
 export default function NotificationResponsableSI() {
-  const router = useRouter(); // ← instancier useRouter
+  const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [filterType, setFilterType] = useState<"" | NotificationItem["type"]>(
@@ -146,6 +150,7 @@ export default function NotificationResponsableSI() {
             type: r.type as NotificationType,
             payload: {
               ...r.payload,
+              technicianId: r.payload.technicianId, // ← ajouté
               createdAt: r.createdAt,
             },
           }))
@@ -187,6 +192,7 @@ export default function NotificationResponsableSI() {
         type: payload.type as NotificationType,
         payload: {
           ...payload,
+          technicianId: payload.technicianId, // ← ajouté
           createdAt: payload.dateCreation ?? new Date().toISOString(),
         },
       };
@@ -215,13 +221,14 @@ export default function NotificationResponsableSI() {
       socket.off("incident", handler);
       socket.off("incident_assign", handler);
       socket.off("rapport-incident", handler);
+      socket.off("rapport-a-corriger", handler);
       socket.off("ALERTE_STOCK", handler);
       socket.off("DEPASSEMENT_STOCK_ALERT", handler);
       socket.off("STOCK_INDISPONIBLE", handler);
     };
   }, [loadNotifications]);
 
-  // Marquer en lu
+  // Marquer une notification comme lue
   const markAsRead = (e: MouseEvent, id: string) => {
     e.stopPropagation();
     fetch(`http://localhost:2000/notifications/${id}/read`, {
@@ -288,7 +295,7 @@ export default function NotificationResponsableSI() {
   return (
     <DefaultLayout>
       <div className="min-h-screen bg-gray-50 px-6 py-8">
-        {/* ─── Header ───────────────────────────────────────────────────────── */}
+        {/* Header */}
         <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-4xl font-extrabold text-gray-900">
             Notifications
@@ -302,7 +309,7 @@ export default function NotificationResponsableSI() {
           </span>
         </div>
 
-        {/* ─── Filtres ───────────────────────────────────────────────────────── */}
+        {/* Filtres */}
         <div className="sticky top-[80px] z-20 mx-auto mb-8 max-w-5xl rounded-xl bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-4">
             {/* Filtre Type */}
@@ -358,7 +365,9 @@ export default function NotificationResponsableSI() {
               </label>
               <select
                 value={filterRead}
-                onChange={(e) => setFilterRead(e.target.value as any)}
+                onChange={(e) =>
+                  setFilterRead(e.target.value as "READ" | "UNREAD" | "")
+                }
                 className="w-40 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm focus:border-green-400 focus:ring-1 focus:ring-green-200"
               >
                 <option value="">Tous</option>
@@ -395,7 +404,7 @@ export default function NotificationResponsableSI() {
           </div>
         </div>
 
-        {/* ─── Groupement par date ───────────────────────────────────────────── */}
+        {/* Groupement par date */}
         <div className="mx-auto max-w-5xl space-y-10">
           {Object.keys(grouped).length === 0 && (
             <p className="text-center text-gray-500">Aucune notification.</p>
@@ -417,6 +426,7 @@ export default function NotificationResponsableSI() {
                     dateCreation,
                     message,
                     incidentId,
+                    technicianId, // ← utilisé
                     technicienPrenom,
                     technicienNom,
                     natureResolution,
@@ -432,9 +442,9 @@ export default function NotificationResponsableSI() {
                   const priorityStyle = priorite
                     ? PRIORITY_STYLES[priorite]
                     : PRIORITY_STYLES.NORMALE;
-                  // juste au-dessus de votre JSX, dans le .map(n => { … })
-                  let detailRapport = "";
 
+                  // Texte détaillé pour rapports
+                  let detailRapport = "";
                   if (n.type === "rapport-incident") {
                     const fullName = `${technicienPrenom} ${technicienNom}`;
                     if (natureIntervention === "SOUS_TRAITANT") {
@@ -446,15 +456,18 @@ export default function NotificationResponsableSI() {
                     }
                   } else if (n.type === "rapport-a-corriger") {
                     const fullName = `${technicienPrenom} ${technicienNom}`;
-                    detailRapport =
-                      `Le technicien ${fullName} a corrigé le rapport suite à un rejet. ` +
-                      `Merci de le relire et de le valider ou d’apporter de nouvelles corrections.`;
+                    detailRapport = `Le technicien ${fullName} a corrigé le rapport suite à un rejet. Merci de le relire et de le valider.`;
                   }
+
+                  // **Logique d'assignation**
+                  const isAssigned =
+                    n.type === "incident" && !!incidentId && !!technicianId;
 
                   return (
                     <div
                       key={n.id}
                       onClick={(e) => {
+                        if (isAssigned) return; // ← bloque le clic
                         if (n.type === "incident" && incidentId) {
                           openAssignModal(incidentId);
                         } else if (
@@ -462,27 +475,37 @@ export default function NotificationResponsableSI() {
                             n.type === "rapport-a-corriger") &&
                           incidentId
                         ) {
-                          // REDIRECTION vers la page /rapport/incident-si/[id]
                           router.push(`/rapport/incident-si/${incidentId}`);
                         } else {
                           markAsRead(e, n.id);
                         }
                       }}
                       className={`
-              relative flex transform cursor-pointer flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
-              hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
-            `}
+                        relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
+                        ${
+                          isAssigned
+                            ? "cursor-default opacity-70"
+                            : "cursor-pointer hover:-translate-y-1 hover:shadow-lg"
+                        }
+                      `}
                     >
-                      {/* Top Accent Bar */}
+                      {/* Accent bar */}
                       <div className={`h-1 w-full ${accent}`} />
 
                       {/* Main Content */}
                       <div className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${accent} bg-white`}
+                            className={`
+                              flex h-8 w-8 shrink-0 items-center justify-center rounded-full
+                              border ${accent} bg-white
+                            `}
                           >
-                            {icon}
+                            {isAssigned ? (
+                              <FiUser size={20} /> // ← icône assigné
+                            ) : (
+                              icon
+                            )}
                           </div>
                           <h3 className="text-lg font-bold text-gray-900">
                             {label}
@@ -491,17 +514,14 @@ export default function NotificationResponsableSI() {
 
                         {n.type === "rapport-incident" ||
                         n.type === "rapport-a-corriger" ? (
-                          // Pour “rapport-incident” ou “à corriger”, on affiche le texte personnalisé
                           <p className="mt-2 text-sm text-gray-700">
                             {detailRapport}
                           </p>
                         ) : message ? (
-                          // Sinon, si on a un message, on l’affiche
                           <p className="mt-2 text-sm text-gray-600">
                             {message}
                           </p>
                         ) : (
-                          // Enfin, le rendu par défaut pour les autres types
                           <div className="mt-2 space-y-2 text-sm text-gray-600">
                             {location && (
                               <p className="flex items-center gap-1">
@@ -569,7 +589,7 @@ export default function NotificationResponsableSI() {
           ))}
         </div>
 
-        {/* ─── Assign Technician Modal ───────────────────────────────────────── */}
+        {/* Assign Technician Modal */}
         {modalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="z-10 w-80 rounded-xl bg-white p-6 shadow-lg">
