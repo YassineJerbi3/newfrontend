@@ -28,6 +28,7 @@ interface User {
   roles: string;
   emplacementId?: string;
   bureauNom?: string;
+  active: boolean; // ← ajoute ça
 }
 interface Emplacement {
   id: string;
@@ -126,6 +127,41 @@ export default function UsersListPage() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [edited, setEdited] = useState<Partial<User>>({});
   const [showEditModal, setShowEditModal] = useState(false);
+  const handleDeactivate = async () => {
+    if (!editUser) return;
+    if (!confirm("Désactiver ce compte ?")) return;
+
+    const res = await fetch(`http://localhost:2000/users/${editUser.id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: false }),
+    });
+    if (!res.ok) return alert("Échec de la désactivation");
+
+    // Met à jour la liste en front
+    setUsers((us) =>
+      us.map((u) => (u.id === editUser.id ? { ...u, active: false } : u)),
+    );
+    closeModal();
+  };
+  const handleActivate = async () => {
+    if (!editUser) return;
+    if (!confirm("Réactiver ce compte ?")) return;
+
+    const res = await fetch(`http://localhost:2000/users/${editUser.id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active: true }),
+    });
+    if (!res.ok) return alert("Échec de la réactivation");
+
+    setUsers((us) =>
+      us.map((u) => (u.id === editUser.id ? { ...u, active: true } : u)),
+    );
+    closeModal();
+  };
 
   // fetch users
   useEffect(() => {
@@ -299,6 +335,11 @@ export default function UsersListPage() {
                         {isMe && (
                           <span className="inline-block rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
                             Moi
+                          </span>
+                        )}
+                        {u.active === false && (
+                          <span className="inline-block rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+                            Inactive
                           </span>
                         )}
                         {u.nom}
@@ -475,13 +516,25 @@ export default function UsersListPage() {
 
                       {/* Actions */}
                       <div className="flex justify-end gap-4 pt-6">
-                        <button
-                          type="button"
-                          onClick={handleDelete}
-                          className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700"
-                        >
-                          Supprimer
-                        </button>
+                        {/* Si c’est pas le compte courant */}
+                        {editUser.id !== currentUser?.id &&
+                          (editUser.active ? (
+                            <button
+                              type="button"
+                              onClick={handleDeactivate}
+                              className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700"
+                            >
+                              Désactiver
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleActivate}
+                              className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700"
+                            >
+                              Activer
+                            </button>
+                          ))}
                         <button
                           type="submit"
                           className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
