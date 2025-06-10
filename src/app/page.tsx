@@ -64,7 +64,30 @@ export default function LoginPage() {
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef<number>();
+  // 1) Ajoute une fonction pour reset tout le flow
+  const resetForgotFlow = () => {
+    setFpStep("request");
+    setFpEmail("");
+    setFpCode("");
+    setFpNew("");
+    setFpConfirm("");
+    setFpMsg("");
+    setFpMsgType("error");
+    setExpiresAt(null);
+    setTimeLeft(0);
+  };
 
+  // 2) Utilise-la à l’ouverture du modal
+  const openForgot = () => {
+    resetForgotFlow();
+    setShowForgot(true);
+  };
+
+  // 3) Et aussi à la fermeture
+  const closeForgot = () => {
+    setShowForgot(false);
+    resetForgotFlow();
+  };
   // Redirect if logged in
   useEffect(() => {
     if (initialized && isLoggedIn) router.replace("/acceuil");
@@ -284,11 +307,11 @@ export default function LoginPage() {
                   className="transform rounded-lg bg-blue-600 px-6 py-3 font-medium text-white shadow transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg"
                 >
                   Se connecter
-                </button>
+                </button>{" "}
                 <button
                   type="button"
                   className="text-sm text-blue-600 hover:underline"
-                  onClick={() => setShowForgot(true)}
+                  onClick={openForgot} // <-- on utilise openForgot ici
                 >
                   Mot de passe oublié ?
                 </button>
@@ -331,7 +354,7 @@ export default function LoginPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
           <div className="animate-scaleUp relative w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-2xl">
             <button
-              onClick={() => setShowForgot(false)}
+              onClick={closeForgot} // <-- et ici on utilise closeForgot
               className="absolute right-4 top-4 text-2xl text-gray-400 hover:text-gray-700"
             >
               &times;
