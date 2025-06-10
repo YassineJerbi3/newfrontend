@@ -182,12 +182,20 @@ export default function UsersListPage() {
 
   // fetch emplacements (use data.items!)
   useEffect(() => {
-    fetch("http://localhost:2000/emplacements", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data: { items: Emplacement[] }) => {
-        setEmplacements(data.items);
+    fetch("http://localhost:2000/emplacements/bureaux", {
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Impossible de charger les bureaux");
+        return res.json();
       })
-      .catch(console.error);
+      .then((bureaux: Emplacement[]) => {
+        setEmplacements(bureaux);
+      })
+      .catch((err) => {
+        console.error(err);
+        // tu peux afficher une alerte ou un message d’erreur ici
+      });
   }, []);
 
   const handleFilterChange = (e: React.ChangeEvent<any>) => {
