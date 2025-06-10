@@ -1,12 +1,10 @@
-// src/app/classes/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { FaDesktop } from "react-icons/fa";
+import { FaChalkboardTeacher } from "react-icons/fa";
 
-// Define TypeScript type matching backend Emplacement entity
 interface Emplacement {
   id: string;
   nom: string;
@@ -39,30 +37,35 @@ export default function ClasseSelectionPage() {
 
   return (
     <DefaultLayout>
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white">
-        <h1 className="mb-8 text-4xl font-extrabold text-gray-800">
-          Sélectionnez la classe
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-white px-4 py-10">
+        <h1 className="mb-12 text-center text-5xl font-extrabold tracking-tight text-indigo-800">
+          Selectionner une classe
         </h1>
 
-        {loading && <p>Chargement des classes...</p>}
-        {error && <p className="text-red-600">Erreur: {error}</p>}
+        {loading && <p className="text-xl text-gray-500">Chargement...</p>}
+        {error && <p className="text-lg text-red-600">Erreur: {error}</p>}
 
-        <div className="flex flex-wrap justify-center gap-6">
+        <div className="grid w-full max-w-7xl grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {!loading && !error && classes.length === 0 && (
-            <p>Aucune classe disponible.</p>
+            <p className="text-lg text-gray-600">Aucune classe disponible.</p>
           )}
 
           {!loading &&
             classes.map((classe) => (
               <Link
                 key={classe.id}
-                href={`/classes/${classe.id}`}
-                className="flex h-20 w-64 items-center justify-center bg-gray-200 shadow-md transition-colors duration-300 hover:bg-gray-300"
+                href={`/classes-edit/${classe.id}`}
+                className="group relative flex flex-col items-center rounded-3xl border border-gray-200 bg-white p-8 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:border-indigo-500 hover:shadow-2xl"
               >
-                <FaDesktop className="mr-4 text-gray-700" size={30} />
-                <span className="text-2xl font-bold text-gray-800">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 transition-colors duration-300 group-hover:bg-indigo-600">
+                  <FaChalkboardTeacher
+                    size={30}
+                    className="text-indigo-600 group-hover:text-white"
+                  />
+                </div>
+                <h2 className="text-center text-2xl font-semibold text-gray-800 group-hover:text-indigo-700">
                   {classe.nom}
-                </span>
+                </h2>
               </Link>
             ))}
         </div>
