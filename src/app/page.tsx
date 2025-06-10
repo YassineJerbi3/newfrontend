@@ -108,7 +108,12 @@ export default function LoginPage() {
 
     // Si échec, on affiche toujours le même message
     if (!res.ok) {
-      setErrorMsg("Échec de la connexion");
+      const { message } = await res.json().catch(() => ({}) as any);
+      setErrorMsg(
+        message === "Compte désactivé"
+          ? "Votre compte est désactivé — contactez le responsable SI"
+          : "Échec de la connexion",
+      );
       return;
     }
 
