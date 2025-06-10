@@ -141,8 +141,16 @@ export default function LoginPage() {
       body: JSON.stringify({ email: fpEmail }),
     });
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      return setFpMsg(j.message || "Email non trouvé");
+      const j = await res.json().catch(() => ({}) as any);
+      // sur 400 BadRequestException, j.message === 'Compte non actif'
+      switch (j.message) {
+        case "Compte non actif":
+          return setFpMsg(
+            "Votre compte n'est pas actif — contactez le responsable SI",
+          );
+        default:
+          return setFpMsg(j.message || "Email non trouvé");
+      }
     }
     const j = await res.json();
     setExpiresAt(new Date(j.expiresAt));
