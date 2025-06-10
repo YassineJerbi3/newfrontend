@@ -289,7 +289,7 @@ export default function AddUserPage() {
             </div>
 
             {/** SECTION 2 : RÔLE & EMPLACEMENT **/}
-            <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="overflow-visible rounded-2xl bg-white shadow-2xl">
               {/* Header */}
               <div className="bg-blue-50 py-3 text-center">
                 <h2 className="text-xl font-semibold text-blue-700">
