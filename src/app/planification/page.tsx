@@ -1,7 +1,6 @@
-// src/app/rapport/planification/MyCalendar.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Calendar,
   momentLocalizer,
@@ -11,7 +10,6 @@ import {
 import moment from "moment";
 import DatePicker from "react-datepicker";
 import Modal from "react-modal";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
@@ -19,38 +17,28 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
 const localizer = momentLocalizer(moment);
 
-// 1) Extend Evenement to cover both rapports and maintenances
 export interface Evenement {
   id: string;
   type: "rapport" | "maintenance";
   title: string;
   start: Date;
   end: Date;
-  // rapport-specific
-  incident?: any;
+  // common
   equipement: any;
   emplacement: { type: string; nom: string; poste?: string };
-  technicien?: { nom: string; prenom: string };
   datePlanification: Date | null;
-  diagnostic?: string;
   statut: "VALIDE" | "A_PLANIFIER";
+  // rapport-only
+  incident?: any;
+  diagnostique?: string;
+  technicien?: { nom: string; prenom: string };
   dateValidation?: string;
-  // maintenance-specific
-  alertDate?: string; // ISO dateOccurrence
+  // maintenance-only
+  alertDate?: string;
+  description?: string;
   maintenancePreventiveId?: string;
-  description?: string; // maintenancePreventive.description
+  plannedTechnicienId?: string;
 }
-
-const eventStyleGetter = (event: Evenement) => ({
-  style: {
-    backgroundColor: event.statut === "VALIDE" ? "#047857" : "#1E3A8A",
-    borderRadius: "1.25rem",
-    color: "#fff",
-    padding: "6px 8px",
-    fontSize: "0.85rem",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-  },
-});
 
 interface User {
   id: string;
@@ -98,7 +86,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           →
         </button>
       </div>
-
       <div className="relative">
         <span
           onClick={() => setShowPicker(!showPicker)}
@@ -122,7 +109,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
           </div>
         )}
       </div>
-
       <button
         onClick={() => onView("month")}
         className={`rounded-full px-4 py-2 text-sm font-medium ${
@@ -144,6 +130,7 @@ interface EventModalProps {
   onClose: () => void;
   onSave: (ev: Evenement) => void;
   onDelete: (id: string) => void;
+  technicians: User[];
 }
 const EventModal: React.FC<EventModalProps> = ({
   isOpen,
@@ -152,21 +139,19 @@ const EventModal: React.FC<EventModalProps> = ({
   onClose,
   onSave,
   onDelete,
+  technicians,
 }) => {
   const [datePlanif, setDatePlanif] = useState<Date>(
     eventData.datePlanification || new Date(),
   );
+  const [selectedTech, setSelectedTech] = useState<string>(
+    eventData.plannedTechnicienId || "",
+  );
+
   useEffect(() => {
     setDatePlanif(eventData.datePlanification || new Date());
+    setSelectedTech(eventData.plannedTechnicienId || "");
   }, [eventData]);
-
-  // Compute minimum date for planification
-  let minDate = new Date();
-  if (eventData.type === "maintenance" && eventData.alertDate) {
-    const ad = new Date(eventData.alertDate);
-    ad.setDate(ad.getDate() + 7);
-    minDate = ad;
-  }
 
   return (
     <Modal
@@ -206,18 +191,36 @@ const EventModal: React.FC<EventModalProps> = ({
               <p>
                 <strong>Emplacement :</strong> {eventData.emplacement.nom}
               </p>
-              {eventData.type === "maintenance" && eventData.description && (
-                <p>
-                  <strong>Maintenance :</strong> {eventData.description}
-                </p>
+
+              {eventData.type === "maintenance" && (
+                <>
+                  <p>
+                    <strong>Description :</strong> {eventData.description}
+                  </p>
+                  <div>
+                    <strong>Choisir technicien :</strong>
+                    <select
+                      value={selectedTech}
+                      onChange={(e) => setSelectedTech(e.target.value)}
+                      className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
+                    >
+                      <option value="">-- Sélectionner --</option>
+                      {technicians.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.prenom} {t.nom}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
+
               <div>
-                <strong>Date planification :</strong>{" "}
+                <strong>Date planification :</strong>
                 <DatePicker
                   selected={datePlanif}
                   onChange={(d) => setDatePlanif(d!)}
                   dateFormat="yyyy-MM-dd"
-                  minDate={minDate}
                   className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
                 />
               </div>
@@ -234,6 +237,7 @@ const EventModal: React.FC<EventModalProps> = ({
                       datePlanification: datePlanif,
                       start: datePlanif,
                       end: datePlanif,
+                      plannedTechnicienId: selectedTech,
                     })
                   }
                   className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
@@ -261,56 +265,34 @@ const EventModal: React.FC<EventModalProps> = ({
   );
 };
 
-const ListEvent: React.FC<{ event: Evenement; onClick: () => void }> = ({
-  event,
-  onClick,
-}) => (
-  <motion.div
-    onClick={onClick}
-    whileHover={{ scale: 1.02, boxShadow: "0 8px 20px rgba(0,0,0,0.08)" }}
-    whileTap={{ scale: 0.98 }}
-    className="mb-4 flex cursor-pointer items-center space-x-4 rounded-3xl bg-white p-4 shadow-sm"
-  >
-    <div className="flex-1 space-y-1">
-      <h3 className="text-lg font-semibold text-gray-800">
-        {event.type === "rapport" ? "Rapport" : "Maintenance"}
-      </h3>
-      <p className="text-sm text-gray-600">
-        {event.equipement.equipmentType} — {event.emplacement.nom}
-      </p>
-      {event.type === "maintenance" && event.alertDate && (
-        <p className="text-sm text-gray-500">
-          Prévue le{" "}
-          {new Date(event.alertDate).toLocaleDateString("fr-FR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          })}
-        </p>
-      )}
-    </div>
-    <div className="text-xl">
-      {event.statut === "VALIDE"
-        ? "✅"
-        : event.type === "rapport"
-          ? "❌"
-          : "🛠️"}
-    </div>
-  </motion.div>
-);
-
 const MyCalendar: React.FC = () => {
   const [date, setDate] = useState(new Date());
   const [rapportEvents, setRapportEvents] = useState<Evenement[]>([]);
   const [maintenanceEvents, setMaintenanceEvents] = useState<Evenement[]>([]);
   const [scheduledEvents, setScheduledEvents] = useState<Evenement[]>([]);
   const [availableEvents, setAvailableEvents] = useState<Evenement[]>([]);
-
   const [modalOpen, setModalOpen] = useState(false);
   const [modalEvent, setModalEvent] = useState<Evenement | null>(null);
   const [modalContext, setModalContext] = useState<"list" | "calendar">("list");
+  const [technicians, setTechnicians] = useState<User[]>([]);
 
-  // Load rapport to-planifier
+  // 2) Chargement des TECHNICIEN
+  useEffect(() => {
+    fetch("http://localhost:2000/users/role/TECHNICIEN", {
+      credentials: "include",
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("Impossible de charger les techniciens");
+        return r.json();
+      })
+      .then((data: User[]) => setTechnicians(data))
+      .catch((err) => {
+        console.error(err);
+        setTechnicians([]); // pour éviter undefined
+      });
+  }, []);
+
+  // 2) Charger rapports + maintenances + planifiés
   useEffect(() => {
     fetch("http://localhost:2000/rapports/nature/a-planifier", {
       credentials: "include",
@@ -327,18 +309,12 @@ const MyCalendar: React.FC = () => {
             incident: r.incident,
             equipement: r.incident.equipement,
             emplacement: r.incident.equipement.emplacement,
-            technicien: r.technicien
-              ? { nom: r.technicien.nom, prenom: r.technicien.prenom }
-              : undefined,
             datePlanification: null,
-            diagnostic: r.diagnosticPanne,
             statut: r.statut,
-            dateValidation: r.dateValidation,
           })),
         );
       });
 
-    // Load maintenance occurrences to-planifier
     fetch("http://localhost:2000/occurrences-maintenance/unplanned", {
       credentials: "include",
     })
@@ -347,26 +323,26 @@ const MyCalendar: React.FC = () => {
         setMaintenanceEvents(
           data.map((o) => {
             const alertDate = new Date(o.dateOccurrence);
-            const dueDate = new Date(alertDate);
-            dueDate.setDate(alertDate.getDate() + 7);
+            const defaultPlanif = new Date(alertDate);
+            defaultPlanif.setDate(alertDate.getDate() + 7);
             return {
               id: o.id,
               type: "maintenance",
               title: o.maintenancePreventive.description,
-              start: dueDate,
-              end: dueDate,
+              start: defaultPlanif,
+              end: defaultPlanif,
               equipement: o.maintenancePreventive.equipement,
               emplacement: o.maintenancePreventive.equipement.emplacement,
-              datePlanification: null,
-              statut: "A_PLANIFIER" as const,
+              datePlanification: defaultPlanif,
+              statut: "A_PLANIFIER",
               alertDate: o.dateOccurrence,
               description: o.maintenancePreventive.description,
+              maintenancePreventiveId: o.maintenancePreventive.id,
             };
           }),
         );
       });
 
-    // Load already planned reports for calendar
     fetch("http://localhost:2000/rapports/planifies", {
       credentials: "include",
     })
@@ -382,19 +358,14 @@ const MyCalendar: React.FC = () => {
             incident: r.incident,
             equipement: r.incident.equipement,
             emplacement: r.incident.equipement.emplacement,
-            technicien: r.technicien
-              ? { nom: r.technicien.nom, prenom: r.technicien.prenom }
-              : undefined,
             datePlanification: new Date(r.datePlanification),
-            diagnostic: r.diagnosticPanne,
             statut: r.statut,
-            dateValidation: r.dateValidation,
           })),
         );
       });
   }, []);
 
-  // merge available events whenever either list changes
+  // 3) Fusionner la liste
   useEffect(() => {
     setAvailableEvents([...rapportEvents, ...maintenanceEvents]);
   }, [rapportEvents, maintenanceEvents]);
@@ -406,29 +377,35 @@ const MyCalendar: React.FC = () => {
   };
   const closeModal = () => setModalOpen(false);
 
+  // 4) Sauvegarder planification
   const handleSave = async (ev: Evenement) => {
     const url =
       ev.type === "rapport"
         ? `http://localhost:2000/rapports/${ev.id}/planifier`
         : `http://localhost:2000/occurrences-maintenance/${ev.id}/planifier`;
+    const body =
+      ev.type === "rapport"
+        ? { datePlanification: ev.datePlanification?.toISOString() }
+        : {
+            datePlanification: ev.datePlanification?.toISOString(),
+            technicienId: ev.plannedTechnicienId,
+          };
 
     await fetch(url, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        datePlanification: ev.datePlanification?.toISOString(),
-      }),
+      body: JSON.stringify(body),
     });
 
-    // reload both lists
+    // retirer l’événement de la liste « à planifier »
     setRapportEvents((prev) => prev.filter((r) => r.id !== ev.id));
     setMaintenanceEvents((prev) => prev.filter((m) => m.id !== ev.id));
     closeModal();
   };
 
+  // 5) Annuler planif. (rapports)
   const handleDelete = async (id: string) => {
-    // only for rapports currently
     await fetch(`http://localhost:2000/rapports/${id}/planifier`, {
       method: "POST",
       credentials: "include",
@@ -439,10 +416,21 @@ const MyCalendar: React.FC = () => {
     closeModal();
   };
 
+  const eventStyleGetter = (event: Evenement) => ({
+    style: {
+      backgroundColor: event.statut === "VALIDE" ? "#047857" : "#1E3A8A",
+      borderRadius: "1.25rem",
+      color: "#fff",
+      padding: "6px 8px",
+      fontSize: "0.85rem",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+    },
+  });
+
   return (
     <DefaultLayout>
       <div className="flex h-screen bg-gradient-to-b from-blue-50 to-white">
-        {/* Left list */}
+        {/* Liste */}
         <div
           className="w-1/3 overflow-y-auto rounded-tr-3xl bg-white/70 p-6 backdrop-blur-sm"
           style={{ maxHeight: "calc(100vh - 90px)" }}
@@ -456,16 +444,47 @@ const MyCalendar: React.FC = () => {
             </p>
           ) : (
             availableEvents.map((ev) => (
-              <ListEvent
+              <motion.div
                 key={ev.id}
-                event={ev}
                 onClick={() => openModal(ev, "list")}
-              />
+                whileHover={{
+                  scale: 1.02,
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                className="mb-4 flex cursor-pointer items-center space-x-4 rounded-3xl bg-white p-4 shadow-sm"
+              >
+                <div className="flex-1 space-y-1">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    {ev.type === "rapport" ? "Rapport" : "Maintenance"}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {ev.equipement.equipmentType} — {ev.emplacement.nom}
+                  </p>
+                  {ev.type === "maintenance" && ev.alertDate && (
+                    <p className="text-sm text-gray-500">
+                      Prévue le{" "}
+                      {new Date(ev.alertDate).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div className="text-xl">
+                  {ev.statut === "VALIDE"
+                    ? "✅"
+                    : ev.type === "rapport"
+                      ? "❌"
+                      : "🛠️"}
+                </div>
+              </motion.div>
             ))
           )}
         </div>
 
-        {/* Calendar */}
+        {/* Calendrier */}
         <div className="flex-1 p-6">
           <Calendar
             localizer={localizer}
@@ -495,20 +514,14 @@ const MyCalendar: React.FC = () => {
               ),
               event: (props: EventProps<Evenement>) => {
                 const { event } = props;
-                const { style } = eventStyleGetter(event);
                 return (
                   <motion.div
                     whileHover={{ scale: 1.03 }}
                     className="flex items-center space-x-1 pl-3"
-                    style={style}
-                    title=""
+                    style={eventStyleGetter(event).style}
                   >
                     <span
-                      className={`${
-                        event.statut === "VALIDE"
-                          ? "text-green-200"
-                          : "text-blue-200"
-                      } text-sm font-semibold`}
+                      className={`${event.statut === "VALIDE" ? "text-green-200" : "text-blue-200"} text-sm font-semibold`}
                     >
                       {event.type === "rapport" ? "Incident" : "Maintenance"}{" "}
                       {event.statut === "VALIDE" ? "✅" : "❌"}
@@ -521,6 +534,7 @@ const MyCalendar: React.FC = () => {
           />
         </div>
 
+        {/* Modal */}
         {modalOpen && modalEvent && (
           <EventModal
             isOpen={modalOpen}
@@ -529,6 +543,7 @@ const MyCalendar: React.FC = () => {
             onClose={closeModal}
             onSave={handleSave}
             onDelete={handleDelete}
+            technicians={technicians}
           />
         )}
       </div>
