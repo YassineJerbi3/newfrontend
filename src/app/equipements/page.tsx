@@ -702,15 +702,6 @@ export default function TableEquipementsPage() {
                   {/* Footer */}
                   <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
                     <button
-                      onClick={() =>
-                        window.confirm("Supprimer cet équipement ?") &&
-                        deleteEquip()
-                      }
-                      className="rounded bg-red-700 px-5 py-2 text-sm font-medium text-white hover:bg-red-800 focus:outline-none"
-                    >
-                      Supprimer
-                    </button>
-                    <button
                       onClick={saveEquip}
                       className="rounded bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none"
                     >

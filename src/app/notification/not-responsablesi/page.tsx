@@ -23,6 +23,7 @@ import {
   FiUser,
   FiMapPin,
   FiEdit2,
+  FiTool,
 } from "react-icons/fi";
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
@@ -36,7 +37,8 @@ type NotificationType =
   | "rapport-a-corriger"
   | "ALERTE_STOCK"
   | "DEPASSEMENT_STOCK_ALERT"
-  | "STOCK_INDISPONIBLE";
+  | "STOCK_INDISPONIBLE"
+  | "MAINTENANCE_ALERT";
 
 interface NotificationItem {
   id: string;
@@ -52,11 +54,16 @@ interface NotificationItem {
     message?: string;
     createdAt: string;
     incidentId?: string;
-    technicianId?: string; // ← ajouté
+    technicianId?: string;
     technicienPrenom?: string;
     technicienNom?: string;
     natureResolution?: string;
     natureIntervention?: string;
+    emplacement?: string; // <- nouveau
+
+    // ← Nouveau pour maintenance
+    dateOccurrence?: string; // J–7
+    description?: string; // mp.description
   };
 }
 
@@ -117,6 +124,11 @@ const TYPE_CONFIG: Record<
     accent: "border-gray-500 text-gray-500",
     label: "Stock Indisp.",
   },
+  MAINTENANCE_ALERT: {
+    icon: <FiTool size={20} />, // ou FiCalendar
+    accent: "border-green-500 text-green-500",
+    label: "Maintenance",
+  },
 };
 
 export default function NotificationResponsableSI() {
@@ -152,6 +164,10 @@ export default function NotificationResponsableSI() {
               ...r.payload,
               technicianId: r.payload.technicianId, // ← ajouté
               createdAt: r.createdAt,
+              dateOccurrence: r.payload.dateOccurrence, // ajouter
+              description: r.payload.description, // ajouter
+              emplacement: r.payload.emplacement,
+              location: r.payload.emplacement,
             },
           }))
           .sort((a, b) => {
@@ -194,6 +210,11 @@ export default function NotificationResponsableSI() {
           ...payload,
           technicianId: payload.technicianId, // ← ajouté
           createdAt: payload.dateCreation ?? new Date().toISOString(),
+          dateOccurrence: payload.dateOccurrence, // J–7
+          description: payload.description, // ex. "Nettoyage filtre"
+          equipmentType: payload.equipmentType,
+          location: payload.emplacement,
+          emplacement: payload.emplacement,
         },
       };
       setNotifications((prev) =>
@@ -216,6 +237,7 @@ export default function NotificationResponsableSI() {
     socket.on("ALERTE_STOCK", handler);
     socket.on("DEPASSEMENT_STOCK_ALERT", handler);
     socket.on("STOCK_INDISPONIBLE", handler);
+    socket.on("MAINTENANCE_ALERT", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -225,6 +247,7 @@ export default function NotificationResponsableSI() {
       socket.off("ALERTE_STOCK", handler);
       socket.off("DEPASSEMENT_STOCK_ALERT", handler);
       socket.off("STOCK_INDISPONIBLE", handler);
+      socket.off("MAINTENANCE_ALERT", handler);
     };
   }, [loadNotifications]);
 
@@ -330,6 +353,8 @@ export default function NotificationResponsableSI() {
                 <option value="demande">Demande</option>
                 <option value="rapport-incident">Rapport</option>
                 <option value="ALERTE_STOCK">Alerte Stock</option>
+                <option value="MAINTENANCE_ALERT">Maintenance</option>
+
                 <option value="DEPASSEMENT_STOCK_ALERT">
                   Dépassement Stock
                 </option>
@@ -462,6 +487,24 @@ export default function NotificationResponsableSI() {
                   // **Logique d'assignation**
                   const isAssigned =
                     n.type === "incident" && !!incidentId && !!technicianId;
+                  let detailMaintenance = "";
+
+                  if (
+                    n.type === "MAINTENANCE_ALERT" &&
+                    n.payload.dateOccurrence
+                  ) {
+                    const alertDate = new Date(n.payload.dateOccurrence);
+                    const dueDate = new Date(alertDate);
+                    dueDate.setDate(alertDate.getDate() + 7);
+
+                    const dueDateStr = dueDate.toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    });
+
+                    detailMaintenance = `Maintenance “${n.payload.description}” sur l’équipement ${n.payload.equipmentType} à l’emplacement ${n.payload.location}, prévue le ${dueDateStr}.`;
+                  }
 
                   return (
                     <div
@@ -512,8 +555,12 @@ export default function NotificationResponsableSI() {
                           </h3>
                         </div>
 
-                        {n.type === "rapport-incident" ||
-                        n.type === "rapport-a-corriger" ? (
+                        {n.type === "MAINTENANCE_ALERT" ? (
+                          <p className="mt-2 text-sm text-gray-700">
+                            {detailMaintenance}
+                          </p>
+                        ) : n.type === "rapport-incident" ||
+                          n.type === "rapport-a-corriger" ? (
                           <p className="mt-2 text-sm text-gray-700">
                             {detailRapport}
                           </p>
