@@ -20,7 +20,8 @@ type NotificationType =
   | "rapport-invalide"
   | "rapport-a-planifier"
   | "rapport-mod-planifier"
-  | "rapport-non-planifie";
+  | "rapport-non-planifie"
+  | "maintenance-assignation"; // ← nouveau
 
 interface RawNotification {
   id: string;
@@ -75,6 +76,12 @@ type NotificationItem =
       type: "rapport-non-planifie";
       rapportId: string;
       incidentId: string;
+    })
+  | (BaseNotification & {
+      type: "maintenance-assignation";
+      equipmentType: string;
+      location: string;
+      datePlanification: string;
     });
 
 const TYPE_CONFIG: Record<
@@ -111,6 +118,11 @@ const TYPE_CONFIG: Record<
     accent: "border-gray-500 text-gray-500",
     label: "Planification annulée",
   },
+  "maintenance-assignation": {
+    icon: <FiAlertTriangle size={20} />, // ou un autre icône si tu veux
+    accent: "border-purple-500 text-purple-500",
+    label: "Maintenance assignée",
+  },
 };
 
 export default function NotificationTechnicien() {
@@ -134,6 +146,7 @@ export default function NotificationTechnicien() {
               "rapport-a-planifier",
               "rapport-mod-planifier",
               "rapport-non-planifie",
+              "maintenance-assignation", // ← ajouter
             ].includes(n.type),
           )
           .map((n) => {
@@ -195,6 +208,20 @@ export default function NotificationTechnicien() {
                   type: "rapport-non-planifie",
                   rapportId: p.rapportId,
                   incidentId: p.incidentId,
+                };
+              }
+              case "maintenance-assignation": {
+                const p = n.payload as {
+                  equipmentType: string;
+                  emplacement: string;
+                  datePlanification: string;
+                };
+                return {
+                  ...base,
+                  type: "maintenance-assignation",
+                  equipmentType: p.equipmentType,
+                  location: p.emplacement,
+                  datePlanification: p.datePlanification,
                 };
               }
             }
@@ -419,6 +446,21 @@ export default function NotificationTechnicien() {
                                 );
                               case "rapport-non-planifie":
                                 return <p>Planification annulée.</p>;
+                              case "maintenance-assignation":
+                                return (
+                                  <>
+                                    <p>
+                                      Équipement : {(n as any).equipmentType}
+                                    </p>
+                                    <p>Emplacement : {(n as any).location}</p>
+                                    <p>
+                                      Date planifiée :{" "}
+                                      {new Date(
+                                        (n as any).datePlanification,
+                                      ).toLocaleDateString("fr-FR")}
+                                    </p>
+                                  </>
+                                );
                               default:
                                 return null;
                             }
