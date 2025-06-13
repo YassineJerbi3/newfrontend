@@ -345,7 +345,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <footer className="absolute bottom-6 text-sm text-gray-600">
-          © {new Date().getFullYear()} École de Manouba — Tous droits réservés
+          © {new Date().getFullYear()} Tous droits réservés
         </footer>
       </div>
 

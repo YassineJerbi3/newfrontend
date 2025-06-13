@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { addDays } from "date-fns";
 
 const localizer = momentLocalizer(moment);
 
@@ -23,7 +24,6 @@ export interface Evenement {
   title: string;
   start: Date;
   end: Date;
-  // common
   equipement: any;
   emplacement: { type: string; nom: string; poste?: string };
   datePlanification: Date | null;
@@ -53,6 +53,7 @@ interface CustomToolbarProps extends ToolbarProps {
   views: string[];
   onView: (view: string) => void;
 }
+
 const CustomToolbar: React.FC<CustomToolbarProps> = ({
   label,
   onNavigate,
@@ -123,35 +124,198 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
   );
 };
 
-interface EventModalProps {
+// ---------------------- Modals ----------------------
+
+interface BaseModalProps {
   isOpen: boolean;
-  eventData: Evenement;
-  context: "list" | "calendar";
   onClose: () => void;
+}
+
+// Rapport List Modal
+interface RapportListModalProps extends BaseModalProps {
+  event: Evenement;
   onSave: (ev: Evenement) => void;
   onDelete: (id: string) => void;
-  technicians: User[];
 }
-const EventModal: React.FC<EventModalProps> = ({
+const RapportListModal: React.FC<RapportListModalProps> = ({
   isOpen,
-  eventData,
-  context,
   onClose,
+  event,
   onSave,
   onDelete,
+}) => {
+  const [datePlanif, setDatePlanif] = useState<Date>(
+    event.datePlanification || new Date(),
+  );
+  useEffect(() => {
+    setDatePlanif(event.datePlanification || new Date());
+  }, [event]);
+  return (
+    <Modal
+      isOpen={isOpen}
+      onRequestClose={onClose}
+      ariaHideApp={false}
+      overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
+      className="outline-none"
+    >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ duration: 0.2 }}
+            className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
+            >
+              ✕
+            </button>
+            <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
+              Détails du rapport
+            </h2>
+            <div className="space-y-3 text-gray-700">
+              <p>
+                <strong>Équipement :</strong> {event.equipement.equipmentType}
+              </p>
+              <p>
+                <strong>Emplacement :</strong> {event.emplacement.nom}
+              </p>
+              <p>
+                <strong>Incident :</strong> {event.incident.description}
+              </p>
+              <div>
+                <strong>Date de planification :</strong>{" "}
+                <DatePicker
+                  selected={datePlanif}
+                  onChange={(d) => setDatePlanif(d!)}
+                  dateFormat="yyyy-MM-dd"
+                  className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end space-x-4">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() =>
+                  onSave({
+                    ...event,
+                    datePlanification: datePlanif,
+                    start: datePlanif,
+                    end: datePlanif,
+                  })
+                }
+                className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
+              >
+                Valider
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onDelete(event.id)}
+                className="rounded-3xl bg-red-600 px-5 py-2 text-white shadow-md hover:bg-red-700"
+              >
+                Annuler planif.
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Modal>
+  );
+};
+
+// Rapport Calendar Modal
+interface RapportCalendarModalProps extends BaseModalProps {
+  event: Evenement;
+}
+const RapportCalendarModal: React.FC<RapportCalendarModalProps> = ({
+  isOpen,
+  onClose,
+  event,
+}) => (
+  <Modal
+    isOpen={isOpen}
+    onRequestClose={onClose}
+    ariaHideApp={false}
+    overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
+    className="outline-none"
+  >
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -30 }}
+          transition={{ duration: 0.2 }}
+          className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
+          >
+            ✕
+          </button>
+          <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
+            Détails du rapport
+          </h2>
+          <div className="space-y-3 text-gray-700">
+            <p>
+              <strong>Équipement :</strong> {event.equipement.equipmentType}
+            </p>
+            <p>
+              <strong>Emplacement :</strong> {event.emplacement.nom}
+            </p>
+            <p>
+              <strong>Incident :</strong> {event.incident.description}
+            </p>
+            <p>
+              <strong>Diagnostic :</strong> {event.diagnostique}
+            </p>
+            <p>
+              <strong>Technicien :</strong> {event.technicien?.prenom}{" "}
+              {event.technicien?.nom}
+            </p>
+            <p>
+              <strong>Date validation :</strong> {event.dateValidation}
+            </p>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </Modal>
+);
+
+// Maintenance List Modal
+interface MaintenanceListModalProps extends BaseModalProps {
+  event: Evenement;
+  onSave: (ev: Evenement) => void;
+  technicians: User[];
+}
+const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
+  isOpen,
+  onClose,
+  event,
+  onSave,
   technicians,
 }) => {
   const [datePlanif, setDatePlanif] = useState<Date>(
-    eventData.datePlanification || new Date(),
+    event.datePlanification || new Date(),
   );
   const [selectedTech, setSelectedTech] = useState<string>(
-    eventData.plannedTechnicienId || "",
+    event.plannedTechnicienId || "",
   );
+  const [techError, setTechError] = useState<string>("");
 
   useEffect(() => {
-    setDatePlanif(eventData.datePlanification || new Date());
-    setSelectedTech(eventData.plannedTechnicienId || "");
-  }, [eventData]);
+    setDatePlanif(event.datePlanification || new Date());
+    setSelectedTech(event.plannedTechnicienId || "");
+  }, [event]);
 
   return (
     <Modal
@@ -178,45 +342,38 @@ const EventModal: React.FC<EventModalProps> = ({
               ✕
             </button>
             <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
-              {eventData.type === "rapport"
-                ? "Détails du rapport"
-                : "Planification Maintenance"}
+              Planification Maintenance
             </h2>
-
             <div className="space-y-3 text-gray-700">
               <p>
-                <strong>Équipement :</strong>{" "}
-                {eventData.equipement.equipmentType}
+                <strong>Équipement :</strong> {event.equipement.equipmentType}
               </p>
               <p>
-                <strong>Emplacement :</strong> {eventData.emplacement.nom}
+                <strong>Emplacement :</strong> {event.emplacement.nom}
               </p>
-
-              {eventData.type === "maintenance" && (
-                <>
-                  <p>
-                    <strong>Description :</strong> {eventData.description}
-                  </p>
-                  <div>
-                    <strong>Choisir technicien :</strong>
-                    <select
-                      value={selectedTech}
-                      onChange={(e) => setSelectedTech(e.target.value)}
-                      className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      {technicians.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.prenom} {t.nom}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
+              <p>
+                <strong>Description :</strong> {event.description}
+              </p>
               <div>
-                <strong>Date planification :</strong>
+                <strong>Choisir technicien :</strong>
+                <select
+                  value={selectedTech}
+                  onChange={(e) => setSelectedTech(e.target.value)}
+                  className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
+                >
+                  <option value="">-- Sélectionner --</option>
+                  {technicians.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.prenom} {t.nom}
+                    </option>
+                  ))}
+                </select>
+                {techError && (
+                  <p className="mt-1 text-sm text-red-600">{techError}</p>
+                )}
+              </div>
+              <div>
+                <strong>Date planification :</strong>{" "}
                 <DatePicker
                   selected={datePlanif}
                   onChange={(d) => setDatePlanif(d!)}
@@ -225,38 +382,27 @@ const EventModal: React.FC<EventModalProps> = ({
                 />
               </div>
             </div>
-
-            <div className="mt-6 flex justify-end space-x-4">
-              {context === "list" && (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() =>
-                    onSave({
-                      ...eventData,
-                      datePlanification: datePlanif,
-                      start: datePlanif,
-                      end: datePlanif,
-                      plannedTechnicienId: selectedTech,
-                    })
+            <div className="mt-6 flex justify-end">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  if (!selectedTech) {
+                    setTechError("Veuillez sélectionner un technicien");
+                    return;
                   }
-                  className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
-                >
-                  Valider
-                </motion.button>
-              )}
-              {context === "calendar" &&
-                eventData.type === "rapport" &&
-                eventData.statut !== "VALIDE" && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => onDelete(eventData.id)}
-                    className="rounded-3xl bg-red-600 px-5 py-2 text-white shadow-md hover:bg-red-700"
-                  >
-                    Annuler planif.
-                  </motion.button>
-                )}
+                  onSave({
+                    ...event,
+                    datePlanification: datePlanif,
+                    start: datePlanif,
+                    end: datePlanif,
+                    plannedTechnicienId: selectedTech,
+                  });
+                }}
+                className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
+              >
+                Valider
+              </motion.button>
             </div>
           </motion.div>
         )}
@@ -264,6 +410,131 @@ const EventModal: React.FC<EventModalProps> = ({
     </Modal>
   );
 };
+
+// Maintenance Calendar Modal
+interface MaintenanceCalendarModalProps extends BaseModalProps {
+  event: Evenement;
+  onSave: (ev: Evenement) => void;
+}
+const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
+  isOpen,
+  onClose,
+  event,
+  onSave,
+}) => {
+  const [datePlanif, setDatePlanif] = useState<Date>(
+    event.datePlanification || new Date(),
+  );
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [dateChanged, setDateChanged] = useState(false);
+
+  useEffect(() => {
+    setDatePlanif(event.datePlanification || new Date());
+    setIsEditingDate(false);
+    setDateChanged(false);
+  }, [event]);
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onRequestClose={onClose}
+      ariaHideApp={false}
+      overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
+      className="outline-none"
+    >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ duration: 0.2 }}
+            className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
+            >
+              ✕
+            </button>
+            <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
+              Détails Maintenance
+            </h2>
+            <div className="space-y-3 text-gray-700">
+              <p>
+                <strong>Équipement :</strong> {event.equipement.equipmentType}
+              </p>
+              <p>
+                <strong>Emplacement :</strong> {event.emplacement.nom}
+              </p>
+              <p>
+                <strong>Description :</strong> {event.description}
+              </p>
+              <p>
+                <strong>Technicien assigné :</strong> {event.technicien?.prenom}{" "}
+                {event.technicien?.nom}
+              </p>
+              <div className="mt-3">
+                <strong>Date de planification :</strong>{" "}
+                {isEditingDate ? (
+                  <DatePicker
+                    selected={datePlanif}
+                    onChange={(d) => {
+                      setDatePlanif(d!);
+                      setDateChanged(true);
+                    }}
+                    dateFormat="yyyy-MM-dd"
+                    inline
+                  />
+                ) : (
+                  <span className="ml-2 font-medium">
+                    {datePlanif.toLocaleDateString("fr-FR")}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  if (isEditingDate) {
+                    setDatePlanif(event.datePlanification || new Date());
+                    setDateChanged(false);
+                  }
+                  setIsEditingDate(!isEditingDate);
+                }}
+                className="rounded-3xl bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+              >
+                {isEditingDate ? "Annuler" : "Changer la date"}
+              </button>
+              {isEditingDate && dateChanged && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    onSave({
+                      ...event,
+                      datePlanification: datePlanif,
+                      start: datePlanif,
+                      end: datePlanif,
+                    });
+                    setIsEditingDate(false);
+                    setDateChanged(false);
+                  }}
+                  className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
+                >
+                  Valider
+                </motion.button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Modal>
+  );
+};
+
+// ---------------------- Main Calendar ----------------------
 
 const MyCalendar: React.FC = () => {
   const [date, setDate] = useState(new Date());
@@ -276,7 +547,7 @@ const MyCalendar: React.FC = () => {
   const [modalContext, setModalContext] = useState<"list" | "calendar">("list");
   const [technicians, setTechnicians] = useState<User[]>([]);
 
-  // 2) Chargement des TECHNICIEN
+  // Load technicians
   useEffect(() => {
     fetch("http://localhost:2000/users/role/TECHNICIEN", {
       credentials: "include",
@@ -286,21 +557,28 @@ const MyCalendar: React.FC = () => {
         return r.json();
       })
       .then((data: User[]) => setTechnicians(data))
-      .catch((err) => {
-        console.error(err);
-        setTechnicians([]); // pour éviter undefined
-      });
+      .catch(() => setTechnicians([]));
   }, []);
 
-  // 2) Charger rapports + maintenances + planifiés
+  // Load events
   useEffect(() => {
-    fetch("http://localhost:2000/rapports/nature/a-planifier", {
-      credentials: "include",
-    })
-      .then((r) => r.json())
-      .then((data: any[]) => {
+    Promise.all([
+      fetch("http://localhost:2000/rapports/nature/a-planifier", {
+        credentials: "include",
+      }).then((r) => (r.ok ? r.json() : Promise.reject())),
+      fetch("http://localhost:2000/occurrences-maintenance/unplanned", {
+        credentials: "include",
+      }).then((r) => (r.ok ? r.json() : Promise.reject())),
+      fetch("http://localhost:2000/rapports/planifies", {
+        credentials: "include",
+      }).then((r) => (r.ok ? r.json() : Promise.reject())),
+      fetch("http://localhost:2000/occurrences-maintenance/planned", {
+        credentials: "include",
+      }).then((r) => (r.ok ? r.json() : Promise.reject())),
+    ])
+      .then(([rapToPlan, maintUnplanned, rapPlanned, maintPlanned]) => {
         setRapportEvents(
-          data.map((r) => ({
+          rapToPlan.map((r: any) => ({
             id: r.id,
             type: "rapport",
             title: r.incident.description,
@@ -313,59 +591,61 @@ const MyCalendar: React.FC = () => {
             statut: r.statut,
           })),
         );
-      });
-
-    fetch("http://localhost:2000/occurrences-maintenance/unplanned", {
-      credentials: "include",
-    })
-      .then((r) => r.json())
-      .then((data: any[]) => {
         setMaintenanceEvents(
-          data.map((o) => {
-            const alertDate = new Date(o.dateOccurrence);
-            const defaultPlanif = new Date(alertDate);
-            defaultPlanif.setDate(alertDate.getDate() + 7);
+          maintUnplanned.map((o: any) => {
+            const defaultPlan = addDays(new Date(o.dateOccurrence), 7);
             return {
               id: o.id,
               type: "maintenance",
               title: o.maintenancePreventive.description,
-              start: defaultPlanif,
-              end: defaultPlanif,
+              start: defaultPlan,
+              end: defaultPlan,
               equipement: o.maintenancePreventive.equipement,
               emplacement: o.maintenancePreventive.equipement.emplacement,
-              datePlanification: defaultPlanif,
+              datePlanification: defaultPlan,
               statut: "A_PLANIFIER",
               alertDate: o.dateOccurrence,
               description: o.maintenancePreventive.description,
-              maintenancePreventiveId: o.maintenancePreventive.id,
             };
           }),
         );
-      });
+        const rapEv = rapPlanned.map((r: any) => ({
+          id: r.id,
+          type: "rapport",
+          title: r.incident.description,
+          start: new Date(r.datePlanification),
+          end: new Date(r.datePlanification),
+          incident: r.incident,
+          equipement: r.incident.equipement,
+          emplacement: r.incident.equipement.emplacement,
+          datePlanification: new Date(r.datePlanification),
+          statut: r.statut,
+          diagnostique: r.diagnostique,
+          technicien: r.technicien,
+          dateValidation: r.dateValidation,
+        }));
+        const maintEv = maintPlanned.map((o: any) => ({
+          id: o.id,
+          type: "maintenance",
+          title: o.maintenancePreventive.description,
+          start: new Date(o.datePlanification),
+          end: new Date(o.datePlanification),
+          equipement: o.maintenancePreventive.equipement,
+          emplacement: o.maintenancePreventive.equipement.emplacement,
+          datePlanification: new Date(o.datePlanification),
+          statut: "VALIDE",
+          description: o.maintenancePreventive.description,
+          plannedTechnicienId: o.plannedTechnicienId,
+          technicien:
+            technicians.find((t) => t.id === o.plannedTechnicienId) ||
+            undefined,
+        }));
+        setScheduledEvents([...rapEv, ...maintEv]);
+      })
+      .catch(console.error);
+  }, [technicians]);
 
-    fetch("http://localhost:2000/rapports/planifies", {
-      credentials: "include",
-    })
-      .then((r) => r.json())
-      .then((data: any[]) => {
-        setScheduledEvents(
-          data.map((r) => ({
-            id: r.id,
-            type: "rapport",
-            title: r.incident.description,
-            start: new Date(r.datePlanification),
-            end: new Date(r.datePlanification),
-            incident: r.incident,
-            equipement: r.incident.equipement,
-            emplacement: r.incident.equipement.emplacement,
-            datePlanification: new Date(r.datePlanification),
-            statut: r.statut,
-          })),
-        );
-      });
-  }, []);
-
-  // 3) Fusionner la liste
+  // Combine list
   useEffect(() => {
     setAvailableEvents([...rapportEvents, ...maintenanceEvents]);
   }, [rapportEvents, maintenanceEvents]);
@@ -377,34 +657,31 @@ const MyCalendar: React.FC = () => {
   };
   const closeModal = () => setModalOpen(false);
 
-  // 4) Sauvegarder planification
   const handleSave = async (ev: Evenement) => {
-    const url =
-      ev.type === "rapport"
-        ? `http://localhost:2000/rapports/${ev.id}/planifier`
-        : `http://localhost:2000/occurrences-maintenance/${ev.id}/planifier`;
-    const body =
-      ev.type === "rapport"
-        ? { datePlanification: ev.datePlanification?.toISOString() }
-        : {
-            datePlanification: ev.datePlanification?.toISOString(),
-            technicienId: ev.plannedTechnicienId,
-          };
+    const isRapport = ev.type === "rapport";
+    const url = isRapport
+      ? `http://localhost:2000/rapports/${ev.id}/planifier`
+      : `http://localhost:2000/occurrences-maintenance/${ev.id}/planifier`;
+
+    const body = isRapport
+      ? { datePlanification: ev.datePlanification?.toISOString() }
+      : {
+          datePlanification: ev.datePlanification?.toISOString(),
+          technicienId: ev.plannedTechnicienId,
+        };
 
     await fetch(url, {
-      method: "PATCH",
+      method: isRapport ? "POST" : "PATCH", // ← use POST for rapports
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-    // retirer l’événement de la liste « à planifier »
     setRapportEvents((prev) => prev.filter((r) => r.id !== ev.id));
     setMaintenanceEvents((prev) => prev.filter((m) => m.id !== ev.id));
     closeModal();
   };
 
-  // 5) Annuler planif. (rapports)
   const handleDelete = async (id: string) => {
     await fetch(`http://localhost:2000/rapports/${id}/planifier`, {
       method: "POST",
@@ -430,7 +707,7 @@ const MyCalendar: React.FC = () => {
   return (
     <DefaultLayout>
       <div className="flex h-screen bg-gradient-to-b from-blue-50 to-white">
-        {/* Liste */}
+        {/* Liste des événements à planifier */}
         <div
           className="w-1/3 overflow-y-auto rounded-tr-3xl bg-white/70 p-6 backdrop-blur-sm"
           style={{ maxHeight: "calc(100vh - 90px)" }}
@@ -514,16 +791,36 @@ const MyCalendar: React.FC = () => {
               ),
               event: (props: EventProps<Evenement>) => {
                 const { event } = props;
+                const style =
+                  event.type === "maintenance"
+                    ? {
+                        backgroundColor: "#EA580C",
+                        border: "2px dashed #F97316",
+                        borderRadius: "1rem",
+                        color: "#FFF",
+                        padding: "6px 8px",
+                        fontSize: "0.85rem",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                      }
+                    : eventStyleGetter(event).style;
                 return (
                   <motion.div
                     whileHover={{ scale: 1.03 }}
                     className="flex items-center space-x-1 pl-3"
-                    style={eventStyleGetter(event).style}
+                    style={style}
                   >
                     <span
-                      className={`${event.statut === "VALIDE" ? "text-green-200" : "text-blue-200"} text-sm font-semibold`}
+                      className={`text-sm font-semibold ${
+                        event.type === "maintenance"
+                          ? "text-yellow-100"
+                          : event.statut === "VALIDE"
+                            ? "text-green-200"
+                            : "text-blue-200"
+                      }`}
                     >
-                      {event.type === "rapport" ? "Incident" : "Maintenance"}{" "}
+                      {event.type === "maintenance"
+                        ? "🛠️ Maintenance"
+                        : "Incident"}{" "}
                       {event.statut === "VALIDE" ? "✅" : "❌"}
                     </span>
                   </motion.div>
@@ -534,17 +831,44 @@ const MyCalendar: React.FC = () => {
           />
         </div>
 
-        {/* Modal */}
+        {/* Modals */}
         {modalOpen && modalEvent && (
-          <EventModal
-            isOpen={modalOpen}
-            eventData={modalEvent}
-            context={modalContext}
-            onClose={closeModal}
-            onSave={handleSave}
-            onDelete={handleDelete}
-            technicians={technicians}
-          />
+          <>
+            {modalEvent.type === "rapport" && modalContext === "list" && (
+              <RapportListModal
+                isOpen={modalOpen}
+                onClose={closeModal}
+                event={modalEvent}
+                onSave={handleSave}
+                onDelete={handleDelete}
+              />
+            )}
+            {modalEvent.type === "rapport" && modalContext === "calendar" && (
+              <RapportCalendarModal
+                isOpen={modalOpen}
+                onClose={closeModal}
+                event={modalEvent}
+              />
+            )}
+            {modalEvent.type === "maintenance" && modalContext === "list" && (
+              <MaintenanceListModal
+                isOpen={modalOpen}
+                onClose={closeModal}
+                event={modalEvent}
+                onSave={handleSave}
+                technicians={technicians}
+              />
+            )}
+            {modalEvent.type === "maintenance" &&
+              modalContext === "calendar" && (
+                <MaintenanceCalendarModal
+                  isOpen={modalOpen}
+                  onClose={closeModal}
+                  event={modalEvent}
+                  onSave={handleSave}
+                />
+              )}
+          </>
         )}
       </div>
     </DefaultLayout>
