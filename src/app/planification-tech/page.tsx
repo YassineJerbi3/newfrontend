@@ -1,3 +1,4 @@
+// src/app/notification/not-technicien/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -12,25 +13,39 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { useRouter } from "next/navigation";
-import { FiCheckCircle, FiAlertCircle, FiClock } from "react-icons/fi";
+import {
+  FiCheckCircle,
+  FiAlertCircle,
+  FiClock,
+  FiAlertTriangle,
+} from "react-icons/fi";
 
 const localizer = momentLocalizer(moment);
 
 const eventStyleGetter = (event: any) => {
   let bgColor: string, icon: JSX.Element;
-  if (event.statut === "VALIDE") {
-    bgColor = "#10B981";
-    icon = <FiCheckCircle />;
-  } else if (event.priority === "Urgent") {
-    bgColor = "#2563EB";
-    icon = <FiAlertCircle />;
-  } else if (event.priority === "Medium") {
-    bgColor = "#3B82F6";
-    icon = <FiClock />;
+
+  if (event.type === "preventive") {
+    // Maintenance préventive en violet
+    bgColor = "#8B5CF6";
+    icon = <FiAlertTriangle />;
   } else {
-    bgColor = "#60A5FA";
-    icon = <FiClock />;
+    // Rapports
+    if (event.statut === "VALIDE") {
+      bgColor = "#10B981";
+      icon = <FiCheckCircle />;
+    } else if (event.priority === "Urgent") {
+      bgColor = "#2563EB";
+      icon = <FiAlertCircle />;
+    } else if (event.priority === "Medium") {
+      bgColor = "#3B82F6";
+      icon = <FiClock />;
+    } else {
+      bgColor = "#60A5FA";
+      icon = <FiClock />;
+    }
   }
+
   return {
     style: {
       backgroundColor: bgColor,
@@ -76,7 +91,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
 
   return (
     <div className="sticky top-0 z-20 mb-4 flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 px-6 py-3 text-white shadow-md">
-      {/* Navigation gauche */}
       <div className="flex space-x-3">
         <button
           onClick={() => onNavigate("PREV")}
@@ -101,7 +115,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
         </button>
       </div>
 
-      {/* Label centré + sélecteur */}
       <div className="relative">
         <span
           onClick={() => setOpen(!open)}
@@ -156,7 +169,6 @@ const CustomToolbar: React.FC<CustomToolbarProps> = ({
         )}
       </div>
 
-      {/* Espace vide à droite */}
       <div style={{ width: 120 }} />
     </div>
   );
@@ -172,38 +184,63 @@ const CalendarOnlyPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(
+        // Charger rapports planifiés
+        const res1 = await fetch(
           "http://localhost:2000/rapports/mes-planifies",
-          {
-            credentials: "include",
-          },
+          { credentials: "include" },
         );
-        if (!res.ok) throw new Error(`Erreur ${res.status}`);
-        const list = await res.json();
-        setEvents(
-          list.map((r: any) => {
-            const d = new Date(r.datePlanification);
-            return {
-              id: r.id,
-              start: d,
-              end: d,
-              priority:
-                r.incident.priorite === "URGENT"
-                  ? "Urgent"
-                  : r.incident.priorite === "BASSE"
-                    ? "Bas"
-                    : "Medium",
-              statut: r.statut,
-              title: "Incident",
-              incident: r.incident,
-              equipement: r.incident.equipement,
-              emplacement: r.incident.equipement.emplacement,
-              dateIncident: r.incident.dateCreation,
-              datePlanification: d,
-              diagnostic: r.diagnosticPanne,
-            };
-          }),
+        if (!res1.ok) throw new Error(`Rapports – Erreur ${res1.status}`);
+        const rapports = await res1.json();
+
+        // Charger maintenances préventives assignées
+        const res2 = await fetch(
+          "http://localhost:2000/occurrences-maintenance/assigned",
+          { credentials: "include" },
         );
+        if (!res2.ok) throw new Error(`Préventives – Erreur ${res2.status}`);
+        const preventives = await res2.json();
+
+        // Transformer en events
+        const eventsRapports = rapports.map((r: any) => {
+          const d = new Date(r.datePlanification);
+          return {
+            id: r.id,
+            type: "rapport",
+            start: d,
+            end: d,
+            priority:
+              r.incident.priorite === "URGENT"
+                ? "Urgent"
+                : r.incident.priorite === "BASSE"
+                  ? "Bas"
+                  : "Medium",
+            statut: r.statut,
+            title: "Rapport",
+            incident: r.incident,
+            equipement: r.incident.equipement,
+            emplacement: r.incident.equipement.emplacement,
+            dateIncident: r.incident.dateCreation,
+            datePlanification: d,
+            diagnostic: r.diagnosticPanne,
+          };
+        });
+
+        const eventsPreventives = preventives.map((o: any) => {
+          const d = new Date(o.datePlanification);
+          return {
+            id: o.id,
+            type: "preventive",
+            start: d,
+            end: d,
+            title: "Maintenance préventive",
+            equipement: o.maintenancePreventive.equipement,
+            emplacement: o.maintenancePreventive.equipement.emplacement,
+            description: o.maintenancePreventive.description,
+            datePlanification: d,
+          };
+        });
+
+        setEvents([...eventsRapports, ...eventsPreventives]);
       } catch (e) {
         setError((e as Error).message);
       }
@@ -247,8 +284,7 @@ const CalendarOnlyPage: React.FC = () => {
                     onDateChange={setDate}
                   />
                 ),
-                event: (props: EventProps<any>) => {
-                  const { event } = props;
+                event: ({ event }: EventProps<any>) => {
                   const { style, icon } = eventStyleGetter(event);
                   return (
                     <div style={style}>
@@ -263,7 +299,7 @@ const CalendarOnlyPage: React.FC = () => {
           )}
         </div>
 
-        {/* Modal glassmorphique original */}
+        {/* Modal */}
         <AnimatePresence>
           {selectedEvent && (
             <motion.div
@@ -286,29 +322,31 @@ const CalendarOnlyPage: React.FC = () => {
                 >
                   ✕
                 </button>
+
                 <h2 className="mb-4 text-xl font-semibold text-blue-700">
-                  Détails de la planification
+                  {selectedEvent.type === "preventive"
+                    ? "Détails Maintenance Préventive"
+                    : "Détails de la planification"}
                 </h2>
-                {selectedEvent.statut === "VALIDE" && (
-                  <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
-                    ✔ Validé
-                  </p>
-                )}
-                {(selectedEvent.statut === "A_PLANIFIER" ||
-                  selectedEvent.statut === "MOD_PLANIFIER") && (
+
+                {/* Badge Disponibilité */}
+                {Date.now() < selectedEvent.datePlanification.getTime() && (
                   <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-800">
                     ⏱ Disponible dans{" "}
-                    {Math.max(
-                      0,
-                      Math.ceil(
-                        (selectedEvent.datePlanification.getTime() -
-                          Date.now()) /
-                          (1000 * 60 * 60 * 24),
-                      ),
+                    {Math.ceil(
+                      (selectedEvent.datePlanification.getTime() - Date.now()) /
+                        (1000 * 60 * 60 * 24),
                     )}{" "}
                     jour(s)
                   </p>
                 )}
+                {selectedEvent.type !== "preventive" &&
+                  selectedEvent.statut === "VALIDE" && (
+                    <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+                      ✔ Validé
+                    </p>
+                  )}
+
                 <div className="space-y-3 text-gray-700">
                   <p>
                     <strong>Équipement :</strong>{" "}
@@ -318,23 +356,35 @@ const CalendarOnlyPage: React.FC = () => {
                     <strong>Emplacement :</strong>{" "}
                     {selectedEvent.emplacement.nom}
                   </p>
-                  <p>
-                    <strong>Date de l'incident :</strong>{" "}
-                    {moment(selectedEvent.dateIncident).format(
-                      "DD/MM/YYYY HH:mm",
-                    )}
-                  </p>
+                  {selectedEvent.type === "preventive" ? (
+                    <>
+                      <p>
+                        <strong>Description :</strong>{" "}
+                        {selectedEvent.description}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        <strong>Date de l'incident :</strong>{" "}
+                        {moment(selectedEvent.dateIncident).format(
+                          "DD/MM/YYYY HH:mm",
+                        )}
+                      </p>
+                      <p>
+                        <strong>Diagnostic :</strong>{" "}
+                        {selectedEvent.diagnostic || "Aucun diagnostic"}
+                      </p>
+                    </>
+                  )}
                   <p>
                     <strong>Date de planification :</strong>{" "}
                     {moment(selectedEvent.datePlanification).format(
                       "DD/MM/YYYY",
                     )}
                   </p>
-                  <p>
-                    <strong>Diagnostic :</strong>{" "}
-                    {selectedEvent.diagnostic || "Aucun diagnostic"}
-                  </p>
                 </div>
+
                 <div className="mt-4 flex justify-end">
                   <button
                     className={`rounded-full px-4 py-2 font-semibold text-white transition ${
@@ -345,14 +395,21 @@ const CalendarOnlyPage: React.FC = () => {
                     disabled={
                       Date.now() < selectedEvent.datePlanification.getTime()
                     }
-                    onClick={() =>
-                      Date.now() >= selectedEvent.datePlanification.getTime() &&
-                      router.push(
-                        `/rapport/incident/${selectedEvent.incident.id}`,
-                      )
-                    }
+                    onClick={() => {
+                      if (
+                        Date.now() >= selectedEvent.datePlanification.getTime()
+                      ) {
+                        const path =
+                          selectedEvent.type === "preventive"
+                            ? `/maintenance-preventive/${selectedEvent.id}`
+                            : `/rapport/incident/${selectedEvent.incident.id}`;
+                        router.push(path);
+                      }
+                    }}
                   >
-                    Voir le rapport
+                    {selectedEvent.type === "preventive"
+                      ? "Voir maintenance"
+                      : "Voir le rapport"}
                   </button>
                 </div>
               </motion.div>
