@@ -52,11 +52,15 @@ interface ArticleMagasin {
   quantite: number;
   typeConsommable: TypeConsommable;
 }
-
+interface LigneBonSortie {
+  id: string;
+  quantiteSortie: number;
+  articleMagasin: ArticleMagasin;
+}
 interface BonSortieExisting {
   id: string;
-  articleMagasin: ArticleMagasin;
-  quantiteSortie: number;
+  dateSortie: string;
+  lignes: LigneBonSortie[];
 }
 
 interface RapportExisting {
@@ -169,13 +173,15 @@ export default function CombinedIncidentForms() {
             cout: data.cout != null ? String(data.cout) : "",
           });
           if (data.bonSorties?.length) {
-            setSelectedConsumables(
-              data.bonSorties.map((b) => ({
-                articleMagasinId: b.articleMagasin.id,
-                quantiteSortie: b.quantiteSortie,
+            const flatLines = data.bonSorties.flatMap((b) =>
+              b.lignes.map((l) => ({
+                articleMagasinId: l.articleMagasin.id,
+                quantiteSortie: l.quantiteSortie,
               })),
             );
+            setSelectedConsumables(flatLines);
           }
+
           // Après : on bloque aussi pour A_CORRIGER
           if (["SOUMIS", "VALIDE", "A_CORRIGER"].includes(data.statut)) {
             setIsSubmitted(true);
@@ -446,25 +452,21 @@ export default function CombinedIncidentForms() {
 
     // Si on “envoie” (statut = A_CORRIGER ou SOUMIS), créer les bons de sortie
     if (envoyer && selectedConsumables.length) {
-      for (const line of selectedConsumables) {
-        if (line.articleMagasinId && line.quantiteSortie > 0) {
-          const dto = {
-            rapportId: rapportSaved.id,
-            articleMagasinId: line.articleMagasinId,
-            quantiteSortie: line.quantiteSortie,
-          };
-          const resBon = await fetch(`http://localhost:2000/bons-sortie`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(dto),
-          });
-          if (!resBon.ok) {
-            console.error("Erreur création bon de sortie", await resBon.text());
-          }
-        }
+      const dto = {
+        rapportId: rapportSaved.id,
+        lignes: selectedConsumables, // [{ articleMagasinId, quantiteSortie }, …]
+      };
+      const res = await fetch(`http://localhost:2000/bons-sortie`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(dto),
+      });
+      if (!res.ok) {
+        console.error("Erreur création bon de sortie", await res.text());
+      } else {
+        setIsSubmitted(true);
       }
-      setIsSubmitted(true);
     }
 
     // Fermer modal, rafraîchir la page, repasser en vue “fiche”
@@ -648,16 +650,30 @@ export default function CombinedIncidentForms() {
                     )}
                   </ul>
                 </div>
-                {existing && existing.bonSorties?.length > 0 && (
+                {existing?.bonSorties && existing.bonSorties.length > 0 && (
                   <div className="space-y-1">
                     <div className="text-sm font-medium text-gray-600">
                       Bons de sortie liés
                     </div>
                     <ul className="space-y-2">
-                      {existing.bonSorties!.map((b) => (
-                        <li key={b.id} className="text-gray-800">
-                          {b.articleMagasin.designation} – Quantité :{" "}
-                          {b.quantiteSortie}
+                      {existing.bonSorties!.map((bon) => (
+                        <li key={bon.id} className="space-y-1">
+                          {/* Show the sortie date */}
+                          <div className="text-sm font-medium text-gray-600">
+                            Sortie du{" "}
+                            {new Date(bon.dateSortie).toLocaleDateString(
+                              "fr-FR",
+                            )}
+                          </div>
+                          {/* List each line */}
+                          <ul className="list-inside list-disc text-gray-800">
+                            {bon.lignes.map((l) => (
+                              <li key={l.id}>
+                                {l.articleMagasin.designation} – Quantité :{" "}
+                                {l.quantiteSortie}
+                              </li>
+                            ))}
+                          </ul>
                         </li>
                       ))}
                     </ul>

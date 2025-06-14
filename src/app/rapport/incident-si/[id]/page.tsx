@@ -36,10 +36,16 @@ interface Incident {
   echeance: string;
 }
 
+interface LigneBonSortie {
+  id: string;
+  quantiteSortie: number;
+  articleMagasin: { designation: string };
+}
+
 interface BonSortieExisting {
   id: string;
-  articleMagasin: { designation: string };
-  quantiteSortie: number;
+  dateSortie: string;
+  lignes: LigneBonSortie[];
 }
 
 interface RapportExisting {
@@ -507,11 +513,21 @@ export default function RapportPage() {
                   <div className="text-sm font-medium text-gray-600">
                     Bons de sortie
                   </div>
-                  <ul className="list-inside list-disc text-gray-700">
-                    {rapport.bonSorties.map((b) => (
-                      <li key={b.id}>
-                        {b.articleMagasin.designation} – Qté :{" "}
-                        {b.quantiteSortie}
+                  <ul className="space-y-4 text-gray-700">
+                    {rapport.bonSorties.map((bon) => (
+                      <li key={bon.id} className="space-y-1">
+                        <div className="text-sm text-gray-600">
+                          Sortie du{" "}
+                          {new Date(bon.dateSortie).toLocaleDateString("fr-FR")}
+                        </div>
+                        <ul className="list-inside list-disc pl-4">
+                          {bon.lignes.map((l) => (
+                            <li key={l.id}>
+                              {l.articleMagasin.designation} – Qté :{" "}
+                              {l.quantiteSortie}
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>
