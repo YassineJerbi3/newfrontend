@@ -14,6 +14,15 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
+const fetcher = (url: string) =>
+  fetch(`${API}${url}`, { credentials: "include" }).then(async (res) => {
+    if (!res.ok) {
+      const err = new Error(res.statusText) as any;
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  });
 
 type OccurrenceWithRelations = {
   id: string;
@@ -27,13 +36,19 @@ type OccurrenceWithRelations = {
       poste: { numero: number } | null;
     };
   };
+  rapport?: {
+    id: string;
+    travailEffectue: string;
+    dateDebut: string;
+    dateFin: string;
+    dureeHeures: number;
+    cout: number;
+    externeNom?: string;
+    externePrenom?: string;
+    externeEmail?: string;
+    externeTelephone?: string;
+  };
 };
-
-const fetcher = (url: string) =>
-  fetch(`${API}${url}`, { credentials: "include" }).then((res) => {
-    if (!res.ok) throw new Error("Erreur réseau");
-    return res.json();
-  });
 
 export default function RapportPreventifPage({
   params: { id },
@@ -41,14 +56,18 @@ export default function RapportPreventifPage({
   params: { id: string };
 }) {
   const router = useRouter();
-  const { data: occ, error } = useSWR<OccurrenceWithRelations>(
+
+  // 1) Récupérer l’occurrence (avec rapport éventuel)
+  const {
+    data: occ,
+    error,
+    isLoading,
+  } = useSWR<OccurrenceWithRelations>(
     `/occurrences-maintenance/${id}`,
     fetcher,
   );
 
-  // Flag “rapport déjà envoyé”
   const [submitted, setSubmitted] = useState(false);
-  // Contrôle affichage des champs sous‑traitant
   const [isSub, setIsSub] = useState(false);
 
   const {
@@ -73,12 +92,35 @@ export default function RapportPreventifPage({
     },
   });
 
-  // Dès que l’API occ est là, on peut préremplir si nécessaire
+  // Helper pour formater ISO→YYYY-MM-DDThh:mm
+  const formatForInput = (iso: string) => {
+    const dt = new Date(iso);
+    const tzOffsetMs = dt.getTimezoneOffset() * 60_000;
+    const localDt = new Date(dt.getTime() - tzOffsetMs);
+    return localDt.toISOString().slice(0, 16);
+  };
+
+  // 2) Préremplir et verrouiller si déjà un rapport
   useEffect(() => {
-    if (occ) {
-      // Par exemple on pourrait reset({ ...existingRapport })
+    if (occ?.rapport) {
+      const r = occ.rapport;
+      reset({
+        occurrenceMaintenanceId: id,
+        travailEffectue: r.travailEffectue,
+        dateDebut: formatForInput(r.dateDebut),
+        dateFin: formatForInput(r.dateFin),
+        dureeHeures: r.dureeHeures,
+        cout: r.cout,
+        nom: r.externeNom || "",
+        prenom: r.externePrenom || "",
+        email: r.externeEmail || "",
+        telephone: r.externeTelephone || "",
+        typeRealisation: r.externeNom ? "sousTraitant" : "interne",
+      });
+      setIsSub(!!r.externeNom);
+      setSubmitted(true);
     }
-  }, [occ]);
+  }, [occ, reset, id]);
 
   const onSubmit = async (data: any) => {
     try {
@@ -88,42 +130,48 @@ export default function RapportPreventifPage({
         body: JSON.stringify(data),
         credentials: "include",
       });
-      // Marque soumis, désactive champs
       setSubmitted(true);
-      // Rafraîchit la page (recharge les données si besoin)
-      //  setTimeout(() => window.location.reload(), 500);
     } catch (e) {
       console.error(e);
       alert("Erreur lors de la soumission du rapport");
     }
   };
 
-  if (error)
-    return (
-      <DefaultLayout>
-        <p className="p-6 text-red-600">
-          Erreur de chargement de l’occurrence : {error.message}
-        </p>
-      </DefaultLayout>
-    );
-  if (!occ)
+  // États chargement / erreur
+  if (isLoading) {
     return (
       <DefaultLayout>
         <p className="p-6 text-gray-500">Chargement des données…</p>
       </DefaultLayout>
     );
+  }
+  if (error) {
+    return (
+      <DefaultLayout>
+        <p className="p-6 text-red-600">
+          {error.status === 404
+            ? "Occurrence introuvable."
+            : `Erreur: ${error.message}`}
+        </p>
+      </DefaultLayout>
+    );
+  }
 
+  // 3) Rendu
   return (
     <DefaultLayout>
       <div className="flex min-h-screen justify-center bg-gray-50 p-6">
         <Card className="w-full max-w-3xl shadow-lg">
           <CardHeader className="rounded-t-lg bg-gradient-to-r from-green-500 to-teal-600 p-4 text-white">
             <CardTitle className="text-2xl">
-              Rapport de maintenance préventif
+              {submitted
+                ? "Rapport envoyé"
+                : "Rapport de maintenance préventif"}
             </CardTitle>
           </CardHeader>
+
           <CardContent className="space-y-6 p-6">
-            {/* --- Infos équipement --- */}
+            {/* --- Infos Équipement --- */}
             <section className="space-y-2 border-b pb-4">
               <p>
                 <strong>Équipement :</strong>{" "}
@@ -149,7 +197,7 @@ export default function RapportPreventifPage({
               )}
             </section>
 
-            {/* --- Formulaire de rapport --- */}
+            {/* --- Formulaire de Rapport --- */}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {/* Travail effectué */}
               <div>
@@ -168,9 +216,9 @@ export default function RapportPreventifPage({
                 )}
               </div>
 
-              {/* Dates */}
+              {/* Dates début / fin */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {["dateDebut", "dateFin"].map((field, idx) => (
+                {(["dateDebut", "dateFin"] as const).map((field, idx) => (
                   <div key={field}>
                     <Label htmlFor={field}>
                       {idx === 0 ? "Date de début" : "Date de fin"} *
@@ -182,7 +230,7 @@ export default function RapportPreventifPage({
                       className="mt-1"
                       disabled={submitted}
                     />
-                    {errors[field as "dateDebut" | "dateFin"] && (
+                    {errors[field] && (
                       <p className="mt-1 text-sm text-red-600">Obligatoire.</p>
                     )}
                   </div>
@@ -227,71 +275,68 @@ export default function RapportPreventifPage({
                 </div>
               </div>
 
-              {/* Interne vs Sous‑traitant */}
+              {/* Interne vs Sous-traitant */}
               <div>
                 <Label>Type de réalisation *</Label>
-                <Controller
-                  control={control}
-                  name="typeRealisation"
-                  rules={{ required: true }}
-                  render={({ field }) => (
-                    <RadioGroup
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        setIsSub(v === "sousTraitant");
-                      }}
-                      value={field.value}
-                      className="mt-2 flex space-x-6"
-                    >
-                      <label className="flex items-center space-x-1">
-                        <RadioGroupItem
-                          value="interne"
-                          id="interne"
-                          disabled={submitted}
-                        />
-                        <span>Interne</span>
-                      </label>
-                      <label className="flex items-center space-x-1">
-                        <RadioGroupItem
-                          value="sousTraitant"
-                          id="sousTraitant"
-                          disabled={submitted}
-                        />
-                        <span>Sous‑traitant</span>
-                      </label>
-                    </RadioGroup>
-                  )}
-                />
+                <fieldset disabled={submitted}>
+                  <Controller
+                    control={control}
+                    name="typeRealisation"
+                    rules={{ required: true }}
+                    render={({ field }) => (
+                      <RadioGroup
+                        onValueChange={(v) => {
+                          field.onChange(v);
+                          setIsSub(v === "sousTraitant");
+                        }}
+                        value={field.value}
+                        className="mt-2 flex space-x-6"
+                      >
+                        <label className="flex items-center space-x-1">
+                          <RadioGroupItem value="interne" id="interne" />
+                          <span>Interne</span>
+                        </label>
+                        <label className="flex items-center space-x-1">
+                          <RadioGroupItem
+                            value="sousTraitant"
+                            id="sousTraitant"
+                          />
+                          <span>Sous-traitant</span>
+                        </label>
+                      </RadioGroup>
+                    )}
+                  />
+                </fieldset>
               </div>
 
-              {/* Champs Sous‑traitant (conditionnels) */}
+              {/* Champs sous-traitant */}
               {isSub && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {["nom", "prenom", "email", "telephone"].map((field) => (
-                    <div key={field}>
-                      <Label htmlFor={field}>
-                        {field.charAt(0).toUpperCase() + field.slice(1)} *
-                      </Label>
-                      <Input
-                        type={field === "email" ? "email" : "text"}
-                        id={field}
-                        {...register(field, { required: true })}
-                        className="mt-1"
-                        disabled={submitted}
-                      />
-                      {errors[
-                        field as "nom" | "prenom" | "email" | "telephone"
-                      ] && (
-                        <p className="mt-1 text-sm text-red-600">
-                          Obligatoire.
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                  {(["nom", "prenom", "email", "telephone"] as const).map(
+                    (field) => (
+                      <div key={field}>
+                        <Label htmlFor={field}>
+                          {field.charAt(0).toUpperCase() + field.slice(1)} *
+                        </Label>
+                        <Input
+                          type={field === "email" ? "email" : "text"}
+                          id={field}
+                          {...register(field, { required: true })}
+                          className="mt-1"
+                          disabled={submitted}
+                        />
+                        {errors[field] && (
+                          <p className="mt-1 text-sm text-red-600">
+                            Obligatoire.
+                          </p>
+                        )}
+                      </div>
+                    ),
+                  )}
                 </div>
               )}
 
-              {/* Champ caché */}
+              {/* Champ caché occurrenceMaintenanceId */}
               <input
                 type="hidden"
                 value={id}
