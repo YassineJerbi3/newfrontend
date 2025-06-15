@@ -56,6 +56,7 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
         icon: <FaChartLine size={18} />,
         roles: ["RESPONSABLE SI"],
       },
+
       {
         label: "Intervention",
         icon: <FaTasks size={18} />,
