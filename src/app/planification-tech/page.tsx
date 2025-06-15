@@ -399,17 +399,22 @@ const CalendarOnlyPage: React.FC = () => {
                       if (
                         Date.now() >= selectedEvent.datePlanification.getTime()
                       ) {
+                        // on considère que pour un event.preventive c'est l'occurrenceMaintenanceId
+                        // et pour un event.rapport (incidents) tu as peut‑être déjà un rapportId ou
+                        // tu gères ça ailleurs.
                         const path =
                           selectedEvent.type === "preventive"
-                            ? `/maintenance-preventive/${selectedEvent.id}`
-                            : `/rapport/incident/${selectedEvent.incident.id}`;
+                            ? // on passe l'ID de l'occurrence ici pour créer/éditer le rapport
+                              `/rapport-maintenance/${selectedEvent.id}`
+                            : // si tu veux quand même rediriger vers un incident-report
+                              `/rapport-incident/${selectedEvent.incident.id}`;
                         router.push(path);
                       }
                     }}
                   >
                     {selectedEvent.type === "preventive"
-                      ? "Voir maintenance"
-                      : "Voir le rapport"}
+                      ? "Saisir le rapport"
+                      : "Voir le rapport incident"}
                   </button>
                 </div>
               </motion.div>
