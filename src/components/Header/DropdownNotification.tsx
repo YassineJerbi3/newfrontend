@@ -147,12 +147,6 @@ export default function DropdownNotification() {
               {/* Header */}
               <div className="flex items-center justify-between border-b px-4 py-2">
                 <h5 className="font-semibold text-gray-800">Notifications</h5>
-                <button
-                  onClick={markAllRead}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  Tout lire
-                </button>
               </div>
 
               {/* Liste */}

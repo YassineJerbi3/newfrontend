@@ -284,19 +284,29 @@ export default function NotificationTechnicien() {
       .catch(console.error);
   }, []);
 
-  const markAsRead = (e: MouseEvent, id: string) => {
+  const conditionalMarkAsRead = (
+    e: MouseEvent,
+    id: string,
+    type: NotificationType,
+  ) => {
     e.stopPropagation();
-    fetch(`http://localhost:2000/notifications/${id}/read`, {
-      method: "PATCH",
-      credentials: "include",
-    }).catch(console.error);
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
+    if (type !== "RAPPORT_MAINTENANCE_INVALIDE") {
+      fetch(`http://localhost:2000/notifications/${id}/read`, {
+        method: "PATCH",
+        credentials: "include",
+      }).catch(console.error);
+      setNotes((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+    }
   };
 
   const grouped = useMemo(() => {
     const filtered = notes.filter((n) => {
+      // ← NOUVEAU : ne jamais afficher une notif invalide déjà lue
+      if (n.type === "RAPPORT_MAINTENANCE_INVALIDE" && n.read) {
+        return false;
+      }
       if (filterType && n.type !== filterType) return false;
       if (filterRead === "READ" && !n.read) return false;
       if (filterRead === "UNREAD" && n.read) return false;
@@ -437,6 +447,7 @@ export default function NotificationTechnicien() {
                             ? "/planification-tech"
                             : "#"
                       }
+                      onClick={(e) => conditionalMarkAsRead(e, n.id, n.type)}
                       className={`
     relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
     hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}

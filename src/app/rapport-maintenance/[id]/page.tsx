@@ -179,6 +179,30 @@ export default function RapportPreventifPage({
         });
       }
       setSubmitted(true);
+      // ─── Marquer la notif “invalide” comme lue ───
+      // 1. Récupère toutes les notifs
+      const rawNotifs: { id: string; type: string; payload: any }[] =
+        await fetch(`${API}/notifications`, { credentials: "include" }).then(
+          (r) => r.json(),
+        );
+
+      // 2. Trouve celle qui correspond à ton rapport
+      const invalNotif = rawNotifs.find(
+        (n) =>
+          n.type === "RAPPORT_MAINTENANCE_INVALIDE" &&
+          n.payload.rapportId === id,
+      );
+
+      // 3. Si elle existe, marque-la en lu
+      if (invalNotif) {
+        await fetch(`${API}/notifications/${invalNotif.id}/read`, {
+          method: "PATCH",
+          credentials: "include",
+        });
+      }
+
+      // 4. Ensuite, redirige vers la page des notifications
+      router.push("/notification/not-technicien");
     } catch (e) {
       console.error(e);
       alert("Erreur lors de la soumission");
