@@ -24,6 +24,7 @@ import {
   FiMapPin,
   FiEdit2,
   FiTool,
+  FiFileText,
 } from "react-icons/fi";
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
@@ -38,7 +39,8 @@ type NotificationType =
   | "ALERTE_STOCK"
   | "DEPASSEMENT_STOCK_ALERT"
   | "STOCK_INDISPONIBLE"
-  | "MAINTENANCE_ALERT";
+  | "MAINTENANCE_ALERT"
+  | "RAPPORT_PREVENTIF_SOUMIS"; // ← ajouté
 
 interface NotificationItem {
   id: string;
@@ -59,7 +61,10 @@ interface NotificationItem {
     technicienNom?: string;
     natureResolution?: string;
     natureIntervention?: string;
-    emplacement?: string; // <- nouveau
+    emplacement?: string;
+    occurrenceMaintenanceId?: string;
+    rapportId?: string; // ← ajouté
+    // <- nouveau
 
     // ← Nouveau pour maintenance
     dateOccurrence?: string; // J–7
@@ -102,32 +107,38 @@ const TYPE_CONFIG: Record<
   "rapport-incident": {
     icon: <FiFlag size={20} />,
     accent: "border-indigo-500 text-indigo-500",
-    label: "Rapport",
+    label: "Rapport d'incident",
   },
   "rapport-a-corriger": {
     icon: <FiEdit2 size={20} />,
     accent: "border-red-600 text-red-600",
-    label: "À Corriger",
+    label: " Rapport d'incident à Corriger",
   },
   ALERTE_STOCK: {
     icon: <FiBox size={20} />,
     accent: "border-yellow-500 text-yellow-500",
-    label: "Alerte Stock",
+    label: "Alerte de Stock",
   },
   DEPASSEMENT_STOCK_ALERT: {
     icon: <FiBox size={20} />,
     accent: "border-orange-500 text-orange-500",
-    label: "Dépassement Stock",
+    label: "Dépassement de Stock",
   },
   STOCK_INDISPONIBLE: {
     icon: <FiBox size={20} />,
     accent: "border-gray-500 text-gray-500",
-    label: "Stock Indisp.",
+    label: "Stock Indisponible",
   },
   MAINTENANCE_ALERT: {
     icon: <FiTool size={20} />, // ou FiCalendar
     accent: "border-green-500 text-green-500",
-    label: "Maintenance",
+    label: "Maintenance Préventif",
+  },
+
+  RAPPORT_PREVENTIF_SOUMIS: {
+    icon: <FiFileText size={20} />, // ou une autre icône qui te parle
+    accent: "border-green-600 text-green-600",
+    label: "Rapport de la maintenance Préventif",
   },
 };
 
@@ -168,6 +179,8 @@ export default function NotificationResponsableSI() {
               description: r.payload.description, // ajouter
               emplacement: r.payload.emplacement,
               location: r.payload.emplacement,
+              occurrenceMaintenanceId: r.payload.occurrenceMaintenanceId,
+              rapportId: r.payload.rapportId,
             },
           }))
           .sort((a, b) => {
@@ -215,6 +228,8 @@ export default function NotificationResponsableSI() {
           equipmentType: payload.equipmentType,
           location: payload.emplacement,
           emplacement: payload.emplacement,
+          occurrenceMaintenanceId: payload.occurrenceMaintenanceId,
+          rapportId: payload.rapportId, // ← AJOUTÉ
         },
       };
       setNotifications((prev) =>
@@ -238,6 +253,7 @@ export default function NotificationResponsableSI() {
     socket.on("DEPASSEMENT_STOCK_ALERT", handler);
     socket.on("STOCK_INDISPONIBLE", handler);
     socket.on("MAINTENANCE_ALERT", handler);
+    socket.on("RAPPORT_PREVENTIF_SOUMIS", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -248,6 +264,7 @@ export default function NotificationResponsableSI() {
       socket.off("DEPASSEMENT_STOCK_ALERT", handler);
       socket.off("STOCK_INDISPONIBLE", handler);
       socket.off("MAINTENANCE_ALERT", handler);
+      socket.off("RAPPORT_PREVENTIF_SOUMIS", handler);
     };
   }, [loadNotifications]);
 
@@ -510,18 +527,37 @@ export default function NotificationResponsableSI() {
                     <div
                       key={n.id}
                       onClick={(e) => {
-                        if (isAssigned) return; // ← bloque le clic
+                        if (isAssigned) return; // bloque le clic si incident déjà assigné
+
+                        // 1) Incident non assigné → modal d’affectation
                         if (n.type === "incident" && incidentId) {
                           openAssignModal(incidentId);
-                        } else if (
+                          return;
+                        }
+
+                        // 2) Rapport de maintenance préventif soumis → page SI
+                        if (
+                          n.type === "RAPPORT_PREVENTIF_SOUMIS" &&
+                          n.payload.rapportId
+                        ) {
+                          router.push(
+                            `/rapport-maintenance-si/${n.payload.rapportId}`,
+                          );
+                          return;
+                        }
+
+                        // 3) Rapport d’incident ou à corriger → page d’incident SI
+                        if (
                           (n.type === "rapport-incident" ||
                             n.type === "rapport-a-corriger") &&
                           incidentId
                         ) {
                           router.push(`/rapport/incident-si/${incidentId}`);
-                        } else {
-                          markAsRead(e, n.id);
+                          return;
                         }
+
+                        // 4) Tous les autres cas → on marque comme lu
+                        markAsRead(e, n.id);
                       }}
                       className={`
                         relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
@@ -555,7 +591,11 @@ export default function NotificationResponsableSI() {
                           </h3>
                         </div>
 
-                        {n.type === "MAINTENANCE_ALERT" ? (
+                        {n.type === "RAPPORT_PREVENTIF_SOUMIS" ? (
+                          <p className="mt-2 text-sm text-gray-700">
+                            {n.payload.message}
+                          </p>
+                        ) : n.type === "MAINTENANCE_ALERT" ? (
                           <p className="mt-2 text-sm text-gray-700">
                             {detailMaintenance}
                           </p>
