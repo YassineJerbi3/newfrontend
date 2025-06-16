@@ -21,7 +21,9 @@ type NotificationType =
   | "rapport-a-planifier"
   | "rapport-mod-planifier"
   | "rapport-non-planifie"
-  | "maintenance-assignation"; // ← nouveau
+  | "maintenance-assignation"
+  | "RAPPORT_MAINTENANCE_VALIDE"
+  | "RAPPORT_MAINTENANCE_INVALIDE"; // ← nouveau
 
 interface RawNotification {
   id: string;
@@ -65,6 +67,19 @@ type NotificationItem =
       remarqueResponsable: string;
       technicienPrenom: string;
       technicienNom: string;
+    })
+  | (BaseNotification & {
+      type: "RAPPORT_MAINTENANCE_VALIDE";
+      rapportId: string;
+      equipmentType: string;
+      emplacement: string;
+    })
+  | (BaseNotification & {
+      type: "RAPPORT_MAINTENANCE_INVALIDE";
+      rapportId: string;
+      equipmentType: string;
+      emplacement: string;
+      remarqueResponsable: string;
     })
   | (BaseNotification & {
       type: "rapport-a-planifier" | "rapport-mod-planifier";
@@ -123,6 +138,16 @@ const TYPE_CONFIG: Record<
     accent: "border-purple-500 text-purple-500",
     label: "Maintenance assignée",
   },
+  RAPPORT_MAINTENANCE_VALIDE: {
+    icon: <FiCheckCircle size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Rapport maintenance validé",
+  },
+  RAPPORT_MAINTENANCE_INVALIDE: {
+    icon: <FiXCircle size={20} />,
+    accent: "border-red-500 text-red-500",
+    label: "Rapport maintenance invalidé",
+  },
 };
 
 export default function NotificationTechnicien() {
@@ -146,7 +171,9 @@ export default function NotificationTechnicien() {
               "rapport-a-planifier",
               "rapport-mod-planifier",
               "rapport-non-planifie",
-              "maintenance-assignation", // ← ajouter
+              "maintenance-assignation",
+              "RAPPORT_MAINTENANCE_VALIDE",
+              "RAPPORT_MAINTENANCE_INVALIDE", // ← ajouter
             ].includes(n.type),
           )
           .map((n) => {
@@ -222,6 +249,28 @@ export default function NotificationTechnicien() {
                   equipmentType: p.equipmentType,
                   location: p.emplacement,
                   datePlanification: p.datePlanification,
+                };
+              }
+              case "RAPPORT_MAINTENANCE_VALIDE": {
+                const p = n.payload;
+                return {
+                  ...base,
+                  type: "RAPPORT_MAINTENANCE_VALIDE",
+                  rapportId: p.rapportId,
+                  equipmentType: p.equipmentType,
+                  emplacement: p.emplacement,
+                };
+              }
+
+              case "RAPPORT_MAINTENANCE_INVALIDE": {
+                const p = n.payload;
+                return {
+                  ...base,
+                  type: "RAPPORT_MAINTENANCE_INVALIDE",
+                  rapportId: p.rapportId,
+                  equipmentType: p.equipmentType,
+                  emplacement: p.emplacement,
+                  remarqueResponsable: p.remarqueResponsable,
                 };
               }
             }
@@ -307,6 +356,12 @@ export default function NotificationTechnicien() {
                 <option value="rapport-a-planifier">Planifié</option>
                 <option value="rapport-mod-planifier">Modifié</option>
                 <option value="rapport-non-planifie">Annulé</option>
+                <option value="RAPPORT_MAINTENANCE_VALIDE">
+                  Maint. validé
+                </option>
+                <option value="RAPPORT_MAINTENANCE_INVALIDE">
+                  Maint. invalidé
+                </option>
               </select>
             </div>
 
@@ -412,6 +467,47 @@ export default function NotificationTechnicien() {
                                       Équipement : {(n as any).equipmentType}
                                     </p>
                                     <p>Emplacement : {(n as any).location}</p>
+                                  </>
+                                );
+                              case "RAPPORT_MAINTENANCE_VALIDE":
+                                return (
+                                  <>
+                                    <p>
+                                      Équipement : {(n as any).equipmentType}
+                                    </p>
+                                    <p>
+                                      Emplacement : {(n as any).emplacement}
+                                    </p>
+                                    <p>
+                                      Date de validation :{" "}
+                                      {new Date(n.createdAt).toLocaleDateString(
+                                        "fr-FR",
+                                      )}
+                                    </p>
+                                  </>
+                                );
+
+                              case "RAPPORT_MAINTENANCE_INVALIDE":
+                                return (
+                                  <>
+                                    <p>
+                                      Le responsable SI n’a pas validé votre
+                                      rapport. Il faut modifier certains
+                                      champs :{" "}
+                                      <Link
+                                        href={`/rapport-maintenance/${(n as any).rapportId}`}
+                                        className="text-indigo-600 underline"
+                                      >
+                                        Cliquez ici pour voir le rapport et la
+                                        remarque
+                                      </Link>
+                                    </p>
+                                    <p>
+                                      Équipement : {(n as any).equipmentType}
+                                    </p>
+                                    <p>
+                                      Emplacement : {(n as any).emplacement}
+                                    </p>
                                   </>
                                 );
                               case "rapport-valide":
