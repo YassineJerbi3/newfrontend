@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { addDays } from "date-fns";
+import { addDays, isAfter, isBefore, isEqual } from "date-fns";
 
 const localizer = momentLocalizer(moment);
 
@@ -311,11 +311,18 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
     event.plannedTechnicienId || "",
   );
   const [techError, setTechError] = useState<string>("");
+  const [warning, setWarning] = useState<string>("");
 
   useEffect(() => {
     setDatePlanif(event.datePlanification || new Date());
     setSelectedTech(event.plannedTechnicienId || "");
+    setTechError("");
+    setWarning("");
   }, [event]);
+  // calcul de la fenêtre recommandée :
+  const occDate = event.alertDate ? new Date(event.alertDate) : new Date(); // si pas d’alertDate, fallback à aujourd’hui
+  const recommendedStart = occDate;
+  const recommendedEnd = addDays(occDate, 6);
 
   return (
     <Modal
@@ -333,7 +340,6 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
             exit={{ opacity: 0, y: -30 }}
             transition={{ duration: 0.2 }}
             className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={onClose}
@@ -354,11 +360,16 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
               <p>
                 <strong>Description :</strong> {event.description}
               </p>
+
+              {/* Choix du technicien */}
               <div>
                 <strong>Choisir technicien :</strong>
                 <select
                   value={selectedTech}
-                  onChange={(e) => setSelectedTech(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedTech(e.target.value);
+                    setTechError("");
+                  }}
                   className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
                 >
                   <option value="">-- Sélectionner --</option>
@@ -372,16 +383,57 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
                   <p className="mt-1 text-sm text-red-600">{techError}</p>
                 )}
               </div>
+
+              {/* Sélecteur de date */}
               <div>
-                <strong>Date planification :</strong>{" "}
+                <strong>Date planification :</strong>
                 <DatePicker
                   selected={datePlanif}
-                  onChange={(d) => setDatePlanif(d!)}
+                  onChange={(d) => {
+                    if (!d) return;
+                    setDatePlanif(d);
+                    // warning si date hors fenêtre
+                    if (isAfter(d, recommendedEnd)) {
+                      setWarning(
+                        `⚠️ Hors période recommandée (jusqu’au ${recommendedEnd.toLocaleDateString(
+                          "fr-FR",
+                        )})`,
+                      );
+                    } else {
+                      setWarning("");
+                    }
+                  }}
                   dateFormat="yyyy-MM-dd"
+                  minDate={recommendedStart} // pas avant la date d'occurrence
+                  dayClassName={(d) => {
+                    // pendant les 7 jours recommandés → fond vert pâle
+                    if (
+                      (isAfter(d, recommendedStart) ||
+                        isEqual(d, recommendedStart)) &&
+                      (isBefore(d, recommendedEnd) ||
+                        isEqual(d, recommendedEnd))
+                    ) {
+                      return "bg-green-100 rounded-full";
+                    }
+                    return "";
+                  }}
                   className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
+                  inline
                 />
+                <p className="mt-1 text-sm text-gray-600">
+                  Période recommandée :{" "}
+                  <strong>
+                    {recommendedStart.toLocaleDateString("fr-FR")} –{" "}
+                    {recommendedEnd.toLocaleDateString("fr-FR")}
+                  </strong>
+                </p>
+                {warning && (
+                  <p className="mt-1 text-sm text-red-600">{warning}</p>
+                )}
               </div>
             </div>
+
+            {/* Bouton Valider */}
             <div className="mt-6 flex justify-end">
               <motion.button
                 whileHover={{ scale: 1.02 }}
