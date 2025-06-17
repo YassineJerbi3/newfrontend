@@ -161,39 +161,50 @@ export default function RapportPreventifPage({
 
   const onSubmit = async (formData: any) => {
     try {
-      if (mode === "occurrence") {
-        // création initiale
-        await fetch(`${API}/rapport-maintenance`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-          credentials: "include",
-        });
-      } else {
-        // correction après invalidation
-        await fetch(`${API}/rapport-maintenance/${id}/contenu`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-          credentials: "include",
-        });
-      }
+      // 1️⃣ Construire le payload en mappant nom/prenom/email/telephone vers les clés externes
+      const payload = {
+        ...formData,
+        externeNom: formData.nom,
+        externePrenom: formData.prenom,
+        externeEmail: formData.email,
+        externeTelephone: formData.telephone,
+      };
+      // 2️⃣ Supprimer les anciennes clés
+      delete payload.nom;
+      delete payload.prenom;
+      delete payload.email;
+      delete payload.telephone;
+
+      // 3️⃣ Choisir l’URL selon le mode (création vs correction)
+      const url =
+        mode === "occurrence"
+          ? `${API}/rapport-maintenance`
+          : `${API}/rapport-maintenance/${id}/contenu`;
+      const method = mode === "occurrence" ? "POST" : "PATCH";
+
+      // 4️⃣ Envoyer le payload correct au back
+      await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+
       setSubmitted(true);
+
+      // Le reste de votre logique (marquer la notif invalide et redirection) reste inchangé…
       // ─── Marquer la notif “invalide” comme lue ───
-      // 1. Récupère toutes les notifs
       const rawNotifs: { id: string; type: string; payload: any }[] =
         await fetch(`${API}/notifications`, { credentials: "include" }).then(
           (r) => r.json(),
         );
 
-      // 2. Trouve celle qui correspond à ton rapport
       const invalNotif = rawNotifs.find(
         (n) =>
           n.type === "RAPPORT_MAINTENANCE_INVALIDE" &&
           n.payload.rapportId === id,
       );
 
-      // 3. Si elle existe, marque-la en lu
       if (invalNotif) {
         await fetch(`${API}/notifications/${invalNotif.id}/read`, {
           method: "PATCH",
@@ -201,13 +212,13 @@ export default function RapportPreventifPage({
         });
       }
 
-      // 4. Ensuite, redirige vers la page des notifications
       router.push("/notification/not-technicien");
     } catch (e) {
       console.error(e);
       alert("Erreur lors de la soumission");
     }
   };
+
   const planDateString =
     mode === "occurrence"
       ? data?.datePlanification

@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { Loader2, X, Check } from "lucide-react";
+import { Loader2, X, Check, Phone, Mail } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 const fetcher = (url: string) =>
@@ -76,7 +76,7 @@ export default function RapportSIDetails({
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        remarque
+        remarque !== undefined
           ? { statut: status, remarqueResponsable: remarque }
           : { statut: status },
       ),
@@ -149,6 +149,32 @@ export default function RapportSIDetails({
           </div>
         </SectionCard>
 
+        {/* Informations Sous-traitant si présentes */}
+        {(rapport.externeNom || rapport.externePrenom) && (
+          <SectionCard title="👥 Sous-traitant externe">
+            {rapport.externePrenom && (
+              <DetailItem label="Prénom" value={rapport.externePrenom} />
+            )}
+            {rapport.externeNom && (
+              <DetailItem label="Nom" value={rapport.externeNom} />
+            )}
+            {rapport.externeEmail && (
+              <DetailItem
+                label="Email"
+                value={rapport.externeEmail}
+                icon={<Mail className="h-4 w-4 text-gray-500" />}
+              />
+            )}
+            {rapport.externeTelephone && (
+              <DetailItem
+                label="Téléphone"
+                value={rapport.externeTelephone}
+                icon={<Phone className="h-4 w-4 text-gray-500" />}
+              />
+            )}
+          </SectionCard>
+        )}
+
         {/* Rapport */}
         <SectionCard title="📋 Détails du rapport">
           <DetailItem
@@ -186,7 +212,7 @@ export default function RapportSIDetails({
                   <Check size={16} /> Valider
                 </button>
                 <button
-                  onClick={() => setShowRemark(true)}
+                  onClick={() => handleUpdate("NON_VALIDE")}
                   disabled={processing}
                   className="flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-white transition hover:bg-red-700"
                 >
@@ -194,19 +220,17 @@ export default function RapportSIDetails({
                 </button>
               </div>
             ) : (
-              <div>
+              <>
                 <textarea
                   rows={3}
                   value={remark}
                   onChange={(e) => setRemark(e.target.value)}
                   className="w-full rounded-md border border-gray-300 p-2"
-                  placeholder="Remarque du responsable..."
+                  placeholder="Remarque du responsable (optionnelle)..."
                 />
                 <div className="mt-3 flex justify-end gap-3">
                   <button
-                    onClick={() =>
-                      remark.trim() && handleUpdate("NON_VALIDE", remark.trim())
-                    }
+                    onClick={() => handleUpdate("NON_VALIDE", remark)}
                     disabled={processing}
                     className="rounded-md bg-red-600 px-6 py-2 text-white transition hover:bg-red-700"
                   >
@@ -222,7 +246,7 @@ export default function RapportSIDetails({
                     Annuler
                   </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}
@@ -247,11 +271,22 @@ function SectionCard({
   );
 }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
+function DetailItem({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <div>
-      <span className="block text-sm text-gray-500">{label}</span>
-      <span className="mt-1 block font-semibold text-gray-800">{value}</span>
+    <div className="flex items-center gap-2">
+      {icon}
+      <div>
+        <span className="block text-sm text-gray-500">{label}</span>
+        <span className="mt-1 block font-semibold text-gray-800">{value}</span>
+      </div>
     </div>
   );
 }
