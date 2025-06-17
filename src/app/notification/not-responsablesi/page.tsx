@@ -40,7 +40,8 @@ type NotificationType =
   | "DEPASSEMENT_STOCK_ALERT"
   | "STOCK_INDISPONIBLE"
   | "MAINTENANCE_ALERT"
-  | "RAPPORT_PREVENTIF_SOUMIS"; // ← ajouté
+  | "RAPPORT_PREVENTIF_SOUMIS"
+  | "RAPPORT_MAINTENANCE_A_CORRIGER"; // ← ajouté
 
 interface NotificationItem {
   id: string;
@@ -139,6 +140,12 @@ const TYPE_CONFIG: Record<
     icon: <FiFileText size={20} />, // ou une autre icône qui te parle
     accent: "border-green-600 text-green-600",
     label: "Rapport de la maintenance Préventif",
+  },
+  // … après RAPPORT_PREVENTIF_SOUMIS
+  RAPPORT_MAINTENANCE_A_CORRIGER: {
+    icon: <FiEdit2 size={20} />,
+    accent: "border-orange-500 text-orange-500",
+    label: "Correction de maintenance soumise",
   },
 };
 
@@ -254,6 +261,7 @@ export default function NotificationResponsableSI() {
     socket.on("STOCK_INDISPONIBLE", handler);
     socket.on("MAINTENANCE_ALERT", handler);
     socket.on("RAPPORT_PREVENTIF_SOUMIS", handler);
+    socket.on("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -265,6 +273,7 @@ export default function NotificationResponsableSI() {
       socket.off("STOCK_INDISPONIBLE", handler);
       socket.off("MAINTENANCE_ALERT", handler);
       socket.off("RAPPORT_PREVENTIF_SOUMIS", handler);
+      socket.off("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
     };
   }, [loadNotifications]);
 
@@ -376,6 +385,12 @@ export default function NotificationResponsableSI() {
                   Dépassement Stock
                 </option>
                 <option value="STOCK_INDISPONIBLE">Stock Indisp.</option>
+                <option value="RAPPORT_PREVENTIF_SOUMIS">
+                  Rapport préventif reçu
+                </option>
+                <option value="RAPPORT_MAINTENANCE_A_CORRIGER">
+                  Correction de maintenance
+                </option>
               </select>
             </div>
 
@@ -553,6 +568,15 @@ export default function NotificationResponsableSI() {
                           incidentId
                         ) {
                           router.push(`/rapport/incident-si/${incidentId}`);
+                          return;
+                        }
+                        if (
+                          n.type === "RAPPORT_MAINTENANCE_A_CORRIGER" &&
+                          n.payload.rapportId
+                        ) {
+                          router.push(
+                            `/rapport-maintenance-si/${n.payload.rapportId}`,
+                          );
                           return;
                         }
 
