@@ -38,6 +38,7 @@ export interface Evenement {
   description?: string;
   maintenancePreventiveId?: string;
   plannedTechnicienId?: string;
+  hasRapport?: boolean;
 }
 
 interface User {
@@ -479,12 +480,17 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
   );
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [dateChanged, setDateChanged] = useState(false);
+  const [warning, setWarning] = useState<string>(""); // ← nouvel état
 
   useEffect(() => {
     setDatePlanif(event.datePlanification || new Date());
     setIsEditingDate(false);
     setDateChanged(false);
+    setWarning("");
   }, [event]);
+  const occDate = event.alertDate ? new Date(event.alertDate) : new Date();
+  const recommendedStart = occDate;
+  const recommendedEnd = addDays(occDate, 6);
 
   return (
     <Modal
@@ -504,15 +510,20 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
             className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Fermer */}
             <button
               onClick={onClose}
               className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
             >
               ✕
             </button>
+
+            {/* Titre */}
             <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
               Détails Maintenance
             </h2>
+
+            {/* Infos */}
             <div className="space-y-3 text-gray-700">
               <p>
                 <strong>Équipement :</strong> {event.equipement.equipmentType}
@@ -520,25 +531,63 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
               <p>
                 <strong>Emplacement :</strong> {event.emplacement.nom}
               </p>
-              <p>
-                <strong>Description :</strong> {event.description}
-              </p>
-              <p>
-                <strong>Technicien assigné :</strong> {event.technicien?.prenom}{" "}
-                {event.technicien?.nom}
-              </p>
+              {event.description && (
+                <p>
+                  <strong>Description :</strong> {event.description}
+                </p>
+              )}
+              {event.technicien && (
+                <p>
+                  <strong>Technicien assigné :</strong>{" "}
+                  {event.technicien.prenom} {event.technicien.nom}
+                </p>
+              )}
+
+              {/* Date de planif */}
               <div className="mt-3">
                 <strong>Date de planification :</strong>{" "}
                 {isEditingDate ? (
-                  <DatePicker
-                    selected={datePlanif}
-                    onChange={(d) => {
-                      setDatePlanif(d!);
-                      setDateChanged(true);
-                    }}
-                    dateFormat="yyyy-MM-dd"
-                    inline
-                  />
+                  <>
+                    <DatePicker
+                      inline
+                      selected={datePlanif}
+                      onChange={(d) => {
+                        if (!d) return;
+                        setDatePlanif(d);
+                        setDateChanged(true);
+
+                        // warning
+                        if (
+                          isBefore(d, recommendedStart) ||
+                          isAfter(d, recommendedEnd)
+                        ) {
+                          setWarning(
+                            `⚠️ Hors période recommandée : ${recommendedStart.toLocaleDateString(
+                              "fr-FR",
+                            )} → ${recommendedEnd.toLocaleDateString("fr-FR")}`,
+                          );
+                        } else {
+                          setWarning("");
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      minDate={
+                        event.alertDate ? new Date(event.alertDate) : undefined
+                      }
+                      dayClassName={(d) => {
+                        if (!event.alertDate) return "";
+                        const occ = new Date(event.alertDate);
+                        const diff =
+                          (d.getTime() - occ.getTime()) / (1000 * 60 * 60 * 24);
+                        return diff >= 0 && diff < 7
+                          ? "bg-green-100 rounded-full"
+                          : "";
+                      }}
+                    />
+                    {warning && (
+                      <p className="mt-1 text-sm text-red-600">{warning}</p>
+                    )}
+                  </>
                 ) : (
                   <span className="ml-2 font-medium">
                     {datePlanif.toLocaleDateString("fr-FR")}
@@ -546,37 +595,46 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Actions */}
             <div className="mt-6 flex justify-end space-x-2">
-              <button
-                onClick={() => {
-                  if (isEditingDate) {
-                    setDatePlanif(event.datePlanification || new Date());
-                    setDateChanged(false);
-                  }
-                  setIsEditingDate(!isEditingDate);
-                }}
-                className="rounded-3xl bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
-              >
-                {isEditingDate ? "Annuler" : "Changer la date"}
-              </button>
-              {isEditingDate && dateChanged && (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    onSave({
-                      ...event,
-                      datePlanification: datePlanif,
-                      start: datePlanif,
-                      end: datePlanif,
-                    });
-                    setIsEditingDate(false);
-                    setDateChanged(false);
-                  }}
-                  className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
-                >
-                  Valider
-                </motion.button>
+              {/* si rapport existant, on masque tout */}
+              {!event.hasRapport && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (isEditingDate) {
+                        setDatePlanif(event.datePlanification || new Date());
+                        setDateChanged(false);
+                        setWarning("");
+                      }
+                      setIsEditingDate(!isEditingDate);
+                    }}
+                    className="rounded-3xl bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+                  >
+                    {isEditingDate ? "Annuler" : "Changer la date"}
+                  </button>
+
+                  {isEditingDate && dateChanged && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        onSave({
+                          datePlanification: datePlanif,
+                          start: datePlanif,
+                          end: datePlanif,
+                        });
+                        setIsEditingDate(false);
+                        setDateChanged(false);
+                        setWarning("");
+                      }}
+                      className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
+                    >
+                      Valider
+                    </motion.button>
+                  )}
+                </>
               )}
             </div>
           </motion.div>
@@ -691,6 +749,7 @@ const MyCalendar: React.FC = () => {
           technicien:
             technicians.find((t) => t.id === o.plannedTechnicienId) ||
             undefined,
+          hasRapport: !!o.rapport,
         }));
         setScheduledEvents([...rapEv, ...maintEv]);
       })
