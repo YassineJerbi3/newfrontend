@@ -208,6 +208,13 @@ export default function RapportPreventifPage({
       alert("Erreur lors de la soumission");
     }
   };
+  const planDateString =
+    mode === "occurrence"
+      ? data?.datePlanification
+      : data?.occurrence?.datePlanification;
+
+  const planDate = planDateString ? new Date(planDateString) : null;
+  const watchDateDebut = watch("dateDebut");
 
   if (loading) {
     return (
@@ -423,32 +430,75 @@ export default function RapportPreventifPage({
 
                 {/* Dates début / fin */}
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  {(["dateDebut", "dateFin"] as const).map((field, idx) => (
-                    <div key={field} className="space-y-3">
-                      <Label
-                        htmlFor={field}
-                        className="flex items-center gap-2 text-base font-semibold text-blue-700"
-                      >
-                        <Calendar className="h-4 w-4" />
-                        {idx === 0 ? "Date de début" : "Date de fin"} *
-                      </Label>
-                      <Input
-                        type="datetime-local"
-                        id={field}
-                        {...register(field, { required: true })}
-                        className="border-blue-300 transition-all duration-200 focus:border-blue-500 focus:ring-blue-500/20"
-                        disabled={submitted}
-                      />
-                      {errors[field] && (
-                        <p className="animate-in slide-in-from-left-2 flex items-center gap-1 text-sm text-red-600 duration-300">
-                          <AlertCircle className="h-4 w-4" />
-                          Obligatoire.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                  {/* Date de début */}
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="dateDebut"
+                      className="flex items-center gap-2 text-base font-semibold text-blue-700"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Date de début *
+                    </Label>
+                    <Input
+                      type="datetime-local"
+                      id="dateDebut"
+                      disabled={submitted}
+                      {...register("dateDebut", {
+                        required: "La date de début est obligatoire",
+                        validate: (value: string) => {
+                          if (!planDate)
+                            return "Date de planification introuvable";
+                          const debut = new Date(value);
+                          return (
+                            debut >= planDate ||
+                            `La date de début doit être ≥ date de planification (${planDate.toISOString().slice(0, 10)})`
+                          );
+                        },
+                      })}
+                      className="border-blue-300 transition-all duration-200 focus:border-blue-500 focus:ring-blue-500/20"
+                    />
+                    {errors.dateDebut && (
+                      <p className="text-sm text-red-600">
+                        {errors.dateDebut.message}
+                      </p>
+                    )}
+                  </div>
 
+                  {/* Date de fin */}
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="dateFin"
+                      className="flex items-center gap-2 text-base font-semibold text-blue-700"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Date de fin *
+                    </Label>
+                    <Input
+                      type="datetime-local"
+                      id="dateFin"
+                      disabled={submitted}
+                      {...register("dateFin", {
+                        required: "La date de fin est obligatoire",
+                        validate: (value: string) => {
+                          const debut = new Date(watchDateDebut);
+                          if (isNaN(debut.getTime()))
+                            return "Veuillez d’abord choisir la date de début";
+                          const fin = new Date(value);
+                          return (
+                            fin >= debut ||
+                            "La date de fin doit être ≥ la date de début"
+                          );
+                        },
+                      })}
+                      className="border-blue-300 transition-all duration-200 focus:border-blue-500 focus:ring-blue-500/20"
+                    />
+                    {errors.dateFin && (
+                      <p className="text-sm text-red-600">
+                        {errors.dateFin.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
                 {/* Durée & Coût */}
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div className="space-y-3">
