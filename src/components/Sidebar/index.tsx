@@ -60,25 +60,20 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
       {
         label: "Intervention",
         icon: <FaTasks size={18} />,
-        roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
+        roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF", "TECHNICIEN"],
         children: [
           {
             label: "Incident",
             route: "/intervention/incident",
             icon: <FaExclamationCircle size={18} />,
-            roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
+            roles: ["RESPONSABLE SI", "TECHNICIEN"],
           },
+
           {
-            label: "Problème applicatif",
-            route: "/intervention/applicatif",
-            icon: <FaDesktop size={18} />,
-            roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
-          },
-          {
-            label: "Demande de publication",
+            label: "Demande de déplacement",
             route: "/intervention/demande",
             icon: <FaEnvelope size={18} />,
-            roles: ["RESPONSABLE SI", "PROFESSOR", "ADMINISTRATIF"],
+            roles: ["TECHNICIEN"],
           },
         ],
       },
