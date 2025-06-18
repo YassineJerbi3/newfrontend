@@ -76,7 +76,7 @@ interface RapportExisting {
   dateDebut?: string;
   dateFin?: string;
   cout?: number;
-  bonSorties?: BonSortieExisting[];
+  bonSortie?: BonSortieExisting;
   statut: "BROUILLON" | "SOUMIS" | "A_PLANIFIER" | "INVALIDE" | "VALIDE";
 }
 
@@ -172,13 +172,12 @@ export default function CombinedIncidentForms() {
             dateFin: data.dateFin?.slice(0, 16) || "",
             cout: data.cout != null ? String(data.cout) : "",
           });
-          if (data.bonSorties?.length) {
-            const flatLines = data.bonSorties.flatMap((b) =>
-              b.lignes.map((l) => ({
-                articleMagasinId: l.articleMagasin.id,
-                quantiteSortie: l.quantiteSortie,
-              })),
-            );
+          // nouveau
+          if (data.bonSortie) {
+            const flatLines = data.bonSortie.lignes.map((l) => ({
+              articleMagasinId: l.articleMagasin.id,
+              quantiteSortie: l.quantiteSortie,
+            }));
             setSelectedConsumables(flatLines);
           }
 
@@ -650,33 +649,27 @@ export default function CombinedIncidentForms() {
                     )}
                   </ul>
                 </div>
-                {existing?.bonSorties && existing.bonSorties.length > 0 && (
+                {existing?.bonSortie && (
                   <div className="space-y-1">
                     <div className="text-sm font-medium text-gray-600">
-                      Bons de sortie liés
+                      Bon de sortie lié
                     </div>
-                    <ul className="space-y-2">
-                      {existing.bonSorties!.map((bon) => (
-                        <li key={bon.id} className="space-y-1">
-                          {/* Show the sortie date */}
-                          <div className="text-sm font-medium text-gray-600">
-                            Sortie du{" "}
-                            {new Date(bon.dateSortie).toLocaleDateString(
-                              "fr-FR",
-                            )}
-                          </div>
-                          {/* List each line */}
-                          <ul className="list-inside list-disc text-gray-800">
-                            {bon.lignes.map((l) => (
-                              <li key={l.id}>
-                                {l.articleMagasin.designation} – Quantité :{" "}
-                                {l.quantiteSortie}
-                              </li>
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-gray-600">
+                        Sortie du{" "}
+                        {new Date(
+                          existing.bonSortie.dateSortie,
+                        ).toLocaleDateString("fr-FR")}
+                      </div>
+                      <ul className="list-inside list-disc text-gray-800">
+                        {existing.bonSortie.lignes.map((l) => (
+                          <li key={l.id}>
+                            {l.articleMagasin.designation} – Quantité :{" "}
+                            {l.quantiteSortie}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>

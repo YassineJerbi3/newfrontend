@@ -21,9 +21,18 @@ import {
   Wrench,
   FileText,
 } from "lucide-react";
+import { useFieldArray } from "react-hook-form";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
-
+// 1) Add these two interfaces:
+interface TypeConsommable {
+  id: string;
+  name: string;
+}
+interface ArticleMagasin {
+  id: string;
+  designation: string;
+}
 export default function RapportPreventifPage({
   params: { id },
 }: {
@@ -40,6 +49,7 @@ export default function RapportPreventifPage({
   const [isSub, setIsSub] = useState(false);
   const [showRemarque, setShowRemarque] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [types, setTypes] = useState<TypeConsommable[]>([]);
 
   // react-hook-form
   const {
@@ -62,11 +72,25 @@ export default function RapportPreventifPage({
       email: "",
       telephone: "",
       typeRealisation: "interne",
+      bonSortie: {
+        lignes: [{ typeId: "", articleId: "", quantiteSortie: undefined }],
+      },
     },
+  });
+  const {
+    fields: bonLignes,
+    append,
+    remove,
+  } = useFieldArray({
+    control,
+    name: "bonSortie.lignes",
   });
 
   // Watch typeRealisation pour gérer l'affichage des champs sous-traitant
   const typeRealisation = watch("typeRealisation");
+  const [articlesByType, setArticlesByType] = useState<
+    Record<string, ArticleMagasin[]>
+  >({});
 
   // format ISO -> "YYYY-MM-DDThh:mm"
   const formatForInput = (iso: string) => {
@@ -76,9 +100,36 @@ export default function RapportPreventifPage({
     return localDt.toISOString().slice(0, 16);
   };
 
-  // charge occurrence ou rapport selon l'id
+  // en haut de ton composant, juste après les useState :
+
+  // ・・・ puis ta useEffect mise à jour ・・・
   useEffect(() => {
     setLoading(true);
+
+    // 1️⃣ load types
+    fetch(`${API}/types-consommable`, { credentials: "include" })
+      .then((r) => {
+        if (!r.ok) throw new Error("Impossible de charger les types");
+        return r.json() as Promise<TypeConsommable[]>;
+      })
+      .then((typesArr) => {
+        setTypes(typesArr);
+
+        // 2️⃣ prefetch articles for every type
+        typesArr.forEach((t) => {
+          fetch(`${API}/magasin?typeId=${t.id}`, { credentials: "include" })
+            .then((r) => r.json() as Promise<ArticleMagasin[]>)
+            .then((arts) =>
+              setArticlesByType((prev) => ({ ...prev, [t.id]: arts })),
+            )
+            .catch((err) =>
+              console.error(`Erreur articles pour type ${t.id}:`, err),
+            );
+        });
+      })
+      .catch((err) => console.error("Erreur types‑consommable:", err));
+
+    // 2️⃣ Charger l’occurrence ou le rapport
     fetch(`${API}/occurrences-maintenance/${id}`, {
       credentials: "include",
     })
@@ -87,9 +138,9 @@ export default function RapportPreventifPage({
           const occ = await res.json();
           setMode("occurrence");
           setData(occ);
-          setSubmitted(false); // Nouveau rapport
+          setSubmitted(false);
         } else if (res.status === 404) {
-          // pas d'occurrence -> c'est un rapportId
+          // pas d'occurrence → c’est un rapport
           const rapRes = await fetch(`${API}/rapport-maintenance/${id}`, {
             credentials: "include",
           });
@@ -97,8 +148,7 @@ export default function RapportPreventifPage({
           const rap = await rapRes.json();
           setMode("rapport");
           setData(rap);
-          // Vérifier si le rapport est déjà validé/envoyé
-          setSubmitted(rap.statut === "valide" || rap.dateEnvoi);
+          setSubmitted(rap.statut === "valide" || Boolean(rap.dateEnvoi));
         } else {
           throw new Error(res.statusText);
         }
@@ -159,64 +209,76 @@ export default function RapportPreventifPage({
     setIsSub(typeRealisation === "sousTraitant");
   }, [typeRealisation]);
 
-  const onSubmit = async (formData: any) => {
-    try {
-      // 1️⃣ Construire le payload en mappant nom/prenom/email/telephone vers les clés externes
-      const payload = {
-        ...formData,
-        externeNom: formData.nom,
-        externePrenom: formData.prenom,
-        externeEmail: formData.email,
-        externeTelephone: formData.telephone,
-      };
-      // 2️⃣ Supprimer les anciennes clés
-      delete payload.nom;
-      delete payload.prenom;
-      delete payload.email;
-      delete payload.telephone;
+  const onSubmit = async (formData) => {
+    // 1) Préparer le payload du rapport
+    const rapportPayload = {
+      occurrenceMaintenanceId: formData.occurrenceMaintenanceId,
+      travailEffectue: formData.travailEffectue,
+      dateDebut: formData.dateDebut,
+      dateFin: formData.dateFin,
+      dureeHeures: formData.dureeHeures,
+      cout: formData.cout,
+      externeNom: formData.nom,
+      externePrenom: formData.prenom,
+      externeEmail: formData.email,
+      externeTelephone: formData.telephone,
+    };
 
-      // 3️⃣ Choisir l’URL selon le mode (création vs correction)
-      const url =
-        mode === "occurrence"
-          ? `${API}/rapport-maintenance`
-          : `${API}/rapport-maintenance/${id}/contenu`;
-      const method = mode === "occurrence" ? "POST" : "PATCH";
-
-      // 4️⃣ Envoyer le payload correct au back
-      await fetch(url, {
-        method,
+    // 2) Créer ou mettre à jour le rapport
+    const respRapport = await fetch(
+      `${API}/rapport-maintenance${mode === "occurrence" ? "" : `/${createdRapportId}`}`,
+      {
+        method: mode === "occurrence" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
         credentials: "include",
-      });
-
-      setSubmitted(true);
-
-      // Le reste de votre logique (marquer la notif invalide et redirection) reste inchangé…
-      // ─── Marquer la notif “invalide” comme lue ───
-      const rawNotifs: { id: string; type: string; payload: any }[] =
-        await fetch(`${API}/notifications`, { credentials: "include" }).then(
-          (r) => r.json(),
-        );
-
-      const invalNotif = rawNotifs.find(
-        (n) =>
-          n.type === "RAPPORT_MAINTENANCE_INVALIDE" &&
-          n.payload.rapportId === id,
+        body: JSON.stringify(rapportPayload),
+      },
+    );
+    if (!respRapport.ok) {
+      console.error(
+        "❌ Erreur création/màj rapport :",
+        await respRapport.text(),
       );
-
-      if (invalNotif) {
-        await fetch(`${API}/notifications/${invalNotif.id}/read`, {
-          method: "PATCH",
-          credentials: "include",
-        });
-      }
-
-      router.push("/notification/not-technicien");
-    } catch (e) {
-      console.error(e);
-      alert("Erreur lors de la soumission");
+      return;
     }
+    const { id: rapportId } = await respRapport.json();
+    console.log("✅ Rapport traité, id =", rapportId);
+
+    // 3) Filtrer et préparer le payload du bon de sortie
+    const lignesValides = formData.bonSortie.lignes.filter(
+      (l) => l.articleId && l.quantity > 0,
+    );
+    const bonPayload = {
+      rapportId,
+      lignes: lignesValides.map((l) => ({
+        articleMagasinId: l.articleId,
+        quantiteSortie: l.quantity,
+      })),
+    };
+    console.log("▶️ BON PAYLOAD ➡️", bonPayload);
+
+    // 4) Créer le bon de sortie
+    const respBon = await fetch(`${API}/bons-sortie`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(bonPayload),
+    });
+    console.log(
+      "▶️ Statut POST /bons‑sortie :",
+      respBon.status,
+      respBon.statusText,
+    );
+    const txtBon = await respBon.text();
+    console.log("▶️ Body réponse bons‑sortie :", txtBon);
+
+    if (!respBon.ok) {
+      console.error("❌ Erreur création bon de sortie :", txtBon);
+      return;
+    }
+
+    // 5) Succès → redirection
+    router.push("/notification/not-technicien");
   };
 
   const planDateString =
@@ -567,6 +629,79 @@ export default function RapportPreventifPage({
                     )}
                   </div>
                 </div>
+                {/* ── Bon de Sortie section ── */}
+                <fieldset disabled={isSubmitting} className="space-y-4 pt-8">
+                  <legend className="text-lg font-semibold">
+                    Bon de Sortie
+                  </legend>
+
+                  {bonLignes.map((line, idx) => (
+                    <div key={line.id} className="flex items-end gap-2">
+                      {/* 1) Type dropdown */}
+                      <select
+                        {...register(`bonSortie.lignes.${idx}.typeId`, {
+                          required: true,
+                        })}
+                        className="border p-2"
+                      >
+                        <option value="">Sélectionnez un type</option>
+                        {types.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* 2) Article dropdown */}
+                      <select
+                        {...register(`bonSortie.lignes.${idx}.articleId`, {
+                          required: true,
+                        })}
+                        className="flex-1 border p-2"
+                      >
+                        <option value="">Sélectionnez un article</option>
+                        {(
+                          articlesByType[
+                            watch(`bonSortie.lignes.${idx}.typeId`)
+                          ] || []
+                        ).map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.designation}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* 3) Quantity */}
+                      <Input
+                        type="number"
+                        {...register(`bonSortie.lignes.${idx}.quantity`, {
+                          required: true,
+                          min: { value: 1, message: "≥ 1" },
+                        })}
+                        placeholder="Qté"
+                        className="w-20"
+                      />
+
+                      {/* 4) Remove line */}
+                      <button
+                        type="button"
+                        onClick={() => remove(idx)}
+                        className="text-red-500"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      append({ typeId: "", articleId: "", quantity: undefined })
+                    }
+                  >
+                    + Ajouter une ligne
+                  </Button>
+                </fieldset>
 
                 {/* Type de réalisation */}
                 <div className="space-y-4">
