@@ -43,6 +43,7 @@ enum UtilisateurType {
 export default function DemandePage() {
   const [formData, setFormData] = useState({
     // Identité (rempli auto)
+    technicienId: "", // ← nouveau
     nom: "",
     prenom: "",
     fonction: "",
@@ -89,6 +90,7 @@ export default function DemandePage() {
       .then((u: any) =>
         setFormData((f) => ({
           ...f,
+          technicienId: u.id, // ← on ajoute l’ID
           nom: u.nom,
           prenom: u.prenom,
           fonction: u.fonction,
@@ -231,7 +233,7 @@ export default function DemandePage() {
     setSubmitError("");
 
     const payload = {
-      technicienId: "", // à récupérer depuis le contexte/auth
+      technicienId: formData.technicienId,
       equipementId: formData.equipementId,
       ancienEmplacementId: formData.emplacementOrigineId,
       etatAvant: formData.etatAvant,
