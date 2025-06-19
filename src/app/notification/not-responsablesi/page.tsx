@@ -29,7 +29,7 @@ import {
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { useRouter } from "next/navigation";
-import { FiCheckCircle, FiXCircle } from "react-icons/fi";
+import { FiCheckCircle, FiXCircle, FiCheckSquare } from "react-icons/fi";
 
 type NotificationType =
   | "incident"
@@ -43,7 +43,8 @@ type NotificationType =
   | "MAINTENANCE_ALERT"
   | "RAPPORT_PREVENTIF_SOUMIS"
   | "RAPPORT_MAINTENANCE_A_CORRIGER"
-  | "demande-deplacement-creee"; // ← ajouté
+  | "demande-deplacement-creee"
+  | "deplacement-equipment"; // ← ajouté
 
 interface NotificationItem {
   id: string;
@@ -69,6 +70,8 @@ interface NotificationItem {
     rapportId?: string;
     autorise?: boolean;
     deplacementId?: string;
+    valide?: boolean;
+    destinationEmplacementId?: string;
     // ← ajouté
     // <- nouveau
 
@@ -157,6 +160,11 @@ const TYPE_CONFIG: Record<
     accent: "border-blue-600 text-blue-600",
     label: "Demande de déplacement",
   },
+  "deplacement-equipment": {
+    icon: <FiCheckSquare size={20} />,
+    accent: "border-green-600 text-green-600",
+    label: "Équipement déplacé",
+  },
 };
 
 export default function NotificationResponsableSI() {
@@ -202,8 +210,8 @@ export default function NotificationResponsableSI() {
             equipmentType: r.payload.equipmentType,
             occurrenceMaintenanceId: r.payload.occurrenceMaintenanceId,
             rapportId: r.payload.rapportId,
-            // on réinitialise autorise pour qu’on le remplisse depuis la source
             autorise: undefined as boolean | undefined,
+            valide: undefined as boolean | undefined, // ← ajouté pour deplacement-equipment
           };
 
           // Si c'est une demande de déplacement et qu'on a l'ID
@@ -219,6 +227,31 @@ export default function NotificationResponsableSI() {
               if (dr.ok) {
                 const dep = await dr.json();
                 basePayload.autorise = dep.autorise;
+              } else {
+                console.warn(
+                  `Échec fetch déplacement ${r.payload.deplacementId}:`,
+                  dr.status,
+                );
+              }
+            } catch (err) {
+              console.warn(
+                "Erreur réseau lors du fetch deplacement",
+                r.payload.deplacementId,
+                err,
+              );
+            }
+          }
+
+          // Si c'est un déplacement d'équipement et qu'on a l'ID
+          if (r.type === "deplacement-equipment" && r.payload.deplacementId) {
+            try {
+              const dr = await fetch(
+                `http://localhost:2000/deplacements/${r.payload.deplacementId}`,
+                { credentials: "include" },
+              );
+              if (dr.ok) {
+                const dep = await dr.json();
+                basePayload.valide = dep.valide;
               } else {
                 console.warn(
                   `Échec fetch déplacement ${r.payload.deplacementId}:`,
@@ -275,6 +308,9 @@ export default function NotificationResponsableSI() {
     if (socket.disconnected) socket.connect();
 
     const handler = (payload: any) => {
+      if (payload.type === "deplacement-equipment") {
+        console.log("Received deplacement-equipment payload:", payload);
+      }
       const newNotif: NotificationItem = {
         id: payload.id,
         read: false,
@@ -282,15 +318,15 @@ export default function NotificationResponsableSI() {
         payload: {
           ...payload,
           deplacementId: payload.deplacementId,
-          technicianId: payload.technicianId, // ← ajouté
+          technicianId: payload.technicianId,
           createdAt: payload.dateCreation ?? new Date().toISOString(),
-          dateOccurrence: payload.dateOccurrence, // J–7
-          description: payload.description, // ex. "Nettoyage filtre"
+          dateOccurrence: payload.dateOccurrence,
+          description: payload.description,
           equipmentType: payload.equipmentType,
           location: payload.emplacement,
           emplacement: payload.emplacement,
           occurrenceMaintenanceId: payload.occurrenceMaintenanceId,
-          rapportId: payload.rapportId, // ← AJOUTÉ
+          rapportId: payload.rapportId,
         },
       };
       setNotifications((prev) =>
@@ -305,7 +341,6 @@ export default function NotificationResponsableSI() {
         }),
       );
     };
-
     socket.on("incident", handler);
     socket.on("incident_assign", handler);
     socket.on("rapport-incident", handler);
@@ -317,6 +352,7 @@ export default function NotificationResponsableSI() {
     socket.on("RAPPORT_PREVENTIF_SOUMIS", handler);
     socket.on("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
     socket.on("demande-deplacement-creee", handler);
+    socket.on("deplacement-equipment", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -330,6 +366,7 @@ export default function NotificationResponsableSI() {
       socket.off("RAPPORT_PREVENTIF_SOUMIS", handler);
       socket.off("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
       socket.off("demande-deplacement-creee", handler);
+      socket.off("deplacement-equipment", handler);
     };
   }, [loadNotifications]);
 
@@ -441,6 +478,50 @@ export default function NotificationResponsableSI() {
       console.error("Erreur réseau sur fetch:", err);
     }
   };
+  const handleValidation = async (notifId: string) => {
+    // Normalize IDs to lowercase for case-insensitive comparison
+    const notif = notifications.find(
+      (n) => n.id.toLowerCase() === notifId.toLowerCase(),
+    );
+
+    if (!notif || !notif.payload.deplacementId) {
+      console.warn("Notification ou deplacementId introuvable", notifId);
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `http://localhost:2000/deplacements/${notif.payload.deplacementId}/valider`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ valide: true }),
+        },
+      );
+
+      if (!res.ok) {
+        console.error("Erreur lors de la validation:", res.status);
+        return;
+      }
+
+      const json = await res.json();
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id.toLowerCase() === notifId.toLowerCase()
+            ? {
+                ...n,
+                payload: { ...n.payload, valide: json.valide },
+                read: true,
+              }
+            : n,
+        ),
+      );
+    } catch (err) {
+      console.error("Erreur réseau lors de la validation:", err);
+      alert("Erreur lors de la validation du déplacement. Veuillez réessayer.");
+    }
+  };
 
   return (
     <DefaultLayout>
@@ -491,6 +572,9 @@ export default function NotificationResponsableSI() {
                 </option>
                 <option value="RAPPORT_MAINTENANCE_A_CORRIGER">
                   Correction de maintenance
+                </option>
+                <option value="deplacement-equipment">
+                  Équipement déplacé
                 </option>
               </select>
             </div>
@@ -696,7 +780,72 @@ export default function NotificationResponsableSI() {
                       </div>
                     );
                   }
+                  // 2) Cas DEPLACEMENT EQUIPEMENT
+                  if (n.type === "deplacement-equipment") {
+                    return (
+                      <div
+                        key={n.id}
+                        className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm"
+                      >
+                        {/* Accent bar */}
+                        <div className="h-1 w-full border-green-600 bg-green-600" />
 
+                        {/* Contenu spécifique */}
+                        <div className="flex flex-col gap-4 px-5 py-4">
+                          <p className="text-sm text-gray-700">
+                            L’équipement{" "}
+                            <strong>{n.payload.equipmentType}</strong> a été
+                            déplacé vers l’emplacement{" "}
+                            <strong>
+                              {n.payload.destinationEmplacementId}
+                            </strong>
+                            .
+                          </p>
+                          <div className="flex items-center">
+                            {n.payload.valide === undefined ||
+                            n.payload.valide === false ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleValidation(n.id);
+                                }}
+                                className="ml-auto rounded bg-green-600 px-3 py-1 text-sm font-semibold text-white hover:bg-green-700"
+                              >
+                                Valider
+                              </button>
+                            ) : (
+                              <FiCheckCircle
+                                size={24}
+                                className="ml-auto text-green-500"
+                                title="Déplacement validé"
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end border-t border-gray-200 px-5 py-3">
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <FiClock size={12} />
+                            <span>
+                              {new Date(
+                                n.payload.dateCreation ?? n.payload.createdAt,
+                              ).toLocaleTimeString("fr-FR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Unread Indicator */}
+                        {!n.read && (
+                          <div className="absolute right-3 top-3 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                        )}
+                      </div>
+                    );
+                  }
                   // 2) Carte générique pour les autres types
                   return (
                     <div
