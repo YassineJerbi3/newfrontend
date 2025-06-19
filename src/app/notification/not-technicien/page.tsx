@@ -1,4 +1,3 @@
-// src/app/notification/not-technicien/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, MouseEvent } from "react";
@@ -23,7 +22,9 @@ type NotificationType =
   | "rapport-non-planifie"
   | "maintenance-assignation"
   | "RAPPORT_MAINTENANCE_VALIDE"
-  | "RAPPORT_MAINTENANCE_INVALIDE"; // ← nouveau
+  | "RAPPORT_MAINTENANCE_INVALIDE"
+  | "demande-deplacement-autorisee"
+  | "demande-deplacement-non-autorisee";
 
 interface RawNotification {
   id: string;
@@ -93,6 +94,18 @@ type NotificationItem =
       incidentId: string;
     })
   | (BaseNotification & {
+      type: "demande-deplacement-autorisee";
+      deplacementId: string;
+      autorise: true;
+      deplace?: boolean;
+    })
+  | (BaseNotification & {
+      type: "demande-deplacement-non-autorisee";
+      deplacementId: string;
+      autorise: false;
+      deplace?: boolean;
+    })
+  | (BaseNotification & {
       type: "maintenance-assignation";
       equipmentType: string;
       location: string;
@@ -134,7 +147,7 @@ const TYPE_CONFIG: Record<
     label: "Planification annulée",
   },
   "maintenance-assignation": {
-    icon: <FiAlertTriangle size={20} />, // ou un autre icône si tu veux
+    icon: <FiAlertTriangle size={20} />,
     accent: "border-purple-500 text-purple-500",
     label: "Maintenance assignée",
   },
@@ -148,6 +161,16 @@ const TYPE_CONFIG: Record<
     accent: "border-red-500 text-red-500",
     label: "Rapport maintenance invalidé",
   },
+  "demande-deplacement-autorisee": {
+    icon: <FiCheckCircle size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Déplacement autorisé",
+  },
+  "demande-deplacement-non-autorisee": {
+    icon: <FiXCircle size={20} />,
+    accent: "border-red-500 text-red-500",
+    label: "Déplacement non autorisé",
+  },
 };
 
 export default function NotificationTechnicien() {
@@ -157,131 +180,167 @@ export default function NotificationTechnicien() {
   const [filterDate, setFilterDate] = useState<string>("");
 
   useEffect(() => {
-    fetch("http://localhost:2000/notifications", {
-      credentials: "include",
-    })
-      .then((r) => r.json())
-      .then((data: RawNotification[]) => {
-        const mapped: NotificationItem[] = data
-          .filter((n) =>
-            [
-              "incident_assign",
-              "rapport-valide",
-              "rapport-invalide",
-              "rapport-a-planifier",
-              "rapport-mod-planifier",
-              "rapport-non-planifie",
-              "maintenance-assignation",
-              "RAPPORT_MAINTENANCE_VALIDE",
-              "RAPPORT_MAINTENANCE_INVALIDE", // ← ajouter
-            ].includes(n.type),
-          )
-          .map((n) => {
-            const base: BaseNotification = {
-              id: n.id,
-              read: n.read,
-              type: n.type,
-              createdAt: n.createdAt,
-            };
-            switch (n.type) {
-              case "incident_assign": {
-                const p = n.payload;
-                return {
+    (async () => {
+      try {
+        // 1) Charger toutes les notifications
+        const res = await fetch("http://localhost:2000/notifications", {
+          credentials: "include",
+        });
+        const data: RawNotification[] = await res.json();
+
+        // 2) Filtrer et enrichir
+        const mapped: NotificationItem[] = await Promise.all(
+          data
+            .filter((n) =>
+              [
+                "incident_assign",
+                "rapport-valide",
+                "rapport-invalide",
+                "rapport-a-planifier",
+                "rapport-mod-planifier",
+                "rapport-non-planifie",
+                "maintenance-assignation",
+                "RAPPORT_MAINTENANCE_VALIDE",
+                "RAPPORT_MAINTENANCE_INVALIDE",
+                "demande-deplacement-autorisee",
+                "demande-deplacement-non-autorisee",
+              ].includes(n.type),
+            )
+            .map(async (n) => {
+              const base = {
+                id: n.id,
+                read: n.read,
+                type: n.type as NotificationType,
+                createdAt: n.createdAt,
+              };
+
+              // Cas déplacement : on récupère deplacementId et flags
+              if (
+                [
+                  "demande-deplacement-autorisee",
+                  "demande-deplacement-non-autorisee",
+                ].includes(n.type)
+              ) {
+                const item = {
                   ...base,
-                  type: "incident_assign",
-                  incidentId: p.incidentId,
-                  equipmentType: p.equipmentType,
-                  location: p.location,
+                  deplacementId: n.payload.deplacementId,
+                  autorise: n.payload.autorise,
                 };
-              }
-              case "rapport-valide": {
-                const p = n.payload;
-                return {
-                  ...base,
-                  type: "rapport-valide",
-                  rapportId: p.rapportId,
-                  incidentId: p.incidentId,
-                  technicienPrenom: p.technicienPrenom,
-                  technicienNom: p.technicienNom,
-                };
-              }
-              case "rapport-invalide": {
-                const p = n.payload;
-                return {
-                  ...base,
-                  type: "rapport-invalide",
-                  rapportId: p.rapportId,
-                  incidentId: p.incidentId,
-                  remarqueResponsable: p.remarqueResponsable,
-                  technicienPrenom: p.technicienPrenom,
-                  technicienNom: p.technicienNom,
-                };
-              }
-              case "rapport-a-planifier":
-              case "rapport-mod-planifier": {
-                const p = n.payload as RapportPlanifPayload;
-                return {
-                  ...base,
-                  type: n.type,
-                  rapportId: p.rapportId,
-                  incidentId: p.incidentId,
-                  datePlanification: p.datePlanification!,
-                };
-              }
-              case "rapport-non-planifie": {
-                const p = n.payload as RapportPlanifPayload;
-                return {
-                  ...base,
-                  type: "rapport-non-planifie",
-                  rapportId: p.rapportId,
-                  incidentId: p.incidentId,
-                };
-              }
-              case "maintenance-assignation": {
-                const p = n.payload as {
-                  equipmentType: string;
-                  emplacement: string;
-                  datePlanification: string;
-                };
-                return {
-                  ...base,
-                  type: "maintenance-assignation",
-                  equipmentType: p.equipmentType,
-                  location: p.emplacement,
-                  datePlanification: p.datePlanification,
-                };
-              }
-              case "RAPPORT_MAINTENANCE_VALIDE": {
-                const p = n.payload;
-                return {
-                  ...base,
-                  type: "RAPPORT_MAINTENANCE_VALIDE",
-                  rapportId: p.rapportId,
-                  equipmentType: p.equipmentType,
-                  emplacement: p.emplacement,
-                };
+                if (n.payload.deplacementId) {
+                  try {
+                    const dr = await fetch(
+                      `http://localhost:2000/deplacements/${n.payload.deplacementId}`,
+                      { credentials: "include" },
+                    );
+                    if (dr.ok) {
+                      const dep = await dr.json();
+                      item.deplace = dep.deplace;
+                    }
+                  } catch {
+                    /* ignore erreurs réseau */
+                  }
+                }
+                return item as NotificationItem;
               }
 
-              case "RAPPORT_MAINTENANCE_INVALIDE": {
-                const p = n.payload;
-                return {
-                  ...base,
-                  type: "RAPPORT_MAINTENANCE_INVALIDE",
-                  rapportId: p.rapportId,
-                  equipmentType: p.equipmentType,
-                  emplacement: p.emplacement,
-                  remarqueResponsable: p.remarqueResponsable,
-                };
+              // Autres types existants…
+              switch (n.type) {
+                case "incident_assign": {
+                  const p = n.payload;
+                  return {
+                    ...base,
+                    incidentId: p.incidentId,
+                    equipmentType: p.equipmentType,
+                    location: p.location,
+                  } as NotificationItem;
+                }
+                case "rapport-valide": {
+                  const p = n.payload;
+                  return {
+                    ...base,
+                    rapportId: p.rapportId,
+                    incidentId: p.incidentId,
+                    technicienPrenom: p.technicienPrenom,
+                    technicienNom: p.technicienNom,
+                  } as NotificationItem;
+                }
+                case "rapport-invalide": {
+                  const p = n.payload;
+                  return {
+                    ...base,
+                    rapportId: p.rapportId,
+                    incidentId: p.incidentId,
+                    remarqueResponsable: p.remarqueResponsable,
+                    technicienPrenom: p.technicienPrenom,
+                    technicienNom: p.technicienNom,
+                  } as NotificationItem;
+                }
+                case "rapport-a-planifier":
+                case "rapport-mod-planifier": {
+                  const p = n.payload as RapportPlanifPayload;
+                  return {
+                    ...base,
+                    rapportId: p.rapportId,
+                    incidentId: p.incidentId,
+                    datePlanification: p.datePlanification!,
+                  } as NotificationItem;
+                }
+                case "rapport-non-planifie": {
+                  const p = n.payload as RapportPlanifPayload;
+                  return {
+                    ...base,
+                    rapportId: p.rapportId,
+                    incidentId: p.incidentId,
+                  } as NotificationItem;
+                }
+                case "maintenance-assignation": {
+                  const p = n.payload as {
+                    equipmentType: string;
+                    emplacement: string;
+                    datePlanification: string;
+                  };
+                  return {
+                    ...base,
+                    equipmentType: p.equipmentType,
+                    location: p.emplacement,
+                    datePlanification: p.datePlanification,
+                  } as NotificationItem;
+                }
+                case "RAPPORT_MAINTENANCE_VALIDE": {
+                  const p = n.payload;
+                  return {
+                    ...base,
+                    rapportId: p.rapportId,
+                    equipmentType: p.equipmentType,
+                    emplacement: p.emplacement,
+                  } as NotificationItem;
+                }
+                case "RAPPORT_MAINTENANCE_INVALIDE": {
+                  const p = n.payload;
+                  return {
+                    ...base,
+                    rapportId: p.rapportId,
+                    equipmentType: p.equipmentType,
+                    emplacement: p.emplacement,
+                    remarqueResponsable: p.remarqueResponsable,
+                  } as NotificationItem;
+                }
               }
-            }
-          })
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-          );
+            }),
+        );
+
+        // 3) Tri par date décroissante
+        mapped.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+
+        // 4) Mise à jour du state
         setNotes(mapped);
-      })
-      .catch(console.error);
+      } catch (err) {
+        console.error("Erreur dans useEffect notifications:", err);
+      }
+    })();
   }, []);
 
   const conditionalMarkAsRead = (
@@ -301,9 +360,38 @@ export default function NotificationTechnicien() {
     }
   };
 
+  const handleDeplacer = async (notifId: string) => {
+    const notif = notes.find((n) => n.id === notifId);
+    if (!notif?.deplacementId || notif.type !== "demande-deplacement-autorisee")
+      return;
+
+    try {
+      // Appel PATCH
+      const response = await fetch(
+        `http://localhost:2000/deplacements/${notif.deplacementId}/deplacer`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ deplace: true }),
+        },
+      );
+
+      if (!response.ok) throw new Error("Failed to update deplacement");
+
+      // Mets à jour localement pour cacher le bouton
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === notifId ? { ...n, deplace: true, read: true } : n,
+        ),
+      );
+    } catch (err) {
+      console.error("Erreur lors du déplacement:", err);
+    }
+  };
+
   const grouped = useMemo(() => {
     const filtered = notes.filter((n) => {
-      // ← NOUVEAU : ne jamais afficher une notif invalide déjà lue
       if (n.type === "RAPPORT_MAINTENANCE_INVALIDE" && n.read) {
         return false;
       }
@@ -449,9 +537,9 @@ export default function NotificationTechnicien() {
                       }
                       onClick={(e) => conditionalMarkAsRead(e, n.id, n.type)}
                       className={`
-    relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
-    hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
-  `}
+                        relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
+                        hover:-translate-y-1 hover:shadow-lg ${n.read ? "opacity-70" : "opacity-100"}
+                      `}
                     >
                       {/* Accent bar */}
                       <div className={`h-1 w-full ${cfg.accent}`} />
@@ -497,14 +585,13 @@ export default function NotificationTechnicien() {
                                     </p>
                                   </>
                                 );
-
                               case "RAPPORT_MAINTENANCE_INVALIDE":
                                 return (
                                   <>
                                     <p>
                                       Le responsable SI n’a pas validé votre
-                                      rapport. Il faut modifier certains
-                                      champs :{" "}
+                                      rapport. Il faut modifier certains champs
+                                      :{" "}
                                       <Link
                                         href={`/rapport-maintenance/${(n as any).rapportId}`}
                                         className="text-indigo-600 underline"
@@ -568,12 +655,46 @@ export default function NotificationTechnicien() {
                                     </p>
                                   </>
                                 );
+                              case "demande-deplacement-autorisee":
+                                return (
+                                  <p>Déplacement autorisé pour l'équipement.</p>
+                                );
+                              case "demande-deplacement-non-autorisee":
+                                return (
+                                  <p>
+                                    Déplacement non autorisé pour l'équipement.
+                                  </p>
+                                );
                               default:
                                 return null;
                             }
                           })()}
                         </div>
                       </div>
+
+                      {/* Bouton “Je déplace” pour les demandes autorisées */}
+                      {n.type === "demande-deplacement-autorisee" && (
+                        <div className="mb-2 flex items-center px-5">
+                          {!n.deplace ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault(); // Prevent Link navigation
+                                handleDeplacer(n.id);
+                              }}
+                              className="ml-auto rounded bg-indigo-600 px-3 py-1 text-sm font-semibold text-white hover:bg-indigo-700"
+                            >
+                              Je déplace
+                            </button>
+                          ) : (
+                            <FiCheckCircle
+                              size={24}
+                              className="ml-auto text-green-500"
+                              title="Équipement déplacé"
+                            />
+                          )}
+                        </div>
+                      )}
 
                       {/* Footer */}
                       <div className="flex items-center justify-end border-t border-gray-200 px-5 py-3">

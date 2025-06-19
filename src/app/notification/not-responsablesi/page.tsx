@@ -29,6 +29,7 @@ import {
 import { getSocket } from "@/utils/socket";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { useRouter } from "next/navigation";
+import { FiCheckCircle, FiXCircle } from "react-icons/fi";
 
 type NotificationType =
   | "incident"
@@ -41,7 +42,8 @@ type NotificationType =
   | "STOCK_INDISPONIBLE"
   | "MAINTENANCE_ALERT"
   | "RAPPORT_PREVENTIF_SOUMIS"
-  | "RAPPORT_MAINTENANCE_A_CORRIGER"; // ← ajouté
+  | "RAPPORT_MAINTENANCE_A_CORRIGER"
+  | "demande-deplacement-creee"; // ← ajouté
 
 interface NotificationItem {
   id: string;
@@ -64,7 +66,10 @@ interface NotificationItem {
     natureIntervention?: string;
     emplacement?: string;
     occurrenceMaintenanceId?: string;
-    rapportId?: string; // ← ajouté
+    rapportId?: string;
+    autorise?: boolean;
+    deplacementId?: string;
+    // ← ajouté
     // <- nouveau
 
     // ← Nouveau pour maintenance
@@ -147,6 +152,11 @@ const TYPE_CONFIG: Record<
     accent: "border-orange-500 text-orange-500",
     label: "Correction de maintenance soumise",
   },
+  "demande-deplacement-creee": {
+    icon: <FiMapPin size={20} />, // choisis l’icône la plus pertinente
+    accent: "border-blue-600 text-blue-600",
+    label: "Demande de déplacement",
+  },
 };
 
 export default function NotificationResponsableSI() {
@@ -169,39 +179,82 @@ export default function NotificationResponsableSI() {
   const [selectedTech, setSelectedTech] = useState<string>("");
 
   // Charge les notifications depuis l’API
-  const loadNotifications = useCallback(() => {
-    fetch("http://localhost:2000/notifications", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data: any[]) => {
-        const items = data
-          .map((r) => ({
+  const loadNotifications = useCallback(async () => {
+    try {
+      // 1) Charger les notifications brutes
+      const res = await fetch("http://localhost:2000/notifications", {
+        credentials: "include",
+      });
+      const data: any[] = await res.json();
+
+      // 2) Enrichir chaque notification
+      const items = await Promise.all(
+        data.map(async (r) => {
+          const basePayload: any = {
+            ...r.payload,
+            deplacementId: r.payload.deplacementId,
+            technicianId: r.payload.technicianId,
+            createdAt: r.createdAt,
+            dateOccurrence: r.payload.dateOccurrence,
+            description: r.payload.description,
+            emplacement: r.payload.emplacement,
+            location: r.payload.emplacement,
+            equipmentType: r.payload.equipmentType,
+            occurrenceMaintenanceId: r.payload.occurrenceMaintenanceId,
+            rapportId: r.payload.rapportId,
+            // on réinitialise autorise pour qu’on le remplisse depuis la source
+            autorise: undefined as boolean | undefined,
+          };
+
+          // Si c'est une demande de déplacement et qu'on a l'ID
+          if (
+            r.type === "demande-deplacement-creee" &&
+            r.payload.deplacementId
+          ) {
+            try {
+              const dr = await fetch(
+                `http://localhost:2000/deplacements/${r.payload.deplacementId}`,
+                { credentials: "include" },
+              );
+              if (dr.ok) {
+                const dep = await dr.json();
+                basePayload.autorise = dep.autorise;
+              } else {
+                console.warn(
+                  `Échec fetch déplacement ${r.payload.deplacementId}:`,
+                  dr.status,
+                );
+              }
+            } catch (err) {
+              console.warn(
+                "Erreur réseau lors du fetch deplacement",
+                r.payload.deplacementId,
+                err,
+              );
+            }
+          }
+
+          return {
             id: r.id,
             read: r.read,
             type: r.type as NotificationType,
-            payload: {
-              ...r.payload,
-              technicianId: r.payload.technicianId, // ← ajouté
-              createdAt: r.createdAt,
-              dateOccurrence: r.payload.dateOccurrence, // ajouter
-              description: r.payload.description, // ajouter
-              emplacement: r.payload.emplacement,
-              location: r.payload.emplacement,
-              occurrenceMaintenanceId: r.payload.occurrenceMaintenanceId,
-              rapportId: r.payload.rapportId,
-            },
-          }))
-          .sort((a, b) => {
-            const aDate = new Date(
-              a.payload.dateCreation ?? a.payload.createdAt,
-            ).getTime();
-            const bDate = new Date(
-              b.payload.dateCreation ?? b.payload.createdAt,
-            ).getTime();
-            return bDate - aDate;
-          });
-        setNotifications(items);
-      })
-      .catch(console.error);
+            payload: basePayload,
+          } as NotificationItem;
+        }),
+      );
+
+      // 3) Tri par date décroissante
+      items.sort((a, b) => {
+        const aDate = new Date(a.payload.createdAt).getTime();
+        const bDate = new Date(b.payload.createdAt).getTime();
+        return bDate - aDate;
+      });
+
+      // 4) Stockage dans le state
+      setNotifications(items);
+    } catch (err) {
+      console.error("Erreur loadNotifications:", err);
+    }
   }, []);
 
   // Charge la liste des techniciens
@@ -228,6 +281,7 @@ export default function NotificationResponsableSI() {
         type: payload.type as NotificationType,
         payload: {
           ...payload,
+          deplacementId: payload.deplacementId,
           technicianId: payload.technicianId, // ← ajouté
           createdAt: payload.dateCreation ?? new Date().toISOString(),
           dateOccurrence: payload.dateOccurrence, // J–7
@@ -262,6 +316,7 @@ export default function NotificationResponsableSI() {
     socket.on("MAINTENANCE_ALERT", handler);
     socket.on("RAPPORT_PREVENTIF_SOUMIS", handler);
     socket.on("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
+    socket.on("demande-deplacement-creee", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -274,6 +329,7 @@ export default function NotificationResponsableSI() {
       socket.off("MAINTENANCE_ALERT", handler);
       socket.off("RAPPORT_PREVENTIF_SOUMIS", handler);
       socket.off("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
+      socket.off("demande-deplacement-creee", handler);
     };
   }, [loadNotifications]);
 
@@ -340,6 +396,51 @@ export default function NotificationResponsableSI() {
       return acc;
     }, {});
   }, [notifications, filterType, filterPriority, filterRead, filterDate]);
+  const handleAutorisation = async (notifId: string, autorise: boolean) => {
+    console.log("handleAutorisation called", notifId, autorise);
+    const notif = notifications.find((n) => n.id === notifId);
+    if (!notif) {
+      console.warn("Notification introuvable", notifId);
+      return;
+    }
+    const deplId = notif.payload.deplacementId;
+    if (!deplId) {
+      console.warn("Pas de deplacementId pour cette notif", notif);
+      return;
+    }
+
+    const url = `http://localhost:2000/deplacements/${deplId}/autoriser`;
+    const body = { autorise };
+    console.log("Envoi PATCH vers", url, "avec le body", body);
+
+    try {
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      console.log("Réponse brute:", res);
+      const json = await res.json();
+      console.log("Réponse JSON:", json);
+
+      if (!res.ok) {
+        console.error("Erreur 4xx/5xx:", json);
+        return;
+      }
+
+      // Mise à jour du state
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.payload.deplacementId === deplId
+            ? { ...n, payload: { ...n.payload, autorise: json.autorise } }
+            : n,
+        ),
+      );
+    } catch (err) {
+      console.error("Erreur réseau sur fetch:", err);
+    }
+  };
 
   return (
     <DefaultLayout>
@@ -474,33 +575,37 @@ export default function NotificationResponsableSI() {
               </h2>
               <div className="grid auto-rows-auto gap-6">
                 {items.map((n) => {
+                  // Déstructuration de ton payload
                   const {
                     priorite,
                     creator,
                     creatorRole,
                     equipmentType,
+                    emplacement,
                     location,
                     dateCreation,
                     message,
                     incidentId,
-                    technicianId, // ← utilisé
+                    technicianId,
                     technicienPrenom,
                     technicienNom,
                     natureResolution,
                     natureIntervention,
                   } = n.payload;
 
-                  const isStock =
-                    n.type === "ALERTE_STOCK" ||
-                    n.type === "DEPASSEMENT_STOCK_ALERT" ||
-                    n.type === "STOCK_INDISPONIBLE";
-
+                  // Calculs communs
                   const { icon, accent, label } = TYPE_CONFIG[n.type];
                   const priorityStyle = priorite
                     ? PRIORITY_STYLES[priorite]
                     : PRIORITY_STYLES.NORMALE;
+                  const isStock =
+                    n.type === "ALERTE_STOCK" ||
+                    n.type === "DEPASSEMENT_STOCK_ALERT" ||
+                    n.type === "STOCK_INDISPONIBLE";
+                  const isAssigned =
+                    n.type === "incident" && !!incidentId && !!technicianId;
 
-                  // Texte détaillé pour rapports
+                  // Texte détaillé rapports
                   let detailRapport = "";
                   if (n.type === "rapport-incident") {
                     const fullName = `${technicienPrenom} ${technicienNom}`;
@@ -516,11 +621,8 @@ export default function NotificationResponsableSI() {
                     detailRapport = `Le technicien ${fullName} a corrigé le rapport suite à un rejet. Merci de le relire et de le valider.`;
                   }
 
-                  // **Logique d'assignation**
-                  const isAssigned =
-                    n.type === "incident" && !!incidentId && !!technicianId;
+                  // Texte détaillé maintenance
                   let detailMaintenance = "";
-
                   if (
                     n.type === "MAINTENANCE_ALERT" &&
                     n.payload.dateOccurrence
@@ -528,29 +630,83 @@ export default function NotificationResponsableSI() {
                     const alertDate = new Date(n.payload.dateOccurrence);
                     const dueDate = new Date(alertDate);
                     dueDate.setDate(alertDate.getDate() + 7);
-
                     const dueDateStr = dueDate.toLocaleDateString("fr-FR", {
                       day: "2-digit",
                       month: "2-digit",
                       year: "numeric",
                     });
-
                     detailMaintenance = `Maintenance “${n.payload.description}” sur l’équipement ${n.payload.equipmentType} à l’emplacement ${n.payload.location}, prévue le ${dueDateStr}.`;
                   }
 
+                  // 1) Cas DEMANDE DE DEPLACEMENT
+                  if (n.type === "demande-deplacement-creee") {
+                    return (
+                      <div
+                        key={n.id}
+                        className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm"
+                      >
+                        {/* Accent bar */}
+                        <div className="h-1 w-full border-blue-600 bg-blue-600" />
+
+                        {/* Contenu spécifique */}
+                        <div className="flex flex-col gap-4 px-5 py-4">
+                          <p className="text-sm text-gray-700">
+                            Nouvelle demande de déplacement pour
+                            l’équipement&nbsp;
+                            <strong>{equipmentType}</strong>&nbsp;à&nbsp;
+                            <strong>{emplacement || location}</strong>.
+                          </p>
+                          <div className="flex items-center">
+                            {n.payload.autorise === undefined ? (
+                              <div className="ml-auto flex flex-col space-y-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAutorisation(n.id, true)}
+                                  className="rounded bg-blue-600 px-2 py-1 text-sm font-semibold text-white hover:bg-blue-700"
+                                >
+                                  Autoriser
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleAutorisation(n.id, false)
+                                  }
+                                  className="rounded bg-gray-600 px-2 py-1 text-sm font-semibold text-white hover:bg-gray-700"
+                                >
+                                  Refuser
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="ml-auto">
+                                {n.payload.autorise ? (
+                                  <FiCheckCircle
+                                    size={24}
+                                    className="text-green-500"
+                                  />
+                                ) : (
+                                  <FiXCircle
+                                    size={24}
+                                    className="text-red-500"
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // 2) Carte générique pour les autres types
                   return (
                     <div
                       key={n.id}
                       onClick={(e) => {
-                        if (isAssigned) return; // bloque le clic si incident déjà assigné
-
-                        // 1) Incident non assigné → modal d’affectation
+                        if (isAssigned) return;
                         if (n.type === "incident" && incidentId) {
                           openAssignModal(incidentId);
                           return;
                         }
-
-                        // 2) Rapport de maintenance préventif soumis → page SI
                         if (
                           n.type === "RAPPORT_PREVENTIF_SOUMIS" &&
                           n.payload.rapportId
@@ -560,8 +716,6 @@ export default function NotificationResponsableSI() {
                           );
                           return;
                         }
-
-                        // 3) Rapport d’incident ou à corriger → page d’incident SI
                         if (
                           (n.type === "rapport-incident" ||
                             n.type === "rapport-a-corriger") &&
@@ -579,18 +733,13 @@ export default function NotificationResponsableSI() {
                           );
                           return;
                         }
-
-                        // 4) Tous les autres cas → on marque comme lu
                         markAsRead(e, n.id);
                       }}
-                      className={`
-                        relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform
-                        ${
-                          isAssigned
-                            ? "cursor-default opacity-70"
-                            : "cursor-pointer hover:-translate-y-1 hover:shadow-lg"
-                        }
-                      `}
+                      className={`relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform ${
+                        isAssigned
+                          ? "cursor-default opacity-70"
+                          : "cursor-pointer hover:-translate-y-1 hover:shadow-lg"
+                      }`}
                     >
                       {/* Accent bar */}
                       <div className={`h-1 w-full ${accent}`} />
@@ -599,16 +748,9 @@ export default function NotificationResponsableSI() {
                       <div className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`
-                              flex h-8 w-8 shrink-0 items-center justify-center rounded-full
-                              border ${accent} bg-white
-                            `}
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${accent} bg-white`}
                           >
-                            {isAssigned ? (
-                              <FiUser size={20} /> // ← icône assigné
-                            ) : (
-                              icon
-                            )}
+                            {isAssigned ? <FiUser size={20} /> : icon}
                           </div>
                           <h3 className="text-lg font-bold text-gray-900">
                             {label}
@@ -638,7 +780,7 @@ export default function NotificationResponsableSI() {
                               <p className="flex items-center gap-1">
                                 <FiMapPin size={14} className="text-gray-500" />
                                 <span>
-                                  <strong>Emplacement:</strong> {location}
+                                  <strong>Emplacement:</strong>&nbsp;{location}
                                 </span>
                               </p>
                             )}
@@ -646,7 +788,7 @@ export default function NotificationResponsableSI() {
                               <p className="flex items-center gap-1">
                                 <FiUser size={14} className="text-gray-500" />
                                 <span>
-                                  <strong>Créateur:</strong> {creator}
+                                  <strong>Créateur:</strong>&nbsp;{creator}
                                   {creatorRole && ` (${creatorRole})`}
                                 </span>
                               </p>
@@ -655,7 +797,8 @@ export default function NotificationResponsableSI() {
                               <p className="flex items-center gap-1">
                                 <FiBox size={14} className="text-gray-500" />
                                 <span>
-                                  <strong>Équipement:</strong> {equipmentType}
+                                  <strong>Équipement:</strong>&nbsp;
+                                  {equipmentType}
                                 </span>
                               </p>
                             )}
