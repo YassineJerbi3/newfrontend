@@ -8,15 +8,7 @@ import { AlertTriangle } from "lucide-react";
 interface Emplacement {
   id: string;
   nom: string;
-}
-interface Equipement {
-  id: string;
-  familleMI: string;
-  equipmentType: string;
-  numeroSerie: string;
-  etat: string;
-  userId?: string | null;
-  posteId?: string | null;
+  type: string;
 }
 interface User {
   id: string;
@@ -27,6 +19,17 @@ interface Poste {
   id: string;
   numero: number | null;
   label: string | null;
+}
+// Maintenant on attend user/poste dans Equipement
+interface Equipement {
+  id: string;
+  familleMI: string;
+  equipmentType: string;
+  numeroSerie: string;
+  etat: string;
+  user?: User | null;
+  utilisateur?: string | null;
+  poste?: Poste | null;
 }
 
 enum DeplacementMotif {
@@ -41,21 +44,21 @@ enum UtilisateurType {
 }
 
 export default function DemandePage() {
+  const API = "http://localhost:2000";
+
   const [formData, setFormData] = useState({
-    // Identité (rempli auto)
-    technicienId: "", // ← nouveau
+    technicienId: "",
     nom: "",
     prenom: "",
     fonction: "",
+    role: "",
     direction: "",
-    // Ancien contexte
     emplacementOrigineId: "",
     typeObject: "",
     equipementId: "",
     etatAvant: "",
-    ancienUserId: "",
-    ancienPosteId: "",
-    // Destination & nouvelle affectation
+    ancienUser: "", // renommé
+    ancienPoste: "", // renommé
     destinationEmplacementId: "",
     motif: "" as DeplacementMotif | "",
     newUserId: "",
@@ -74,7 +77,7 @@ export default function DemandePage() {
   const [selectedEquipement, setSelectedEquipement] =
     useState<Equipement | null>(null);
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [destUsers, setDestUsers] = useState<User[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
 
   const motifs = [
@@ -83,170 +86,178 @@ export default function DemandePage() {
     { value: DeplacementMotif.REPARATION, label: "Réparation" },
   ];
 
-  // 1) Charger l’utilisateur courant
+  // 1) Identité
   useEffect(() => {
-    fetch("http://localhost:2000/auth/me", { credentials: "include" })
+    fetch(`${API}/auth/me`, { credentials: "include" })
       .then((r) => r.json())
       .then((u: any) =>
         setFormData((f) => ({
           ...f,
-          technicienId: u.id, // ← on ajoute l’ID
+          technicienId: u.id,
           nom: u.nom,
           prenom: u.prenom,
           fonction: u.fonction,
           direction: u.direction,
+          role: u.roles,
         })),
       )
       .catch(console.error);
   }, []);
 
-  // 2) Charger les emplacements
+  // 2) Emplacements
   useEffect(() => {
-    fetch("http://localhost:2000/emplacements", { credentials: "include" })
+    fetch(`${API}/emplacements`, { credentials: "include" })
       .then((r) => r.json())
-      .then((data: { items: Emplacement[] }) => setEmplacements(data.items))
-      .catch((err) => {
-        console.error("Erreur fetch emplacements:", err);
-        setEmplacements([]);
-      });
-  }, []);
-
-  // 3) Charger tous les users pour réaffectation
-  useEffect(() => {
-    fetch("http://localhost:2000/users", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data: User[]) => setUsers(data))
+      .then((d: { items: Emplacement[] }) => setEmplacements(d.items))
       .catch(console.error);
   }, []);
 
-  // 4) Charger équipements d’origine
+  // 3) Equipements origine
   useEffect(() => {
     if (!formData.emplacementOrigineId) {
-      setAllEquipements([]);
-      setTypes([]);
-      setFilteredEquipements([]);
-      setSelectedEquipement(null);
-      setFormData((f) => ({
-        ...f,
-        typeObject: "",
-        equipementId: "",
-        etatAvant: "",
-        ancienUserId: "",
-        ancienPosteId: "",
-      }));
+      resetEquipement();
       return;
     }
-    fetch(
-      `http://localhost:2000/equipements?emplacementId=${formData.emplacementOrigineId}`,
-      { credentials: "include" },
-    )
+    fetch(`${API}/equipements?emplacementId=${formData.emplacementOrigineId}`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
-      .then((data: Equipement[]) => {
-        setAllEquipements(data);
-        setTypes(Array.from(new Set(data.map((eq) => eq.equipmentType))));
-        setFilteredEquipements([]);
-        setSelectedEquipement(null);
-        setFormData((f) => ({
-          ...f,
-          typeObject: "",
-          equipementId: "",
-          etatAvant: "",
-          ancienUserId: "",
-          ancienPosteId: "",
-        }));
+      .then((list: Equipement[]) => {
+        setAllEquipements(list);
+        setTypes([...new Set(list.map((eq) => eq.equipmentType))]);
+        resetEquipement();
       })
       .catch(console.error);
   }, [formData.emplacementOrigineId]);
 
-  // 5) Filtrer par type d’équipement
+  function resetEquipement() {
+    setFilteredEquipements([]);
+    setSelectedEquipement(null);
+    setFormData((f) => ({
+      ...f,
+      typeObject: "",
+      equipementId: "",
+      etatAvant: "",
+      ancienUser: "",
+      ancienPoste: "",
+    }));
+  }
+
+  // 4) Filtrer par type
   useEffect(() => {
     if (!formData.typeObject) {
-      setFilteredEquipements([]);
-      setSelectedEquipement(null);
-      setFormData((f) => ({
-        ...f,
-        equipementId: "",
-        etatAvant: "",
-        ancienUserId: "",
-        ancienPosteId: "",
-      }));
+      resetEquipement();
       return;
     }
-    const filtered = allEquipements.filter(
+    const filt = allEquipements.filter(
       (eq) => eq.equipmentType === formData.typeObject,
     );
-    setFilteredEquipements(filtered);
-    setSelectedEquipement(null);
+    setFilteredEquipements(filt);
     setFormData((f) => ({
       ...f,
       equipementId: "",
       etatAvant: "",
-      ancienUserId: "",
-      ancienPosteId: "",
+      ancienUser: "",
+      ancienPoste: "",
     }));
+    setSelectedEquipement(null);
   }, [formData.typeObject, allEquipements]);
 
-  // 6) Gérer changement de champ
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
-  ) => {
+  // 5) handleChange
+  const handleChange = (e: React.ChangeEvent<any>) => {
     const { name, value } = e.target;
     if (name === "equipementId") {
-      const eq = filteredEquipements.find((e) => e.id === value) || null;
+      const eq = filteredEquipements.find((x) => x.id === value) || null;
+      let ancienUser = "Aucun";
+      if (eq) {
+        if (eq.user) ancienUser = `${eq.user.nom} ${eq.user.prenom}`;
+        else if (eq.utilisateur) ancienUser = eq.utilisateur;
+      }
+      let ancienPoste = "Aucun";
+      if (eq && eq.poste) {
+        ancienPoste =
+          eq.poste.numero !== null
+            ? `Poste ${eq.poste.numero}`
+            : eq.poste.label || "Poste Enseignant";
+      }
       setSelectedEquipement(eq);
       setFormData((f) => ({
         ...f,
         equipementId: value,
         etatAvant: eq?.etat ?? "",
-        ancienUserId: eq?.userId ?? "",
-        ancienPosteId: eq?.posteId ?? "",
+        ancienUser,
+        ancienPoste,
       }));
       return;
     }
     setFormData((f) => ({ ...f, [name]: value }));
   };
 
-  // 7) Charger postes du nouvel emplacement si écran/UC
+  // 6) Fetch destUsers si bureau
   useEffect(() => {
-    if (
-      formData.destinationEmplacementId &&
-      ["ECRAN", "UC"].includes(formData.typeObject)
-    ) {
-      fetch(
-        `http://localhost:2000/postes?emplacementId=${formData.destinationEmplacementId}`,
-        { credentials: "include" },
-      )
+    const destId = formData.destinationEmplacementId;
+    const emp = emplacements.find((e) => e.id === destId);
+    if (emp?.type === "BUREAU") {
+      fetch(`${API}/users?emplacementId=${destId}`, { credentials: "include" })
         .then((r) => r.json())
-        .then((data: Poste[]) => setPostes(data))
+        .then((list: User[]) => setDestUsers(list))
         .catch(console.error);
     } else {
-      setPostes([]);
-      setFormData((f) => ({ ...f, newPosteId: "" }));
+      setDestUsers([]);
     }
-  }, [formData.destinationEmplacementId, formData.typeObject]);
+  }, [formData.destinationEmplacementId, emplacements]);
 
-  // 8) Soumission du formulaire
+  // 7) Postes dispo
+  useEffect(() => {
+    const { destinationEmplacementId, typeObject, newUtilisateur } = formData;
+    if (!destinationEmplacementId || !["ECRAN", "UC"].includes(typeObject)) {
+      setPostes([]);
+      return;
+    }
+    fetch(`${API}/postes?emplacementId=${destinationEmplacementId}`, {
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((list: Poste[]) => {
+        const dispo = list.filter((p) => {
+          // exclure déjà équipés même type
+          const used = allEquipements.find(
+            (eq) => eq.poste?.id === p.id && eq.equipmentType === typeObject,
+          );
+          if (used) return false;
+          // filtre classe
+          if (newUtilisateur === UtilisateurType.ENSEIGNANT)
+            return p.numero === null;
+          if (newUtilisateur === UtilisateurType.ETUDIANT)
+            return p.numero !== null;
+          return true;
+        });
+        setPostes(dispo);
+      })
+      .catch(console.error);
+  }, [
+    formData.destinationEmplacementId,
+    formData.typeObject,
+    formData.newUtilisateur,
+    allEquipements,
+  ]);
+
+  // 8) submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError("");
-
     const payload = {
       technicienId: formData.technicienId,
       equipementId: formData.equipementId,
-      ancienEmplacementId: formData.emplacementOrigineId,
       etatAvant: formData.etatAvant,
-      destinationEmplacementId: formData.destinationEmplacementId,
+      nouvelleEmplacement: formData.destinationEmplacementId,
       motif: formData.motif,
-      posteId: formData.ancienPosteId || undefined,
-      newPosteId: formData.newPosteId || undefined,
-      newUserId: formData.newUserId || undefined,
-      newUtilisateur: formData.newUtilisateur || undefined,
+      nouvelUtilisateur: formData.newUserId || undefined,
+      typeUtilisateur: formData.newUtilisateur || undefined,
+      nouveauPoste: formData.newPosteId || undefined,
       commentaire: formData.commentaire || undefined,
     };
-
-    fetch("http://localhost:2000/deplacements", {
+    fetch(`${API}/deplacements`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -257,18 +268,14 @@ export default function DemandePage() {
           const err = await res.json();
           setSubmitError(err.message || "Erreur inconnue");
         } else {
-          // reset sauf identification
           setFormData((f) => ({
-            nom: f.nom,
-            prenom: f.prenom,
-            fonction: f.fonction,
-            direction: f.direction,
+            ...f,
             emplacementOrigineId: "",
             typeObject: "",
             equipementId: "",
             etatAvant: "",
-            ancienUserId: "",
-            ancienPosteId: "",
+            ancienUser: "",
+            ancienPoste: "",
             destinationEmplacementId: "",
             motif: "",
             newUserId: "",
@@ -280,7 +287,7 @@ export default function DemandePage() {
           setSelectedEquipement(null);
         }
       })
-      .catch(() => setSubmitError("Erreur réseau, réessayez plus tard"));
+      .catch(() => setSubmitError("Erreur réseau"));
   };
 
   return (
@@ -289,33 +296,52 @@ export default function DemandePage() {
         onSubmit={handleSubmit}
         className="mx-auto max-w-6xl space-y-10 p-8"
       >
-        {/* Header */}
+        {/* Header & 1. IDENTITÉ inchangés */}
+        {/* Header */}{" "}
         <div className="mb-8 rounded-xl bg-gradient-to-r from-blue-600 to-blue-800 p-8 text-center shadow-2xl">
+          {" "}
           <h1 className="text-6xl font-extrabold tracking-wide text-white">
-            Demande de Déplacement
-          </h1>
+            {" "}
+            Demande de Déplacement{" "}
+          </h1>{" "}
         </div>
-
-        {/* 1. IDENTITÉ */}
+        {/* 1. IDENTITÉ TECHNICIEN */}
         <div className="relative rounded-2xl bg-white p-8 shadow-2xl">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-            {["nom", "prenom", "fonction", "direction"].map((field) => (
-              <div key={field} className="flex flex-col">
-                <label className="mb-2 text-sm font-medium uppercase text-gray-700">
-                  {field.charAt(0).toUpperCase() + field.slice(1)}
-                </label>
-                <input
-                  type="text"
-                  name={field}
-                  value={(formData as any)[field]}
-                  readOnly
-                  className="rounded-lg border border-gray-300 bg-gray-50 px-5 py-3"
-                />
-              </div>
-            ))}
+            <div className="flex flex-col">
+              <label>Nom</label>
+              <input
+                readOnly
+                value={formData.nom}
+                className="rounded-lg border bg-gray-50 px-5 py-3"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label>Prénom</label>
+              <input
+                readOnly
+                value={formData.prenom}
+                className="rounded-lg border bg-gray-50 px-5 py-3"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label>Direction</label>
+              <input
+                readOnly
+                value={formData.direction}
+                className="rounded-lg border bg-gray-50 px-5 py-3"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label>Rôle</label>
+              <input
+                readOnly
+                value={formData.role}
+                className="rounded-lg border bg-gray-50 px-5 py-3"
+              />
+            </div>
           </div>
         </div>
-
         {/* 2. ANCIENNES INFORMATIONS SUR LE MATÉRIEL */}
         <div className="relative rounded-2xl bg-white p-8 shadow-2xl">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -329,12 +355,11 @@ export default function DemandePage() {
                 className="rounded-lg border border-gray-300 bg-white px-5 py-3"
               >
                 <option value="">— Choisir —</option>
-                {Array.isArray(emplacements) &&
-                  emplacements.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nom}
-                    </option>
-                  ))}
+                {emplacements.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nom}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex flex-col">
@@ -396,7 +421,7 @@ export default function DemandePage() {
                   <label>Ancien utilisateur</label>
                   <input
                     readOnly
-                    value={formData.ancienUserId || "Aucun"}
+                    value={formData.ancienUser || "Aucun"}
                     className="rounded-lg border border-gray-300 bg-gray-50 px-5 py-3"
                   />
                 </div>
@@ -404,7 +429,7 @@ export default function DemandePage() {
                   <label>Ancien poste</label>
                   <input
                     readOnly
-                    value={formData.ancienPosteId || "Aucun"}
+                    value={formData.ancienPoste || "Aucun"}
                     className="rounded-lg border border-gray-300 bg-gray-50 px-5 py-3"
                   />
                 </div>
@@ -412,7 +437,6 @@ export default function DemandePage() {
             )}
           </div>
         </div>
-
         {/* 3. DESTINATION & NOUVELLES AFFECTATIONS */}
         <div className="relative rounded-2xl bg-white p-8 shadow-2xl">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -426,12 +450,11 @@ export default function DemandePage() {
                 className="rounded-lg border border-gray-300 bg-white px-5 py-3"
               >
                 <option value="">— Choisir —</option>
-                {Array.isArray(emplacements) &&
-                  emplacements.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nom}
-                    </option>
-                  ))}
+                {emplacements.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nom}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex flex-col">
@@ -456,36 +479,40 @@ export default function DemandePage() {
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <label>Nouvel utilisateur (optionnel)</label>
-              <select
-                name="newUserId"
-                value={formData.newUserId}
-                onChange={handleChange}
-                className="rounded-lg border border-gray-300 bg-white px-5 py-3"
-              >
-                <option value="">— Aucun —</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nom} {u.prenom}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col">
-              <label>Pool utilisateur (optionnel)</label>
-              <select
-                name="newUtilisateur"
-                value={formData.newUtilisateur}
-                onChange={handleChange}
-                className="rounded-lg border border-gray-300 bg-white px-5 py-3"
-              >
-                <option value="">— Aucun —</option>
-                <option value={UtilisateurType.ENSEIGNANT}>ENSEIGNANT</option>
-                <option value={UtilisateurType.ETUDIANT}>ÉTUDIANT</option>
-              </select>
-            </div>
+            {emplacements.find(
+              (e) => e.id === formData.destinationEmplacementId,
+            )?.type === "BUREAU" ? (
+              <div className="flex flex-col">
+                <label>Nouvel utilisateur (optionnel)</label>
+                <select
+                  name="newUserId"
+                  value={formData.newUserId}
+                  onChange={handleChange}
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3"
+                >
+                  <option value="">— Aucun —</option>
+                  {destUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nom} {u.prenom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <label>Pool utilisateur (optionnel)</label>
+                <select
+                  name="newUtilisateur"
+                  value={formData.newUtilisateur}
+                  onChange={handleChange}
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3"
+                >
+                  <option value="">— Aucun —</option>
+                  <option value={UtilisateurType.ENSEIGNANT}>ENSEIGNANT</option>
+                  <option value={UtilisateurType.ETUDIANT}>ÉTUDIANT</option>
+                </select>
+              </div>
+            )}
 
             {["ECRAN", "UC"].includes(formData.typeObject) && (
               <div className="flex flex-col">
@@ -518,7 +545,6 @@ export default function DemandePage() {
             </div>
           </div>
         </div>
-
         {/* 4. BOUTON D’ENVOI */}
         <div className="grid grid-cols-1 items-end gap-8 md:grid-cols-2">
           <div />
@@ -529,7 +555,6 @@ export default function DemandePage() {
             Envoyer ma demande
           </button>
         </div>
-
         {submitError && (
           <div className="mt-4 flex items-start space-x-2 rounded-lg border border-red-200 bg-red-50 p-3">
             <AlertTriangle className="h-5 w-5 text-red-600" />
