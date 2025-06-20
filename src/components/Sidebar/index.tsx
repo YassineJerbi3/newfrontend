@@ -66,7 +66,12 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
             label: "Incident",
             route: "/intervention/incident",
             icon: <FaExclamationCircle size={18} />,
-            roles: ["RESPONSABLE SI", "TECHNICIEN"],
+            roles: [
+              "RESPONSABLE SI",
+              "PROFESSOR",
+              "ADMINISTRATIF",
+              "TECHNICIEN",
+            ],
           },
 
           {
