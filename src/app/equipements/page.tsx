@@ -6,6 +6,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { Calendar, Edit2, Trash2 } from "lucide-react";
 import { Tag, FileText, Hash, MapPin, User, CheckCircle } from "lucide-react";
+import { saveAs } from "file-saver";
 
 interface Emplacement {
   id: string;
@@ -226,6 +227,18 @@ export default function TableEquipementsPage() {
         : eq,
     );
     setPendingDelete(null);
+  };
+  const downloadCyclePdf = async () => {
+    if (!selectedEquip) return;
+    try {
+      const res = await fetch(`${API}/equipements/${selectedEquip.id}/pdf`);
+      if (!res.ok) throw new Error("Erreur lors du téléchargement");
+      const blob = await res.blob();
+      saveAs(blob, `cycle-de-vie-${selectedEquip.id}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("Impossible de télécharger le PDF.");
+    }
   };
 
   return (
@@ -707,6 +720,14 @@ export default function TableEquipementsPage() {
                     >
                       Enregistrer
                     </button>
+                    {/* ← Your new button */}
+                    <button
+                      onClick={downloadCyclePdf}
+                      className="rounded bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    >
+                      Télécharger cycle de vie
+                    </button>
+
                     <button
                       onClick={() => setShowModal(false)}
                       className="rounded border border-gray-300 px-5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 focus:outline-none"

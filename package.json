@@ -16,6 +16,7 @@
     "apexcharts": "^4.5.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
+    "file-saver": "^2.0.5",
     "flatpickr": "^4.6.13",
     "framer-motion": "^12.12.1",
     "jsvectormap": "^1.6.0",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@shadcn/ui": "^0.0.4",
+    "@types/file-saver": "^2.0.7",
     "@types/next-auth": "^3.13.0",
     "@types/node": "^20",
     "@types/react": "^18",
