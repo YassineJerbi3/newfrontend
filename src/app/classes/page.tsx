@@ -54,7 +54,7 @@ export default function ClasseSelectionPage() {
             classes.map((classe) => (
               <Link
                 key={classe.id}
-                href={`/classes-edit/${classe.id}`}
+                href={`/classes/${classe.id}`}
                 className="group relative flex flex-col items-center rounded-3xl border border-gray-200 bg-white p-8 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:border-indigo-500 hover:shadow-2xl"
               >
                 <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 transition-colors duration-300 group-hover:bg-indigo-600">
