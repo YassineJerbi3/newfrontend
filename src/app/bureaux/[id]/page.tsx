@@ -12,6 +12,15 @@ import {
   FaTh,
   FaTrash,
   FaEdit,
+  FaUserTie,
+  FaTv,
+  FaMicrochip,
+  FaTimes,
+  FaLayerGroup,
+  FaTag,
+  FaInfoCircle,
+  FaBarcode,
+  FaHashtag,
 } from "react-icons/fa";
 
 interface Poste {
@@ -34,7 +43,6 @@ interface Equipment {
   etat: string;
   codeInventaire: string;
   numeroSerie: string;
-  // Le user “propriétaire” de l’équipement (nullable)
   user: { nom: string; prenom: string } | null;
   posteId: string;
 }
@@ -44,60 +52,57 @@ export default function BureauDetailPage() {
   const id = pathname.split("/").pop()!;
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 
+  // États principaux
   const [emplacement, setEmplacement] = useState<EmplacementDetail | null>(
     null,
   );
+  const [allEquipements, setAllEquipements] = useState<Equipment[]>([]);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // grid vs list
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  // modal equipment
-  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  // Modals et sélection
   const [selectedPoste, setSelectedPoste] = useState<Poste | null>(null);
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
-  // tous les équipements de l’emplacement (pour le filtrage en réaffectation)
-  const [allEquipements, setAllEquipements] = useState<Equipment[]>([]);
+  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
+    null,
+  );
+  const [showEquipDetailModal, setShowEquipDetailModal] = useState(false);
 
-  // 1️⃣ Nouveaux états pour la réaffectation
+  // Réaffectation
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [reassignEquipment, setReassignEquipment] = useState<Equipment | null>(
     null,
   );
   const [targetPosteId, setTargetPosteId] = useState<string | null>(null);
 
-  // add / delete postes
+  // Gestion des postes (add / delete / edit)
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addMode, setAddMode] = useState(false);
   const [formQuantity, setFormQuantity] = useState(1);
-  // pour la modale d’édition
   const [editPosteModal, setEditPosteModal] = useState(false);
-  // pour le nouveau numéro
   const [newNumero, setNewNumero] = useState<number | null>(null);
 
-  // pour la modale détail équipement
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
-    null,
-  );
-  const [showEquipDetailModal, setShowEquipDetailModal] = useState(false);
-  // ouvre la modale détail équipement
+  // Détail équipement
   const openEquipDetailModal = (eq: Equipment) => {
     setSelectedEquipment(eq);
     setShowEquipDetailModal(true);
   };
-
-  // ferme la modale détail équipement
   const closeEquipDetailModal = () => {
     setSelectedEquipment(null);
     setShowEquipDetailModal(false);
   };
 
-  // Fetch postes + detail
+  // Fetch de l’emplacement et de tous les équipements
   const fetchDetail = () => {
     setLoading(true);
-    fetch(`${API}/emplacements/${id}`, { credentials: "include" })
+    setError(null);
+
+    fetch(`${API}/emplacements/${id}`, {
+      credentials: "include",
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
         return res.json();
@@ -108,10 +113,7 @@ export default function BureauDetailPage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  };
-  useEffect(fetchDetail, [id]);
-  // juste sous fetchDetail
-  useEffect(() => {
+
     fetch(`${API}/equipements?emplacementId=${id}`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -132,56 +134,22 @@ export default function BureauDetailPage() {
           })),
         );
       })
-
       .catch(() => setAllEquipements([]));
-  }, [id]);
+  };
+  useEffect(fetchDetail, [id]);
 
-  // ouvrir la modale
-  const openEditModal = (poste: Poste) => {
-    setSelectedPoste(poste);
-    setNewNumero(poste.numero);
-    setEditPosteModal(true);
-  };
-  // soumettre l’édition
-  const handleEditSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!selectedPoste || newNumero == null) return;
-    try {
-      const res = await fetch(`${API}/postes/${selectedPoste.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ numero: newNumero }),
-      });
-      const payload = await res.json();
-      if (!res.ok) {
-        if (res.status === 409) {
-          // conflit de numéro
-          alert(payload.message);
-        } else {
-          throw new Error(payload.message || "Erreur serveur");
-        }
-        return;
-      }
-      // succès
-      setEditPosteModal(false);
-      fetchDetail();
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-  // Open equipment modal for a poste
+  // Ouvre la modal de détail d’un **poste**
   const openEquipmentModal = (poste: Poste) => {
     setSelectedPoste(poste);
     setShowEquipmentModal(true);
-
-    fetch(`${API}/postes/${poste.id}`, { credentials: "include" })
+    fetch(`${API}/postes/${poste.id}/equipements`, {
+      credentials: "include",
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
         return res.json();
       })
       .then((resp: any) => {
-        // resp.equipements contient maintenant bien tous les équipements de ce poste
         const list = Array.isArray(resp.equipements) ? resp.equipements : [];
         setEquipmentList(
           list.map((eq: any) => ({
@@ -200,6 +168,7 @@ export default function BureauDetailPage() {
       .catch((err) => alert("Erreur chargement équipements : " + err.message));
   };
 
+  // Ferme toutes les modals
   const closeAll = () => {
     setShowEquipmentModal(false);
     setSelectedPoste(null);
@@ -207,8 +176,16 @@ export default function BureauDetailPage() {
     setDeleteMode(false);
     setSelectedIds(new Set());
     setAddMode(false);
+    setShowEquipDetailModal(false);
+    setSelectedEquipment(null);
+    setShowReassignModal(false);
+    setReassignEquipment(null);
+    setTargetPosteId(null);
+    setEditPosteModal(false);
+    setNewNumero(null);
   };
 
+  // Toggle delete-mode pour suppression multiple de postes
   const toggleDeleteMode = () => {
     setDeleteMode((m) => !m);
     setSelectedIds(new Set());
@@ -219,7 +196,9 @@ export default function BureauDetailPage() {
     setSelectedIds(s);
   };
 
-  // Add postes in batch
+  // Ouvre la modal de modification de poste
+
+  // Ajout batch de postes
   const handleAddSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!emplacement) return;
@@ -231,8 +210,11 @@ export default function BureauDetailPage() {
       fetch(`${API}/postes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ numero: maxNumero + i + 1, emplacementId: id }),
         credentials: "include",
+        body: JSON.stringify({
+          numero: maxNumero + i + 1,
+          emplacementId: id,
+        }),
       }),
     );
     Promise.all(promises)
@@ -243,7 +225,7 @@ export default function BureauDetailPage() {
       .catch((err) => alert(err.message));
   };
 
-  // Batch delete
+  // Suppression batch de postes
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`Supprimer ${selectedIds.size} poste(s) ?`)) return;
@@ -259,7 +241,40 @@ export default function BureauDetailPage() {
       fetchDetail();
     });
   };
-  // 2️⃣ Handler pour détacher un équipement
+
+  // Édition d’un poste
+  const openEditModal = (poste: Poste) => {
+    setSelectedPoste(poste);
+    setNewNumero(poste.numero);
+    setEditPosteModal(true);
+  };
+  const handleEditSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedPoste || newNumero == null) return;
+    try {
+      const res = await fetch(`${API}/postes/${selectedPoste.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ numero: newNumero }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          alert(payload.message);
+        } else {
+          throw new Error(payload.message || "Erreur serveur");
+        }
+        return;
+      }
+      setEditPosteModal(false);
+      fetchDetail();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // Détachement d’un équipement
   const handleDetachEquipment = (eqId: string) => {
     if (!selectedPoste) return;
     fetch(`${API}/postes/${selectedPoste.id}/equipements/${eqId}`, {
@@ -270,14 +285,12 @@ export default function BureauDetailPage() {
       .catch((err) => alert("Erreur détachement : " + err.message));
   };
 
-  // 3️⃣ Handler pour ouvrir la modale de réaffectation
+  // Ouverture modal de réaffectation
   const openReassignModal = (eq: Equipment) => {
     setReassignEquipment(eq);
     setTargetPosteId(null);
     setShowReassignModal(true);
   };
-
-  // 4️⃣ Confirmer la réaffectation côté backend
   const handleConfirmReassign = () => {
     if (!reassignEquipment || !targetPosteId) return;
     fetch(`${API}/equipements/${reassignEquipment.id}`, {
@@ -288,11 +301,34 @@ export default function BureauDetailPage() {
     })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
-        // on recharge la modale et la liste
         if (selectedPoste) openEquipmentModal(selectedPoste);
       })
       .catch((err) => alert("Erreur réaffectation : " + err.message))
       .finally(() => setShowReassignModal(false));
+  };
+  // Supprimer le poste sélectionné
+  const handleDeletePoste = () => {
+    if (!selectedPoste) return;
+    if (!confirm(`Supprimer le poste ${selectedPoste.numero} ?`)) return;
+
+    fetch(`${API}/postes/${selectedPoste.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        // Ferme la modal et recharge
+        closeAll();
+        fetchDetail();
+      })
+      .catch((err) => alert(err.message));
+  };
+
+  // Ouvre la modal de modification de poste
+  const openEditPoste = () => {
+    if (!selectedPoste) return;
+    setNewNumero(selectedPoste.numero);
+    setEditPosteModal(true);
   };
 
   return (
@@ -305,62 +341,68 @@ export default function BureauDetailPage() {
           <>
             {/* Header */}
             <div className="mb-8 flex items-center justify-between">
-              <h1 className="text-4xl font-bold text-gray-900">
+              <h1 className="text-4xl font-extrabold text-gray-900">
                 {emplacement.nom}
               </h1>
-              <div className="flex items-center space-x-2">
-                {/* Grid / List toggle */}
+              <div className="flex items-center space-x-3">
+                {/* Toggle Grid / List */}
                 <button
                   onClick={() => setViewMode("grid")}
-                  className={`rounded p-2 ${viewMode === "grid" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-                  title="Grille"
+                  className={`rounded-lg p-2 transition ${
+                    viewMode === "grid"
+                      ? "bg-blue-600 text-white shadow"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                  title="Vue Grille"
                 >
-                  <FaTh />
+                  <FaTh size={20} />
                 </button>
                 <button
                   onClick={() => setViewMode("list")}
-                  className={`rounded p-2 ${viewMode === "list" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-                  title="Liste"
+                  className={`rounded-lg p-2 transition ${
+                    viewMode === "list"
+                      ? "bg-blue-600 text-white shadow"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                  title="Vue Liste"
                 >
-                  <FaList />
+                  <FaList size={20} />
                 </button>
 
-                {/* Add / Delete */}
+                {/* Add + Delete */}
                 <button
                   onClick={() => setAddMode(true)}
-                  className="flex items-center rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+                  className="flex items-center space-x-1 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
                 >
-                  <FaPlus className="mr-1" /> Ajouter
+                  <FaPlus /> <span>Ajouter</span>
                 </button>
                 <button
                   onClick={toggleDeleteMode}
-                  className={`flex items-center rounded px-4 py-2 ${
+                  className={`flex items-center space-x-1 rounded-lg px-4 py-2 transition ${
                     deleteMode
                       ? "bg-red-600 text-white hover:bg-red-700"
-                      : "bg-gray-200 hover:bg-gray-300"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  <FaTrashAlt className="mr-1" />
-                  {deleteMode ? "Annuler" : "Supprimer"}
+                  <FaTrashAlt />{" "}
+                  <span>{deleteMode ? "Annuler" : "Supprimer"}</span>
                 </button>
               </div>
             </div>
 
-            {/* View modes */}
+            {/* GRID */}
             {viewMode === "grid" ? (
-              // --- GRID sur les postes ---
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {emplacement!.postes.map((poste) => (
+                {emplacement.postes.map((poste) => (
                   <div
                     key={poste.id}
-                    onClick={
-                      () =>
-                        deleteMode
-                          ? handleSelect(poste.id)
-                          : openEquipmentModal(poste) // Pour afficher la modale poste
+                    onClick={() =>
+                      deleteMode
+                        ? handleSelect(poste.id)
+                        : openEquipmentModal(poste)
                     }
-                    className={`relative flex flex-col items-center rounded-2xl bg-white p-6 shadow-md transition hover:shadow-xl ${
-                      deleteMode ? "cursor-pointer" : ""
+                    className={`relative flex cursor-pointer flex-col items-center space-y-4 rounded-2xl bg-white p-6 shadow-md transition-transform hover:scale-105 ${
+                      deleteMode ? "ring-2 ring-red-400" : ""
                     }`}
                   >
                     {deleteMode && (
@@ -371,50 +413,55 @@ export default function BureauDetailPage() {
                         className="absolute left-4 top-4 h-5 w-5 text-red-600"
                       />
                     )}
-                    <FaDesktop size={48} className="mb-4 text-gray-600" />
-                    <span className="text-xl font-semibold">
+                    <FaDesktop className="text-gray-600" size={48} />
+                    <span className="text-xl font-medium text-gray-800">
                       Poste {poste.numero}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              // --- LISTE de tous les équipements ---
+              /* LISTE */
               <div className="space-y-4">
-                <h2 className="text-2xl font-bold">Tous les équipements</h2>
-                <table className="w-full table-auto border-collapse text-sm">
+                <h2 className="text-2xl font-semibold text-gray-800">
+                  Tous les équipements
+                </h2>
+                <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border p-2">Type</th>
-                      <th className="border p-2">Famille MI</th>
-                      <th className="border p-2">Utilisateurs</th>
-                      <th className="border p-2">État</th>
-                      <th className="border p-2">Poste</th>
+                    <tr className="bg-blue-600 text-white">
+                      <th className="border px-4 py-2 text-left">Type</th>
+                      <th className="border px-4 py-2 text-left">Famille MI</th>
+                      <th className="border px-4 py-2 text-left">État</th>
+                      <th className="border px-4 py-2 text-left">Poste</th>
+                      <th className="border px-4 py-2 text-left">
+                        Utilisateur
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {allEquipements.length > 0 ? (
-                      allEquipements.map((eq) => {
-                        const poste = emplacement!.postes.find(
+                      allEquipements.map((eq, idx) => {
+                        const poste = emplacement.postes.find(
                           (p) => p.id === eq.posteId,
                         );
                         return (
                           <tr
                             key={eq.id}
-                            className="cursor-pointer hover:bg-gray-50"
-                            onClick={() => openEquipDetailModal(eq)} // Pour afficher la modale équipement
+                            onClick={() => openEquipDetailModal(eq)}
+                            className={`cursor-pointer transition hover:bg-blue-50 ${
+                              idx % 2 === 0 ? "bg-white" : "bg-gray-50"
+                            }`}
                           >
-                            <td className="border p-2">{eq.type}</td>
-                            <td className="border p-2">{eq.familleMI}</td>
-                            <td className="border p-2">
+                            <td className="border px-4 py-2">{eq.type}</td>
+                            <td className="border px-4 py-2">{eq.familleMI}</td>
+                            <td className="border px-4 py-2">{eq.etat}</td>
+                            <td className="border px-4 py-2">
+                              {poste ? `Poste ${poste.numero}` : "—"}
+                            </td>
+                            <td className="border px-4 py-2">
                               {eq.user
                                 ? `${eq.user.nom} ${eq.user.prenom}`
-                                : "-"}
-                            </td>
-
-                            <td className="border p-2">{eq.etat}</td>
-                            <td className="border p-2">
-                              {poste ? `Poste ${poste.numero}` : "Aucun poste"}
+                                : "—"}
                             </td>
                           </tr>
                         );
@@ -423,7 +470,7 @@ export default function BureauDetailPage() {
                       <tr>
                         <td
                           colSpan={5}
-                          className="border p-4 text-center text-gray-500"
+                          className="border px-4 py-6 text-center text-gray-500"
                         >
                           Aucun équipement trouvé.
                         </td>
@@ -440,7 +487,7 @@ export default function BureauDetailPage() {
                 <button
                   onClick={handleDeleteSelected}
                   disabled={selectedIds.size === 0}
-                  className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                  className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
                 >
                   Supprimer ({selectedIds.size})
                 </button>
@@ -451,16 +498,16 @@ export default function BureauDetailPage() {
             {addMode && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div
-                  className="absolute inset-0 bg-black/40"
+                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                   onClick={closeAll}
                 />
                 <form
                   onSubmit={handleAddSubmit}
-                  className="relative z-10 w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-lg"
+                  className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white p-6 shadow-xl"
                 >
                   <button
                     onClick={closeAll}
-                    className="absolute right-4 top-4 text-2xl text-gray-500"
+                    className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
                   >
                     &times;
                   </button>
@@ -478,27 +525,28 @@ export default function BureauDetailPage() {
                   </label>
                   <button
                     type="submit"
-                    className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700"
+                    className="w-full rounded-lg bg-blue-600 py-2 text-white hover:bg-blue-700"
                   >
                     Ajouter
                   </button>
                 </form>
               </div>
             )}
+
             {/* Edit Poste Modal */}
             {editPosteModal && selectedPoste && (
-              <div className="fixed inset-0 z-999 flex items-center justify-center">
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div
-                  className="absolute inset-0 bg-black/40"
+                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                   onClick={() => setEditPosteModal(false)}
                 />
                 <form
                   onSubmit={handleEditSubmit}
-                  className="relative z-10 w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-lg"
+                  className="relative z-10 w-full max-w-sm space-y-4 rounded-3xl bg-white p-6 shadow-xl"
                 >
                   <button
                     onClick={() => setEditPosteModal(false)}
-                    className="absolute right-4 top-4 text-2xl text-gray-500"
+                    className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
                   >
                     &times;
                   </button>
@@ -515,7 +563,7 @@ export default function BureauDetailPage() {
                   </label>
                   <button
                     type="submit"
-                    className="w-full rounded bg-green-600 py-2 text-white hover:bg-green-700"
+                    className="w-full rounded-lg bg-blue-600 py-2 text-white hover:bg-blue-700"
                   >
                     Enregistrer
                   </button>
@@ -523,251 +571,340 @@ export default function BureauDetailPage() {
               </div>
             )}
 
-            {/* Equipment Modal */}
+            {/* Equipment Modal (comme dans la page Classes) */}
             {selectedPoste && showEquipmentModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <>
+                {/* Overlay */}
                 <div
-                  className="absolute inset-0 bg-black/40"
+                  className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
                   onClick={closeAll}
                 />
-                <div className="relative z-10 max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-lg">
+
+                {/* Modal */}
+                <div className="fixed bottom-0 left-[300px] right-0 top-[90px] z-50 flex items-start justify-center overflow-y-auto p-6">
+                  <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+                    {/* Header */}
+                    <div className="flex items-center justify-between bg-gradient-to-r from-blue-900 to-blue-600 p-6 text-white">
+                      <h2 className="flex items-center text-2xl font-bold">
+                        <FaDesktop className="mr-3" size={24} />
+                        Détails du poste {selectedPoste.numero}
+                      </h2>
+                      <button
+                        onClick={closeAll}
+                        className="text-3xl transition hover:text-gray-200"
+                      >
+                        &times;
+                      </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="space-y-8 p-6">
+                      {/* Utilisateur */}
+                      {equipmentList.length > 0 && (
+                        <div className="flex items-center space-x-4 rounded-xl bg-blue-50 p-4 shadow-sm">
+                          <FaUserTie className="text-blue-600" size={20} />
+                          <div>
+                            <label className="block text-sm font-medium text-blue-800">
+                              Utilisateur
+                            </label>
+                            <p className="mt-1 text-gray-700">
+                              {equipmentList
+                                .map((eq) =>
+                                  eq.user
+                                    ? `${eq.user.nom} ${eq.user.prenom}`
+                                    : "–",
+                                )
+                                .join(", ")}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sections Équipements */}
+                      <div className="grid grid-cols-2 gap-8">
+                        {["ECRAN", "UNITE CENTRALE"].map((type) => {
+                          const items = equipmentList.filter(
+                            (e) => e.type === type,
+                          );
+                          if (!items.length) return null;
+                          return (
+                            <div key={type} className="space-y-4">
+                              <h3 className="text-lg font-semibold text-gray-800">
+                                {type === "ECRAN" ? "Écran" : "Unité Centrale"}
+                              </h3>
+                              <div className="space-y-4">
+                                {items.map((eq) => (
+                                  <div
+                                    key={eq.id}
+                                    className="relative flex flex-col justify-between space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow transition hover:shadow-lg"
+                                  >
+                                    {/* Infos */}
+                                    <div className="flex items-center space-x-4">
+                                      <div className="flex-shrink-0">
+                                        {type === "ECRAN" ? (
+                                          <FaTv
+                                            className="text-blue-600"
+                                            size={24}
+                                          />
+                                        ) : (
+                                          <FaMicrochip
+                                            className="text-blue-600"
+                                            size={24}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Famille MI
+                                          </label>
+                                          <p>{eq.familleMI || "—"}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Désignation
+                                          </label>
+                                          <p>{eq.designation}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            État
+                                          </label>
+                                          <p>{eq.etat}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Code Inv.
+                                          </label>
+                                          <p>{eq.codeInventaire}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-medium text-blue-800">
+                                            Série
+                                          </label>
+                                          <p>{eq.numeroSerie}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex justify-end space-x-2">
+                                      <button
+                                        onClick={() =>
+                                          handleDetachEquipment(eq.id)
+                                        }
+                                        className="flex items-center space-x-1 rounded-full border border-red-300 bg-red-50 px-3 py-1 text-red-600 transition hover:bg-red-100 hover:shadow-sm"
+                                      >
+                                        <FaTrash size={14} />
+                                        <span className="text-xs">
+                                          Détacher
+                                        </span>
+                                      </button>
+                                      <button
+                                        onClick={() => openReassignModal(eq)}
+                                        className="flex items-center space-x-1 rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-blue-600 transition hover:bg-blue-100 hover:shadow-sm"
+                                      >
+                                        <FaEdit size={14} />
+                                        <span className="text-xs">
+                                          Réaffecter
+                                        </span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex justify-end gap-4 bg-gray-100 p-6">
+                      <button
+                        onClick={handleDeletePoste}
+                        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-red-900 to-red-600 px-5 py-2 text-white transition hover:from-red-800 hover:to-red-500"
+                      >
+                        <FaTrash /> <span>Supprimer</span>
+                      </button>
+                      <button
+                        onClick={openEditPoste}
+                        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-blue-900 to-blue-600 px-5 py-2 text-white transition hover:from-blue-800 hover:to-blue-500"
+                      >
+                        <FaEdit /> <span>Modifier</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Equipement Detail Modal */}
+            {selectedEquipment && showEquipDetailModal && (
+              <>
+                <div
+                  className="fixed bottom-0 left-[288.8px] right-0 top-[80px] z-50 bg-black/50 backdrop-blur-sm"
+                  onClick={closeEquipDetailModal}
+                />
+                <div className="fixed bottom-0 left-[288.8px] right-0 top-[80px] z-50 flex items-center justify-center px-8 py-12">
+                  <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl">
+                    <div className="flex items-center justify-between rounded-t-3xl bg-gradient-to-r from-blue-900 to-blue-600 p-6 text-white">
+                      <div className="flex items-center space-x-3">
+                        {selectedEquipment.type === "ECRAN" ? (
+                          <FaTv size={28} />
+                        ) : (
+                          <FaMicrochip size={28} />
+                        )}
+                        <h2 className="text-2xl font-bold">
+                          Détail {selectedEquipment.type.toLowerCase()}
+                        </h2>
+                      </div>
+                      <button
+                        onClick={closeEquipDetailModal}
+                        className="text-3xl hover:text-gray-200"
+                      >
+                        <FaTimes />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-6 p-6 text-gray-700 md:grid-cols-3">
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaLayerGroup className="text-blue-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Famille MI
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.familleMI || "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaTag className="text-green-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Désignation
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.designation}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaInfoCircle className="text-yellow-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            État
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.etat}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaBarcode className="text-purple-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Code Inventaire
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.codeInventaire}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaHashtag className="text-indigo-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Numéro de série
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.numeroSerie}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
+                        <FaUserTie className="text-teal-600" />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-600">
+                            Utilisateur
+                          </span>
+                          <p className="mt-1 font-semibold text-gray-800">
+                            {selectedEquipment.user
+                              ? `${selectedEquipment.user.nom} ${selectedEquipment.user.prenom}`
+                              : "–"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Bouton Réaffecter si ÉCRAN ou UNITE CENTRALE */}
+                    {(selectedEquipment.type === "ECRAN" ||
+                      selectedEquipment.type === "UNITE CENTRALE") && (
+                      <div className="flex justify-end gap-4 rounded-b-3xl bg-gray-100 p-6">
+                        <button
+                          onClick={() => {
+                            closeEquipDetailModal();
+                            openReassignModal(selectedEquipment);
+                          }}
+                          className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-blue-900 to-blue-600 px-5 py-2 text-white hover:from-blue-800 hover:to-blue-500"
+                        >
+                          <FaEdit /> <span>Réaffecter</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Modal Réaffectation */}
+            {showReassignModal && reassignEquipment && (
+              <div className="fixed inset-0 z-[999] flex items-center justify-center">
+                <div
+                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  onClick={() => setShowReassignModal(false)}
+                />
+                <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
                   <button
-                    onClick={closeAll}
-                    className="absolute right-4 top-4 text-2xl text-gray-500"
+                    onClick={() => setShowReassignModal(false)}
+                    className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
                   >
                     &times;
                   </button>
                   <h2 className="mb-4 text-2xl font-bold">
-                    Poste {selectedPoste.numero} — Équipements
+                    Réaffecter l’équipement
                   </h2>
-                  {/* Modal Header Actions */}
-                  <div className="mb-4 flex gap-2">
-                    <button
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Supprimer le poste ${selectedPoste!.numero} ?`,
-                          )
-                        ) {
-                          fetch(`${API}/postes/${selectedPoste!.id}`, {
-                            method: "DELETE",
-                            credentials: "include",
-                          }).then(() => {
-                            closeAll();
-                            fetchDetail();
-                          });
-                        }
-                      }}
-                      className="flex items-center rounded bg-red-600 px-3 py-1 text-white hover:bg-red-700"
+                  <label className="mb-4 block">
+                    Choisir un autre poste
+                    <select
+                      value={targetPosteId ?? ""}
+                      onChange={(e) => setTargetPosteId(e.target.value)}
+                      className="mt-1 w-full rounded border p-2"
                     >
-                      <FaTrash className="mr-1" /> Supprimer Poste
-                    </button>
-                    <button
-                      onClick={() => openEditModal(selectedPoste!)}
-                      className="flex items-center rounded bg-yellow-500 px-3 py-1 text-white hover:bg-yellow-600"
-                    >
-                      <FaEdit className="mr-1" /> Modifier Poste
-                    </button>
-                  </div>
-
-                  {/* Utilisateurs */}
-                  {equipmentList.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="mb-2 text-xl font-semibold">
-                        Utilisateur
-                      </h3>
-                      <p className="text-gray-700">
-                        {equipmentList
-                          .map((eq) =>
-                            eq.user ? `${eq.user.nom} ${eq.user.prenom}` : "–",
-                          )
-                          .join(", ")}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Sections ECRAN & UNITE_CENTRALE */}
-                  {["ECRAN", "UNITE CENTRALE"].map((section) => {
-                    const items = equipmentList.filter(
-                      (e) => e.type === section,
-                    );
-                    if (!items.length) return null;
-                    return (
-                      <div key={section} className="mb-6">
-                        <h3 className="mb-2 text-xl font-semibold">
-                          {section === "ECRAN" ? "Écran" : "Unité Centrale"}
-                        </h3>
-                        <div className="space-y-4">
-                          {items.map((eq) => (
-                            <div
-                              key={eq.id}
-                              className="relative rounded-lg border bg-gray-50 p-4 shadow-sm"
-                            >
-                              {/* ← Boutons Détacher & Réaffecter */}
-                              <div className="absolute right-2 top-2 flex space-x-2">
-                                <button
-                                  onClick={() => handleDetachEquipment(eq.id)}
-                                  title="Détacher de ce poste"
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <FaTrash />
-                                </button>
-                                <button
-                                  onClick={() => openReassignModal(eq)}
-                                  title="Réaffecter à un autre poste"
-                                  className="text-blue-600 hover:text-blue-800"
-                                >
-                                  <FaEdit />
-                                </button>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                                <div>
-                                  <strong>Famille MI:</strong> {eq.familleMI}
-                                </div>
-                                <div>
-                                  <strong>Désignation:</strong> {eq.designation}
-                                </div>
-                                <div>
-                                  <strong>État:</strong> {eq.etat}
-                                </div>
-                                <div>
-                                  <strong>Code Inventaire:</strong>{" "}
-                                  {eq.codeInventaire}
-                                </div>
-                                <div>
-                                  <strong>Numéro de série:</strong>{" "}
-                                  {eq.numeroSerie}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      <option value="" disabled>
+                        -- sélectionnez un poste --
+                      </option>
+                      {emplacement.postes
+                        .filter((p) => p.id !== reassignEquipment.posteId)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            Poste {p.numero}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button
+                    onClick={handleConfirmReassign}
+                    disabled={!targetPosteId}
+                    className="w-full rounded-lg bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Confirmer
+                  </button>
                 </div>
               </div>
             )}
           </>
         )}
       </div>
-      {/* Modale Détail Équipement */}
-      {showEquipDetailModal && selectedEquipment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={closeEquipDetailModal}
-          />
-          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
-            <button
-              onClick={closeEquipDetailModal}
-              className="absolute right-4 top-4 text-2xl text-gray-500"
-            >
-              &times;
-            </button>
-            <h2 className="mb-4 text-2xl font-bold">Détail de l’équipement</h2>
-            <div className="space-y-2 text-gray-700">
-              <p>
-                <strong>Type :</strong> {selectedEquipment.type}
-              </p>
-              <p>
-                <strong>Famille MI :</strong> {selectedEquipment.familleMI}
-              </p>
-              <p>
-                <strong>Désignation :</strong> {selectedEquipment.designation}
-              </p>
-              <p>
-                <strong>État :</strong> {selectedEquipment.etat}
-              </p>
-              <p>
-                <strong>Code Inventaire :</strong>{" "}
-                {selectedEquipment.codeInventaire}
-              </p>
-              <p>
-                <strong>Numéro de série :</strong>{" "}
-                {selectedEquipment.numeroSerie}
-              </p>
-              <p>
-                <strong>Utilisateur :</strong>{" "}
-                {selectedEquipment.user
-                  ? `${selectedEquipment.user.nom} ${selectedEquipment.user.prenom}`
-                  : "Aucun"}
-              </p>
-
-              <p>
-                <strong>Poste :</strong>{" "}
-                {(() => {
-                  const p = emplacement!.postes.find(
-                    (x) => x.id === selectedEquipment.posteId,
-                  );
-                  return p ? `Poste ${p.numero}` : "Aucun poste";
-                })()}
-              </p>
-              {/* ════════ BOUTON RÉAFFECTER ════════ */}
-              {(selectedEquipment.type === "ECRAN" ||
-                selectedEquipment.type === "UNITE CENTRALE") && (
-                <div className="mt-6 flex justify-end">
-                  <button
-                    onClick={() => {
-                      closeEquipDetailModal();
-                      openReassignModal(selectedEquipment);
-                    }}
-                    className="flex items-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                  >
-                    <FaEdit className="mr-2" />
-                    Réaffecter
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {showReassignModal && reassignEquipment && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setShowReassignModal(false)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg">
-            <button
-              onClick={() => setShowReassignModal(false)}
-              className="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800"
-            >
-              &times;
-            </button>
-            <h2 className="mb-4 text-2xl font-bold">Réaffecter l’équipement</h2>
-            <label className="mb-4 block">
-              Poste de destination
-              <select
-                className="mt-1 w-full rounded border p-2"
-                value={targetPosteId ?? ""}
-                onChange={(e) => setTargetPosteId(e.target.value)}
-              >
-                <option value="" disabled>
-                  -- Sélectionner un poste --
-                </option>
-                {emplacement!.postes
-                  // on ne propose pas le poste courant
-                  .filter((p) => p.id !== reassignEquipment.posteId)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      Poste {p.numero}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <button
-              onClick={handleConfirmReassign}
-              disabled={!targetPosteId}
-              className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              Confirmer
-            </button>
-          </div>
-        </div>
-      )}
     </DefaultLayout>
   );
 }
