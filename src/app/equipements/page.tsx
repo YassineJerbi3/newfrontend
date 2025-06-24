@@ -7,6 +7,7 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { Calendar, Edit2, Trash2 } from "lucide-react";
 import { Tag, FileText, Hash, MapPin, User, CheckCircle } from "lucide-react";
 import { saveAs } from "file-saver";
+import { Download } from "lucide-react";
 
 interface Emplacement {
   id: string;
@@ -723,9 +724,11 @@ export default function TableEquipementsPage() {
                     {/* ← Your new button */}
                     <button
                       onClick={downloadCyclePdf}
-                      className="rounded bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700"
+                      aria-label="Télécharger le cycle de vie en PDF"
+                      title="Télécharger le cycle de vie"
+                      className="rounded bg-green-600 p-2 text-white hover:bg-green-700 focus:outline-none"
                     >
-                      Télécharger cycle de vie
+                      <Download size={20} />
                     </button>
 
                     <button
