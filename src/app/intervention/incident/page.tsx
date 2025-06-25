@@ -185,13 +185,13 @@ export default function DemandeInterventionForm() {
     let minDays = 0;
     switch (formData.priorite) {
       case "URGENT":
-        minDays = 2;
+        minDays = 3;
         break;
       case "NORMALE":
-        minDays = 4;
+        minDays = 5;
         break;
       case "BASSE":
-        minDays = 7;
+        minDays = 8;
         break;
     }
     const minDate = new Date(today);

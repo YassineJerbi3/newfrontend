@@ -2,6 +2,7 @@
 
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Equipement {
   id: string;
@@ -25,22 +26,34 @@ const imageMap: Record<string, string> = {
   "CAMERA DE SURVEILLANCE": "/images/devices/camer.png",
   TV: "/images/devices/tv.png",
 };
+const DEFAULT_IMG = "/images/devices/default.png";
 
 export default function VotreBureauPage() {
+  const router = useRouter();
   const [data, setData] = useState<MineResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Equipement | null>(null);
 
+  const fetchMine = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("http://localhost:2000/equipements/mine", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const json: MineResponse = await res.json();
+      setData(json);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch("http://localhost:2000/equipements/mine", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Erreur ${res.status}`);
-        return res.json();
-      })
-      .then((json: MineResponse) => setData(json))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    fetchMine();
   }, []);
 
   return (
@@ -59,7 +72,15 @@ export default function VotreBureauPage() {
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent" />
           </div>
         ) : error ? (
-          <div className="p-6 text-center text-red-600">Erreur : {error}</div>
+          <div className="p-6 text-center text-red-600">
+            Erreur : {error}{" "}
+            <button
+              onClick={fetchMine}
+              className="ml-2 text-blue-600 underline"
+            >
+              Réessayer
+            </button>
+          </div>
         ) : data?.message ? (
           <div className="p-6 text-center text-gray-700">{data.message}</div>
         ) : (
@@ -70,9 +91,10 @@ export default function VotreBureauPage() {
                 onClick={() => setSelected(eq)}
                 className="group focus:outline-none"
                 title={eq.designation}
+                aria-label={`Équipement : ${eq.designation}`}
               >
                 <img
-                  src={imageMap[eq.equipmentType]}
+                  src={imageMap[eq.equipmentType] || DEFAULT_IMG}
                   alt={eq.equipmentType}
                   className="h-32 w-32 object-contain transition-transform hover:scale-110"
                 />
@@ -87,15 +109,20 @@ export default function VotreBureauPage() {
 
       {/* Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onKeyDown={(e) => e.key === "Escape" && setSelected(null)}
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="w-80 rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="mb-4 text-2xl font-semibold">
               {selected.designation}
             </h3>
             <button
-              onClick={() => {
-                /* Déclarer une intervention */
-              }}
+              onClick={() =>
+                router.push(`/interventions/create?equipementId=${selected.id}`)
+              }
               className="mb-2 w-full rounded-lg bg-red-600 py-2 text-white transition hover:bg-red-700"
             >
               Déclarer une intervention

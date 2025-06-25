@@ -1,7 +1,7 @@
 // src/app/bureaux/[id]/page.tsx
 "use client";
 
-import React, { useEffect, useState, FormEvent, useMemo } from "react";
+import React, { useEffect, useState, FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import {
@@ -52,7 +52,6 @@ export default function BureauDetailPage() {
   const id = pathname.split("/").pop()!;
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2000";
 
-  // États principaux
   const [emplacement, setEmplacement] = useState<EmplacementDetail | null>(
     null,
   );
@@ -62,7 +61,6 @@ export default function BureauDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  // Modals et sélection
   const [selectedPoste, setSelectedPoste] = useState<Poste | null>(null);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
@@ -70,14 +68,12 @@ export default function BureauDetailPage() {
   );
   const [showEquipDetailModal, setShowEquipDetailModal] = useState(false);
 
-  // Réaffectation
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [reassignEquipment, setReassignEquipment] = useState<Equipment | null>(
     null,
   );
   const [targetPosteId, setTargetPosteId] = useState<string | null>(null);
 
-  // Gestion des postes (add / delete / edit)
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addMode, setAddMode] = useState(false);
@@ -85,7 +81,6 @@ export default function BureauDetailPage() {
   const [editPosteModal, setEditPosteModal] = useState(false);
   const [newNumero, setNewNumero] = useState<number | null>(null);
 
-  // Détail équipement
   const openEquipDetailModal = (eq: Equipment) => {
     setSelectedEquipment(eq);
     setShowEquipDetailModal(true);
@@ -95,14 +90,11 @@ export default function BureauDetailPage() {
     setShowEquipDetailModal(false);
   };
 
-  // Fetch de l’emplacement et de tous les équipements
   const fetchDetail = () => {
     setLoading(true);
     setError(null);
 
-    fetch(`${API}/emplacements/${id}`, {
-      credentials: "include",
-    })
+    fetch(`${API}/emplacements/${id}`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
         return res.json();
@@ -138,37 +130,38 @@ export default function BureauDetailPage() {
   };
   useEffect(fetchDetail, [id]);
 
-  // Ouvre la modal de détail d’un **poste**
   const openEquipmentModal = (poste: Poste) => {
     setSelectedPoste(poste);
     setShowEquipmentModal(true);
-    fetch(`${API}/postes/${poste.id}/equipements`, {
-      credentials: "include",
-    })
+
+    // src/app/bureaux/[id]/page.tsx
+    // … inside openEquipmentModal(poste):
+    fetch(`${API}/postes/${poste.id}/equipements`, { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
         return res.json();
       })
-      .then((resp: any) => {
-        const list = Array.isArray(resp.equipements) ? resp.equipements : [];
-        setEquipmentList(
-          list.map((eq: any) => ({
-            id: eq.id,
-            type: eq.equipmentType,
-            familleMI: eq.familleMI,
-            designation: eq.designation,
-            etat: eq.etat,
-            codeInventaire: eq.codeInventaire,
-            numeroSerie: eq.numeroSerie,
-            user: eq.user ? { nom: eq.user.nom, prenom: eq.user.prenom } : null,
-            posteId: poste.id,
-          })),
-        );
+      .then((data: any[]) => {
+        console.log("💡 raw poste equipements[0] →", data[0]);
+
+        console.log("postes equipements →", data); // debug to confirm shape
+        const mapped = data.map((eq) => ({
+          id: eq.id,
+          type: eq.equipmentType,
+          familleMI: eq.familleMI,
+          designation: eq.designation,
+          etat: eq.etat,
+          codeInventaire: eq.codeInventaire,
+          numeroSerie: eq.numeroSerie,
+          user: eq.user ? { nom: eq.user.nom, prenom: eq.user.prenom } : null,
+          posteId: poste.id,
+        }));
+        console.log("⟡ fetched for poste", poste.numero, mapped);
+
+        setEquipmentList(mapped);
       })
       .catch((err) => alert("Erreur chargement équipements : " + err.message));
   };
-
-  // Ferme toutes les modals
   const closeAll = () => {
     setShowEquipmentModal(false);
     setSelectedPoste(null);
@@ -185,7 +178,6 @@ export default function BureauDetailPage() {
     setNewNumero(null);
   };
 
-  // Toggle delete-mode pour suppression multiple de postes
   const toggleDeleteMode = () => {
     setDeleteMode((m) => !m);
     setSelectedIds(new Set());
@@ -196,9 +188,6 @@ export default function BureauDetailPage() {
     setSelectedIds(s);
   };
 
-  // Ouvre la modal de modification de poste
-
-  // Ajout batch de postes
   const handleAddSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!emplacement) return;
@@ -206,18 +195,19 @@ export default function BureauDetailPage() {
       (m, p) => Math.max(m, p.numero),
       0,
     );
-    const promises = Array.from({ length: formQuantity }, (_, i) =>
-      fetch(`${API}/postes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          numero: maxNumero + i + 1,
-          emplacementId: id,
+    Promise.all(
+      Array.from({ length: formQuantity }, (_, i) =>
+        fetch(`${API}/postes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            numero: maxNumero + i + 1,
+            emplacementId: id,
+          }),
         }),
-      }),
-    );
-    Promise.all(promises)
+      ),
+    )
       .then(() => {
         closeAll();
         fetchDetail();
@@ -225,7 +215,6 @@ export default function BureauDetailPage() {
       .catch((err) => alert(err.message));
   };
 
-  // Suppression batch de postes
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`Supprimer ${selectedIds.size} poste(s) ?`)) return;
@@ -242,7 +231,6 @@ export default function BureauDetailPage() {
     });
   };
 
-  // Édition d’un poste
   const openEditModal = (poste: Poste) => {
     setSelectedPoste(poste);
     setNewNumero(poste.numero);
@@ -260,11 +248,8 @@ export default function BureauDetailPage() {
       });
       const payload = await res.json();
       if (!res.ok) {
-        if (res.status === 409) {
-          alert(payload.message);
-        } else {
-          throw new Error(payload.message || "Erreur serveur");
-        }
+        if (res.status === 409) alert(payload.message);
+        else throw new Error(payload.message || "Erreur serveur");
         return;
       }
       setEditPosteModal(false);
@@ -274,7 +259,6 @@ export default function BureauDetailPage() {
     }
   };
 
-  // Détachement d’un équipement
   const handleDetachEquipment = (eqId: string) => {
     if (!selectedPoste) return;
     fetch(`${API}/postes/${selectedPoste.id}/equipements/${eqId}`, {
@@ -285,7 +269,6 @@ export default function BureauDetailPage() {
       .catch((err) => alert("Erreur détachement : " + err.message));
   };
 
-  // Ouverture modal de réaffectation
   const openReassignModal = (eq: Equipment) => {
     setReassignEquipment(eq);
     setTargetPosteId(null);
@@ -306,25 +289,22 @@ export default function BureauDetailPage() {
       .catch((err) => alert("Erreur réaffectation : " + err.message))
       .finally(() => setShowReassignModal(false));
   };
-  // Supprimer le poste sélectionné
+
   const handleDeletePoste = () => {
     if (!selectedPoste) return;
     if (!confirm(`Supprimer le poste ${selectedPoste.numero} ?`)) return;
-
     fetch(`${API}/postes/${selectedPoste.id}`, {
       method: "DELETE",
       credentials: "include",
     })
       .then((res) => {
         if (!res.ok) throw new Error(`Error ${res.status}`);
-        // Ferme la modal et recharge
         closeAll();
         fetchDetail();
       })
       .catch((err) => alert(err.message));
   };
 
-  // Ouvre la modal de modification de poste
   const openEditPoste = () => {
     if (!selectedPoste) return;
     setNewNumero(selectedPoste.numero);
@@ -345,52 +325,38 @@ export default function BureauDetailPage() {
                 {emplacement.nom}
               </h1>
               <div className="flex items-center space-x-3">
-                {/* Toggle Grid / List */}
                 <button
                   onClick={() => setViewMode("grid")}
-                  className={`rounded-lg p-2 transition ${
-                    viewMode === "grid"
-                      ? "bg-blue-600 text-white shadow"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`rounded-lg p-2 transition ${viewMode === "grid" ? "bg-blue-600 text-white shadow" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
                   title="Vue Grille"
                 >
                   <FaTh size={20} />
                 </button>
                 <button
                   onClick={() => setViewMode("list")}
-                  className={`rounded-lg p-2 transition ${
-                    viewMode === "list"
-                      ? "bg-blue-600 text-white shadow"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`rounded-lg p-2 transition ${viewMode === "list" ? "bg-blue-600 text-white shadow" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
                   title="Vue Liste"
                 >
                   <FaList size={20} />
                 </button>
-
-                {/* Add + Delete */}
                 <button
                   onClick={() => setAddMode(true)}
                   className="flex items-center space-x-1 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700"
                 >
-                  <FaPlus /> <span>Ajouter</span>
+                  <FaPlus />
+                  <span>Ajouter</span>
                 </button>
                 <button
                   onClick={toggleDeleteMode}
-                  className={`flex items-center space-x-1 rounded-lg px-4 py-2 transition ${
-                    deleteMode
-                      ? "bg-red-600 text-white hover:bg-red-700"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`flex items-center space-x-1 rounded-lg px-4 py-2 transition ${deleteMode ? "bg-red-600 text-white hover:bg-red-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
                 >
-                  <FaTrashAlt />{" "}
+                  <FaTrashAlt />
                   <span>{deleteMode ? "Annuler" : "Supprimer"}</span>
                 </button>
               </div>
             </div>
 
-            {/* GRID */}
+            {/* GRID or LIST */}
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {emplacement.postes.map((poste) => (
@@ -401,9 +367,7 @@ export default function BureauDetailPage() {
                         ? handleSelect(poste.id)
                         : openEquipmentModal(poste)
                     }
-                    className={`relative flex cursor-pointer flex-col items-center space-y-4 rounded-2xl bg-white p-6 shadow-md transition-transform hover:scale-105 ${
-                      deleteMode ? "ring-2 ring-red-400" : ""
-                    }`}
+                    className={`relative flex cursor-pointer flex-col items-center space-y-4 rounded-2xl bg-white p-6 shadow-md transition-transform hover:scale-105 ${deleteMode ? "ring-2 ring-red-400" : ""}`}
                   >
                     {deleteMode && (
                       <input
@@ -421,7 +385,6 @@ export default function BureauDetailPage() {
                 ))}
               </div>
             ) : (
-              /* LISTE */
               <div className="space-y-4">
                 <h2 className="text-2xl font-semibold text-gray-800">
                   Tous les équipements
@@ -448,9 +411,7 @@ export default function BureauDetailPage() {
                           <tr
                             key={eq.id}
                             onClick={() => openEquipDetailModal(eq)}
-                            className={`cursor-pointer transition hover:bg-blue-50 ${
-                              idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
+                            className={`cursor-pointer transition hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
                           >
                             <td className="border px-4 py-2">{eq.type}</td>
                             <td className="border px-4 py-2">{eq.familleMI}</td>
@@ -481,7 +442,6 @@ export default function BureauDetailPage() {
               </div>
             )}
 
-            {/* Batch delete */}
             {deleteMode && (
               <div className="mt-6 text-right">
                 <button
@@ -494,7 +454,6 @@ export default function BureauDetailPage() {
               </div>
             )}
 
-            {/* Add Modal */}
             {addMode && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div
@@ -533,7 +492,6 @@ export default function BureauDetailPage() {
               </div>
             )}
 
-            {/* Edit Poste Modal */}
             {editPosteModal && selectedPoste && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div
@@ -571,35 +529,28 @@ export default function BureauDetailPage() {
               </div>
             )}
 
-            {/* Equipment Modal (comme dans la page Classes) */}
+            {/* -- Equipment Modal (un seul bloc, version "Classes") -- */}
             {selectedPoste && showEquipmentModal && (
               <>
-                {/* Overlay */}
                 <div
                   className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
                   onClick={closeAll}
                 />
-
-                {/* Modal */}
                 <div className="fixed bottom-0 left-[300px] right-0 top-[90px] z-50 flex items-start justify-center overflow-y-auto p-6">
                   <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-                    {/* Header */}
                     <div className="flex items-center justify-between bg-gradient-to-r from-blue-900 to-blue-600 p-6 text-white">
                       <h2 className="flex items-center text-2xl font-bold">
-                        <FaDesktop className="mr-3" size={24} />
-                        Détails du poste {selectedPoste.numero}
+                        <FaDesktop className="mr-3" size={24} /> Détails du
+                        poste {selectedPoste.numero}
                       </h2>
                       <button
                         onClick={closeAll}
-                        className="text-3xl transition hover:text-gray-200"
+                        className="text-3xl hover:text-gray-200"
                       >
                         &times;
                       </button>
                     </div>
-
-                    {/* Body */}
                     <div className="space-y-8 p-6">
-                      {/* Utilisateur */}
                       {equipmentList.length > 0 && (
                         <div className="flex items-center space-x-4 rounded-xl bg-blue-50 p-4 shadow-sm">
                           <FaUserTie className="text-blue-600" size={20} />
@@ -619,8 +570,6 @@ export default function BureauDetailPage() {
                           </div>
                         </div>
                       )}
-
-                      {/* Sections Équipements */}
                       <div className="grid grid-cols-2 gap-8">
                         {["ECRAN", "UNITE CENTRALE"].map((type) => {
                           const items = equipmentList.filter(
@@ -638,7 +587,6 @@ export default function BureauDetailPage() {
                                     key={eq.id}
                                     className="relative flex flex-col justify-between space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow transition hover:shadow-lg"
                                   >
-                                    {/* Infos */}
                                     <div className="flex items-center space-x-4">
                                       <div className="flex-shrink-0">
                                         {type === "ECRAN" ? (
@@ -686,14 +634,12 @@ export default function BureauDetailPage() {
                                         </div>
                                       </div>
                                     </div>
-
-                                    {/* Actions */}
                                     <div className="flex justify-end space-x-2">
                                       <button
                                         onClick={() =>
                                           handleDetachEquipment(eq.id)
                                         }
-                                        className="flex items-center space-x-1 rounded-full border border-red-300 bg-red-50 px-3 py-1 text-red-600 transition hover:bg-red-100 hover:shadow-sm"
+                                        className="flex items-center space-x-1 rounded-full border border-red-300 bg-red-50 px-3 py-1 text-red-600 hover:bg-red-100"
                                       >
                                         <FaTrash size={14} />
                                         <span className="text-xs">
@@ -702,7 +648,7 @@ export default function BureauDetailPage() {
                                       </button>
                                       <button
                                         onClick={() => openReassignModal(eq)}
-                                        className="flex items-center space-x-1 rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-blue-600 transition hover:bg-blue-100 hover:shadow-sm"
+                                        className="flex items-center space-x-1 rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-blue-600 hover:bg-blue-100"
                                       >
                                         <FaEdit size={14} />
                                         <span className="text-xs">
@@ -718,18 +664,16 @@ export default function BureauDetailPage() {
                         })}
                       </div>
                     </div>
-
-                    {/* Footer Actions */}
                     <div className="flex justify-end gap-4 bg-gray-100 p-6">
                       <button
                         onClick={handleDeletePoste}
-                        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-red-900 to-red-600 px-5 py-2 text-white transition hover:from-red-800 hover:to-red-500"
+                        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-red-900 to-red-600 px-5 py-2 text-white hover:from-red-800 hover:to-red-500"
                       >
                         <FaTrash /> <span>Supprimer</span>
                       </button>
                       <button
                         onClick={openEditPoste}
-                        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-blue-900 to-blue-600 px-5 py-2 text-white transition hover:from-blue-800 hover:to-blue-500"
+                        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-blue-900 to-blue-600 px-5 py-2 text-white hover:from-blue-800 hover:to-blue-500"
                       >
                         <FaEdit /> <span>Modifier</span>
                       </button>
@@ -739,7 +683,6 @@ export default function BureauDetailPage() {
               </>
             )}
 
-            {/* Equipement Detail Modal */}
             {selectedEquipment && showEquipDetailModal && (
               <>
                 <div
@@ -836,7 +779,6 @@ export default function BureauDetailPage() {
                         </div>
                       </div>
                     </div>
-                    {/* Bouton Réaffecter si ÉCRAN ou UNITE CENTRALE */}
                     {(selectedEquipment.type === "ECRAN" ||
                       selectedEquipment.type === "UNITE CENTRALE") && (
                       <div className="flex justify-end gap-4 rounded-b-3xl bg-gray-100 p-6">
@@ -847,7 +789,8 @@ export default function BureauDetailPage() {
                           }}
                           className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-blue-900 to-blue-600 px-5 py-2 text-white hover:from-blue-800 hover:to-blue-500"
                         >
-                          <FaEdit /> <span>Réaffecter</span>
+                          <FaEdit />
+                          <span>Réaffecter</span>
                         </button>
                       </div>
                     )}
@@ -856,7 +799,6 @@ export default function BureauDetailPage() {
               </>
             )}
 
-            {/* Modal Réaffectation */}
             {showReassignModal && reassignEquipment && (
               <div className="fixed inset-0 z-[999] flex items-center justify-center">
                 <div
