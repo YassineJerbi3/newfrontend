@@ -10,6 +10,12 @@ interface Equipement {
   equipmentType: string;
   numeroSerie: string;
 }
+interface Stats {
+  total: number;
+  fonctionnel: number;
+  enPanne: number;
+  monthly: { month: string; count: number }[];
+}
 
 interface MineResponse {
   emplacement?: { id: string; nom: string };
@@ -51,6 +57,10 @@ export default function VotreBureauPage() {
   const [echeanceError, setEcheanceError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Stats
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [statsLoading, setStatsLoading] = useState<boolean>(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   // Fetch user's equipment
   const fetchMine = async () => {
@@ -70,8 +80,49 @@ export default function VotreBureauPage() {
     }
   };
 
+  // Fetch stats for current user
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      const [totalRes, etatRes, monthlyRes] = await Promise.all([
+        fetch("http://localhost:2000/equipements/stats/total", {
+          credentials: "include",
+        }),
+        fetch("http://localhost:2000/equipements/stats/etat", {
+          credentials: "include",
+        }),
+        fetch("http://localhost:2000/equipements/stats/monthly-failures", {
+          credentials: "include",
+        }),
+      ]);
+
+      if (!totalRes.ok || !etatRes.ok || !monthlyRes.ok) {
+        throw new Error("Erreur chargement stats");
+      }
+
+      const total = (await totalRes.json()) as number;
+      const { fonctionnel, enPanne } = (await etatRes.json()) as {
+        fonctionnel: number;
+        enPanne: number;
+      };
+      const monthlyRaw = (await monthlyRes.json()) as {
+        month: string;
+        count: number;
+      }[];
+
+      setStats({ total, fonctionnel, enPanne, monthly: monthlyRaw });
+    } catch (err: any) {
+      setStatsError(err.message);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // On mount, fetch both equipment and stats
   useEffect(() => {
     fetchMine();
+    fetchStats();
   }, []);
 
   // Open detail modal
@@ -163,6 +214,40 @@ export default function VotreBureauPage() {
         <h1 className="text-4xl font-bold">
           Votre Bureau{data?.emplacement && ` : ${data.emplacement.nom}`}
         </h1>
+      </div>
+      {/* Stats */}
+      <div className="mb-6 rounded-lg bg-white p-6 shadow">
+        {statsLoading ? (
+          <div>Chargement des statistiques…</div>
+        ) : statsError ? (
+          <div className="text-red-600">Erreur: {statsError}</div>
+        ) : stats ? (
+          <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
+            <div>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <div>Total équipements</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{stats.fonctionnel}</div>
+              <div>Fonctionnels</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{stats.enPanne}</div>
+              <div>En panne</div>
+            </div>
+            {/* Optionally render a small monthly chart or list */}
+            <div className="mt-4 sm:col-span-3">
+              <h4 className="mb-2 font-medium">Pannes par mois</h4>
+              <ul className="flex space-x-4 overflow-auto">
+                {stats.monthly.map((m) => (
+                  <li key={m.month} className="text-sm">
+                    <span className="font-semibold">{m.month}</span>: {m.count}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Equipment grid */}
