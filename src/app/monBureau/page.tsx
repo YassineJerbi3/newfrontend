@@ -85,33 +85,22 @@ export default function VotreBureauPage() {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const [totalRes, etatRes, monthlyRes] = await Promise.all([
-        fetch("http://localhost:2000/equipements/stats/total", {
-          credentials: "include",
-        }),
-        fetch("http://localhost:2000/equipements/stats/etat", {
-          credentials: "include",
-        }),
-        fetch("http://localhost:2000/equipements/stats/monthly-failures", {
-          credentials: "include",
-        }),
-      ]);
-
-      if (!totalRes.ok || !etatRes.ok || !monthlyRes.ok) {
-        throw new Error("Erreur chargement stats");
-      }
-
-      const total = (await totalRes.json()) as number;
-      const { fonctionnel, enPanne } = (await etatRes.json()) as {
+      const res = await fetch("http://localhost:2000/equipements/stats/mine", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const json = (await res.json()) as {
+        total: number;
         fonctionnel: number;
         enPanne: number;
+        monthly: { month: string; count: number }[];
       };
-      const monthlyRaw = (await monthlyRes.json()) as {
-        month: string;
-        count: number;
-      }[];
-
-      setStats({ total, fonctionnel, enPanne, monthly: monthlyRaw });
+      setStats({
+        total: json.total,
+        fonctionnel: json.fonctionnel,
+        enPanne: json.enPanne,
+        monthly: json.monthly,
+      });
     } catch (err: any) {
       setStatsError(err.message);
     } finally {
