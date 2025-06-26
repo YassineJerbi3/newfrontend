@@ -15,7 +15,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-datepicker/dist/react-datepicker.css";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { addDays, isAfter, isBefore, isEqual } from "date-fns";
-
+import { startOfToday } from "date-fns";
 const localizer = momentLocalizer(moment);
 
 export interface Evenement {
@@ -324,6 +324,7 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
   const occDate = event.alertDate ? new Date(event.alertDate) : new Date(); // si pas d’alertDate, fallback à aujourd’hui
   const recommendedStart = occDate;
   const recommendedEnd = addDays(occDate, 6);
+  const today = startOfToday();
 
   return (
     <Modal
@@ -556,7 +557,7 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                         setDatePlanif(d);
                         setDateChanged(true);
 
-                        // warning
+                        // warning si hors période recommandée
                         if (
                           isBefore(d, recommendedStart) ||
                           isAfter(d, recommendedEnd)
@@ -571,15 +572,15 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                         }
                       }}
                       dateFormat="yyyy-MM-dd"
-                      minDate={
-                        event.alertDate ? new Date(event.alertDate) : undefined
-                      }
+                      minDate={today} // désactive tous les jours avant aujourd’hui
                       dayClassName={(d) => {
+                        // si pas d’alertDate, on ne surligne rien
                         if (!event.alertDate) return "";
-                        const occ = new Date(event.alertDate);
-                        const diff =
-                          (d.getTime() - occ.getTime()) / (1000 * 60 * 60 * 24);
-                        return diff >= 0 && diff < 7
+                        // jours dans [recommendedStart, recommendedEnd[
+                        return (isAfter(d, recommendedStart) ||
+                          isEqual(d, recommendedStart)) &&
+                          (isBefore(d, recommendedEnd) ||
+                            isEqual(d, recommendedEnd))
                           ? "bg-green-100 rounded-full"
                           : "";
                       }}
@@ -703,7 +704,7 @@ const MyCalendar: React.FC = () => {
         );
         setMaintenanceEvents(
           maintUnplanned.map((o: any) => {
-            const defaultPlan = addDays(new Date(o.dateOccurrence), 7);
+            const defaultPlan = new Date();
             return {
               id: o.id,
               type: "maintenance",
