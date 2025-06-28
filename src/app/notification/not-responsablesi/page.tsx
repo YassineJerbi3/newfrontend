@@ -688,7 +688,12 @@ export default function NotificationResponsableSI() {
                     n.type === "STOCK_INDISPONIBLE";
                   const isAssigned =
                     n.type === "incident" && !!incidentId && !!technicianId;
-
+                  const assignedUser = users.find(
+                    (u) => u.id === n.payload.technicianId,
+                  );
+                  const assignedName = assignedUser
+                    ? `${assignedUser.prenom} ${assignedUser.nom}`
+                    : "";
                   // Texte détaillé rapports
                   let detailRapport = "";
                   if (n.type === "rapport-incident") {
@@ -851,7 +856,9 @@ export default function NotificationResponsableSI() {
                     <div
                       key={n.id}
                       onClick={(e) => {
+                        // si déjà affecté, on ne fait rien
                         if (isAssigned) return;
+                        // sinon on ouvre la modal comme avant
                         if (n.type === "incident" && incidentId) {
                           openAssignModal(incidentId);
                           return;
@@ -896,6 +903,13 @@ export default function NotificationResponsableSI() {
                       {/* Main Content */}
                       <div className="px-5 py-4">
                         <div className="flex items-center gap-3">
+                          {/* ← Insère ton paragraphe juste ici */}
+                          {n.type === "incident" && isAssigned && (
+                            <p className="mt-2 text-sm text-gray-700">
+                              Cet incident est assigné au technicien&nbsp;
+                              <strong>{assignedName}</strong>.
+                            </p>
+                          )}
                           <div
                             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${accent} bg-white`}
                           >

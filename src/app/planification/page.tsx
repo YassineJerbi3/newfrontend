@@ -16,6 +16,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { addDays, isAfter, isBefore, isEqual } from "date-fns";
 import { startOfToday } from "date-fns";
+
 const localizer = momentLocalizer(moment);
 
 export interface Evenement {
@@ -151,6 +152,7 @@ const RapportListModal: React.FC<RapportListModalProps> = ({
   useEffect(() => {
     setDatePlanif(event.datePlanification || new Date());
   }, [event]);
+  const today = startOfToday(); // ← AJOUT ICI
   return (
     <Modal
       isOpen={isOpen}
@@ -194,6 +196,7 @@ const RapportListModal: React.FC<RapportListModalProps> = ({
                   selected={datePlanif}
                   onChange={(d) => setDatePlanif(d!)}
                   dateFormat="yyyy-MM-dd"
+                  minDate={today}
                   className="ml-2 rounded-md border border-gray-300 px-2 py-1 focus:outline-none"
                 />
               </div>
