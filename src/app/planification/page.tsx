@@ -406,7 +406,6 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
   const occDate = event.alertDate ? new Date(event.alertDate) : new Date(); // si pas d’alertDate, fallback à aujourd’hui
   const recommendedStart = occDate;
   const recommendedEnd = addDays(occDate, 6);
-  const today = startOfToday();
 
   return (
     <Modal
@@ -572,7 +571,10 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
     setDateChanged(false);
     setWarning("");
   }, [event]);
-  const occDate = event.alertDate ? new Date(event.alertDate) : new Date();
+  const today = startOfToday();
+  const occDate = event.alertDate ? new Date(event.alertDate) : today;
+  const minDate = isAfter(occDate, today) ? occDate : today;
+
   const recommendedStart = occDate;
   const recommendedEnd = addDays(occDate, 6);
 
@@ -656,7 +658,7 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                         }
                       }}
                       dateFormat="yyyy-MM-dd"
-                      minDate={today} // désactive tous les jours avant aujourd’hui
+                      minDate={minDate} // désactive tous les jours avant aujourd’hui
                       dayClassName={(d) => {
                         // si pas d’alertDate, on ne surligne rien
                         if (!event.alertDate) return "";
