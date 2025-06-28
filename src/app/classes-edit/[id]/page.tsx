@@ -29,6 +29,7 @@ interface Poste {
   numero?: number; // devient optionnel
   label?: string; // nouveau champ
 }
+import EmplacementStats from "@/components/EmplacementStats";
 
 interface EmplacementDetail {
   id: string;
@@ -403,7 +404,13 @@ export default function ClasseDetailPage() {
                 </button>
               </div>
             </div>
-
+            {/* Ici par exemple, juste après le titre de la classe */}
+            {emplacement && (
+              <EmplacementStats
+                emplacementId={emplacement.id}
+                className="mb-8"
+              />
+            )}
             {/* Grid view */}
             {viewMode === "grid" ? (
               <>

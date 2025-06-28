@@ -22,6 +22,7 @@ import {
   FaBarcode,
   FaHashtag,
 } from "react-icons/fa";
+import EmplacementStats from "@/components/EmplacementStats";
 
 interface Poste {
   id: string;
@@ -355,7 +356,13 @@ export default function BureauDetailPage() {
                 </button>
               </div>
             </div>
-
+            {/* Ici par exemple, juste après le titre de la classe */}
+            {emplacement && (
+              <EmplacementStats
+                emplacementId={emplacement.id}
+                className="mb-8"
+              />
+            )}
             {/* GRID or LIST */}
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

@@ -23,6 +23,7 @@ import {
   FaTag,
   FaLayerGroup,
 } from "react-icons/fa";
+import EmplacementStats from "@/components/EmplacementStats";
 
 interface Poste {
   id: string;
@@ -200,6 +201,13 @@ export default function ClasseDetailPage() {
                 </button>
               </div>
             </div>
+            {/* Ici par exemple, juste après le titre de la classe */}
+            {emplacement && (
+              <EmplacementStats
+                emplacementId={emplacement.id}
+                className="mb-8"
+              />
+            )}
 
             {/* Grid / List */}
             {viewMode === "grid" ? (
