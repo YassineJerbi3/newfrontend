@@ -45,7 +45,9 @@ type NotificationType =
   | "RAPPORT_MAINTENANCE_A_CORRIGER"
   | "demande-deplacement-creee"
   | "deplacement-equipment"
-  | "intervention-terminee";
+  | "intervention-terminee"
+  | "DATE_VENIR_MAINTENANCE"
+  | "RETARD_MAINTENANCE";
 
 interface NotificationItem {
   id: string;
@@ -61,6 +63,7 @@ interface NotificationItem {
     message?: string;
     createdAt: string;
     incidentId?: string;
+    dueDate?: string; // ← add this
     technicianId?: string;
     technicienPrenom?: string;
     technicienNom?: string;
@@ -79,6 +82,8 @@ interface NotificationItem {
     // ← Nouveau pour maintenance
     dateOccurrence?: string; // J–7
     description?: string; // mp.description
+    overdueDays?: number;
+    occurrenceDate?: string;
   };
 }
 
@@ -144,6 +149,11 @@ const TYPE_CONFIG: Record<
     accent: "border-green-500 text-green-500",
     label: "Maintenance Préventif",
   },
+  DATE_VENIR_MAINTENANCE: {
+    icon: <FiCalendar size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Maintenance à venir (J–7)",
+  },
 
   RAPPORT_PREVENTIF_SOUMIS: {
     icon: <FiFileText size={20} />, // ou une autre icône qui te parle
@@ -170,6 +180,11 @@ const TYPE_CONFIG: Record<
     icon: <FiCheckCircle size={20} />,
     accent: "border-green-500 text-green-500",
     label: "Intervention terminée",
+  },
+  RETARD_MAINTENANCE: {
+    icon: <FiAlertTriangle size={20} />, // warning icon
+    accent: "border-red-500 text-red-500", // red accent
+    label: "Maintenance en retard",
   },
 };
 
@@ -328,6 +343,9 @@ export default function NotificationResponsableSI() {
           createdAt: payload.dateCreation ?? new Date().toISOString(),
           dateOccurrence: payload.dateOccurrence,
           description: payload.description,
+          dueDate: payload.dueDate,
+          overdueDays: payload.overdueDays,
+          occurrenceDate: payload.occurrenceDate,
           equipmentType: payload.equipmentType,
           location: payload.emplacement,
           emplacement: payload.emplacement,
@@ -354,12 +372,14 @@ export default function NotificationResponsableSI() {
     socket.on("ALERTE_STOCK", handler);
     socket.on("DEPASSEMENT_STOCK_ALERT", handler);
     socket.on("STOCK_INDISPONIBLE", handler);
+    socket.on("DATE_VENIR_MAINTENANCE", handler);
     socket.on("MAINTENANCE_ALERT", handler);
     socket.on("RAPPORT_PREVENTIF_SOUMIS", handler);
     socket.on("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
     socket.on("demande-deplacement-creee", handler);
     socket.on("deplacement-equipment", handler);
     socket.on("intervention-terminee", handler);
+    socket.on("RETARD_MAINTENANCE", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -369,8 +389,10 @@ export default function NotificationResponsableSI() {
       socket.off("ALERTE_STOCK", handler);
       socket.off("DEPASSEMENT_STOCK_ALERT", handler);
       socket.off("STOCK_INDISPONIBLE", handler);
+      socket.off("DATE_VENIR_MAINTENANCE", handler);
       socket.off("MAINTENANCE_ALERT", handler);
       socket.off("RAPPORT_PREVENTIF_SOUMIS", handler);
+      socket.off("RETARD_MAINTENANCE", handler);
       socket.off("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
       socket.off("demande-deplacement-creee", handler);
       socket.off("deplacement-equipment", handler);
@@ -570,7 +592,9 @@ export default function NotificationResponsableSI() {
                 <option value="rapport-incident">Rapport</option>
                 <option value="ALERTE_STOCK">Alerte Stock</option>
                 <option value="MAINTENANCE_ALERT">Maintenance</option>
-
+                <option value="DATE_VENIR_MAINTENANCE">
+                  Maintenance à venir
+                </option>
                 <option value="DEPASSEMENT_STOCK_ALERT">
                   Dépassement Stock
                 </option>
@@ -586,6 +610,9 @@ export default function NotificationResponsableSI() {
                 </option>
                 <option value="intervention-terminee">
                   Intervention terminée
+                </option>
+                <option value="RETARD_MAINTENANCE">
+                  Maintenance en retard
                 </option>
               </select>
             </div>
@@ -724,18 +751,40 @@ export default function NotificationResponsableSI() {
                   // Texte détaillé maintenance
                   let detailMaintenance = "";
                   if (
-                    n.type === "MAINTENANCE_ALERT" &&
-                    n.payload.dateOccurrence
+                    (n.type === "MAINTENANCE_ALERT" ||
+                      n.type === "DATE_VENIR_MAINTENANCE") &&
+                    n.payload.description &&
+                    (n.payload.dueDate || n.payload.dateOccurrence)
                   ) {
-                    const alertDate = new Date(n.payload.dateOccurrence);
-                    const dueDate = new Date(alertDate);
-                    dueDate.setDate(alertDate.getDate() + 7);
-                    const dueDateStr = dueDate.toLocaleDateString("fr-FR", {
+                    // now TS knows at least one of them is defined
+                    const due = n.payload.dueDate
+                      ? new Date(n.payload.dueDate)
+                      : new Date(
+                          new Date(n.payload.dateOccurrence!).getTime() +
+                            7 * 86400000,
+                        );
+                    const dueStr = due.toLocaleDateString("fr-FR", {
                       day: "2-digit",
                       month: "2-digit",
                       year: "numeric",
                     });
-                    detailMaintenance = `Maintenance “${n.payload.description}” sur l’équipement ${n.payload.equipmentType} à l’emplacement ${n.payload.location}, prévue le ${dueDateStr}.`;
+                    detailMaintenance = `Maintenance “${n.payload.description}” sur l’équipement ${n.payload.equipmentType} à l’emplacement ${n.payload.location}, prévue le ${dueStr}.`;
+                  }
+                  // Texte détaillé maintenance en retard
+                  let detailOverdue = "";
+                  if (
+                    n.type === "RETARD_MAINTENANCE" &&
+                    typeof n.payload.overdueDays === "number"
+                  ) {
+                    const occDate = n.payload.occurrenceDate
+                      ? new Date(n.payload.occurrenceDate)
+                      : new Date(n.payload.dateOccurrence!);
+                    const occStr = occDate.toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    });
+                    detailOverdue = `Maintenance “${n.payload.description}” sur l’équipement ${n.payload.equipmentType} à l’emplacement ${n.payload.location}, datant du ${occStr}, en retard de ${n.payload.overdueDays} jour${n.payload.overdueDays > 1 ? "s" : ""}.`;
                   }
 
                   // 1) Cas DEMANDE DE DEPLACEMENT
@@ -988,9 +1037,14 @@ export default function NotificationResponsableSI() {
                           <p className="mt-2 text-sm text-gray-700">
                             {n.payload.message}
                           </p>
-                        ) : n.type === "MAINTENANCE_ALERT" ? (
+                        ) : n.type === "MAINTENANCE_ALERT" ||
+                          n.type === "DATE_VENIR_MAINTENANCE" ? (
                           <p className="mt-2 text-sm text-gray-700">
                             {detailMaintenance}
+                          </p>
+                        ) : n.type === "RETARD_MAINTENANCE" ? (
+                          <p className="mt-2 text-sm text-gray-700">
+                            {detailOverdue}
                           </p>
                         ) : n.type === "rapport-incident" ||
                           n.type === "rapport-a-corriger" ? (
