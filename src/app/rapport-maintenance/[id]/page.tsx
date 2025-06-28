@@ -32,6 +32,7 @@ interface TypeConsommable {
 interface ArticleMagasin {
   id: string;
   designation: string;
+  quantite: number; // ← nouveau
 }
 export default function RapportPreventifPage({
   params: { id },
@@ -210,75 +211,107 @@ export default function RapportPreventifPage({
   }, [typeRealisation]);
 
   const onSubmit = async (formData) => {
-    // 1) Préparer le payload du rapport
-    const rapportPayload = {
-      occurrenceMaintenanceId: formData.occurrenceMaintenanceId,
-      travailEffectue: formData.travailEffectue,
-      dateDebut: formData.dateDebut,
-      dateFin: formData.dateFin,
-      dureeHeures: formData.dureeHeures,
-      cout: formData.cout,
-      externeNom: formData.nom,
-      externePrenom: formData.prenom,
-      externeEmail: formData.email,
-      externeTelephone: formData.telephone,
-    };
+    try {
+      // 1) Préparer le payload du rapport
+      const rapportPayload = {
+        occurrenceMaintenanceId: formData.occurrenceMaintenanceId,
+        travailEffectue: formData.travailEffectue,
+        dateDebut: formData.dateDebut,
+        dateFin: formData.dateFin,
+        dureeHeures: formData.dureeHeures,
+        cout: formData.cout,
+        externeNom: formData.nom,
+        externePrenom: formData.prenom,
+        externeEmail: formData.email,
+        externeTelephone: formData.telephone,
+      };
 
-    // 2) Créer ou mettre à jour le rapport
-    const respRapport = await fetch(
-      `${API}/rapport-maintenance${mode === "occurrence" ? "" : `/${createdRapportId}`}`,
-      {
+      // 2) Construire l’URL (POST pour création, PATCH pour correction)
+      const url =
+        mode === "occurrence"
+          ? `${API}/rapport-maintenance` // création
+          : `${API}/rapport-maintenance/${id}/contenu`; // correction de contenu
+
+      const respRapport = await fetch(url, {
         method: mode === "occurrence" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(rapportPayload),
-      },
-    );
-    if (!respRapport.ok) {
-      console.error(
-        "❌ Erreur création/màj rapport :",
-        await respRapport.text(),
+      });
+
+      if (!respRapport.ok) {
+        console.error(
+          "❌ Erreur création/màj rapport :",
+          await respRapport.text(),
+        );
+        return;
+      }
+
+      // 3) Récupérer l’ID du rapport
+      const { id: rapportId } = await respRapport.json();
+      console.log("✅ Rapport traité, id =", rapportId);
+
+      // 4) Filtrer les lignes valides du bon de sortie
+      const lignesValides = (formData.bonSortie?.lignes || []).filter(
+        (l) => l.articleId && l.quantiteSortie > 0,
       );
-      return;
+
+      // 5) Vérifier côté client que quantiteSortie ≤ stock dispo
+      for (const l of lignesValides) {
+        const art = Object.values(articlesByType)
+          .flat()
+          .find((a) => a.id === l.articleId);
+        if (!art) {
+          alert("❌ Article introuvable pour une ligne de bon de sortie.");
+          return;
+        }
+        if (l.quantiteSortie > art.quantite) {
+          alert(
+            `❌ Quantité demandée (${l.quantiteSortie}) dépasse le stock disponible (${art.quantite}) pour "${art.designation}".`,
+          );
+          return;
+        }
+      }
+
+      // 6) Créer le bon de sortie seulement s’il y a des lignes
+      if (lignesValides.length > 0) {
+        const bonPayload = {
+          rapportId,
+          lignes: lignesValides.map((l) => ({
+            articleMagasinId: l.articleId,
+            quantiteSortie: l.quantiteSortie,
+          })),
+        };
+
+        console.log(
+          "▶️ Envoi création bon de sortie avec payload :",
+          bonPayload,
+        );
+
+        const respBon = await fetch(`${API}/bons-sortie`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(bonPayload),
+        });
+
+        const txtBon = await respBon.text();
+        console.log("▶️ Réponse POST /bons‑sortie :", respBon.status, txtBon);
+
+        if (!respBon.ok) {
+          console.error("❌ Erreur création bon de sortie :", txtBon);
+          return;
+        }
+        console.log("✅ Bon de sortie créé avec succès");
+      } else {
+        console.log("ℹ️ Aucune ligne saisie → pas de bon de sortie créé");
+      }
+
+      // 7) Succès → redirection
+      router.push("/notification/not-technicien");
+    } catch (err) {
+      console.error("🚨 Erreur inattendue dans onSubmit :", err);
     }
-    const { id: rapportId } = await respRapport.json();
-    console.log("✅ Rapport traité, id =", rapportId);
-
-    // 3) Filtrer et préparer le payload du bon de sortie
-    const lignesValides = formData.bonSortie.lignes.filter(
-      (l) => l.articleId && l.quantity > 0,
-    );
-    const bonPayload = {
-      rapportId,
-      lignes: lignesValides.map((l) => ({
-        articleMagasinId: l.articleId,
-        quantiteSortie: l.quantity,
-      })),
-    };
-    console.log("▶️ BON PAYLOAD ➡️", bonPayload);
-
-    // 4) Créer le bon de sortie
-    const respBon = await fetch(`${API}/bons-sortie`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(bonPayload),
-    });
-    console.log(
-      "▶️ Statut POST /bons‑sortie :",
-      respBon.status,
-      respBon.statusText,
-    );
-    const txtBon = await respBon.text();
-    console.log("▶️ Body réponse bons‑sortie :", txtBon);
-
-    if (!respBon.ok) {
-      console.error("❌ Erreur création bon de sortie :", txtBon);
-      return;
-    }
-
-    // 5) Succès → redirection
-    router.push("/notification/not-technicien");
   };
 
   const planDateString =
@@ -666,7 +699,7 @@ export default function RapportPreventifPage({
                           ] || []
                         ).map((a) => (
                           <option key={a.id} value={a.id}>
-                            {a.designation}
+                            {a.designation} ({a.quantite} dispo)
                           </option>
                         ))}
                       </select>
@@ -674,13 +707,35 @@ export default function RapportPreventifPage({
                       {/* 3) Quantity */}
                       <Input
                         type="number"
-                        {...register(`bonSortie.lignes.${idx}.quantity`, {
-                          required: true,
+                        {...register(`bonSortie.lignes.${idx}.quantiteSortie`, {
+                          required: "Quantité requise",
                           min: { value: 1, message: "≥ 1" },
+                          validate: (q) => {
+                            const typeId = watch(
+                              `bonSortie.lignes.${idx}.typeId`,
+                            );
+                            const artId = watch(
+                              `bonSortie.lignes.${idx}.articleId`,
+                            );
+                            const art = articlesByType[typeId]?.find(
+                              (a) => a.id === artId,
+                            );
+                            if (!art) return "Sélectionnez d’abord un article";
+                            return (
+                              q <= art.quantite ||
+                              `Quantité max disponible : ${art.quantite}`
+                            );
+                          },
                         })}
                         placeholder="Qté"
                         className="w-20"
                       />
+                      {/* Affiche l’erreur si nécessaire */}
+                      {errors.bonSortie?.lignes?.[idx]?.quantiteSortie && (
+                        <p className="text-sm text-red-600">
+                          {errors.bonSortie.lignes[idx].quantiteSortie.message}
+                        </p>
+                      )}
 
                       {/* 4) Remove line */}
                       <button
@@ -696,7 +751,11 @@ export default function RapportPreventifPage({
                   <Button
                     type="button"
                     onClick={() =>
-                      append({ typeId: "", articleId: "", quantity: undefined })
+                      append({
+                        typeId: "",
+                        articleId: "",
+                        quantiteSortie: undefined,
+                      })
                     }
                   >
                     + Ajouter une ligne

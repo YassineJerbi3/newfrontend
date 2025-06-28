@@ -561,9 +561,10 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
   const [datePlanif, setDatePlanif] = useState<Date>(
     event.datePlanification || new Date(),
   );
+
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [dateChanged, setDateChanged] = useState(false);
-  const [warning, setWarning] = useState<string>(""); // ← nouvel état
+  const [warning, setWarning] = useState<string>("");
 
   useEffect(() => {
     setDatePlanif(event.datePlanification || new Date());
@@ -706,16 +707,21 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        onSave({
-                          ...event,
-                          datePlanification: datePlanif,
-                          start: datePlanif,
-                          end: datePlanif,
-                        });
-                        setIsEditingDate(false);
-                        setDateChanged(false);
-                        setWarning("");
+                      onClick={async () => {
+                        // Appel à l’endpoint PATCH /unplanifier
+                        await fetch(
+                          `http://localhost:2000/occurrences-maintenance/${event.id}/unplanifier`,
+                          {
+                            method: "PATCH",
+                            credentials: "include",
+                          },
+                        );
+
+                        // Appelle un callback du parent pour retirer l’événement
+                        onDelete(event.id);
+
+                        // Fermer le modal
+                        onClose();
                       }}
                       className="rounded-3xl bg-blue-700 px-5 py-2 text-white shadow-md hover:bg-blue-800"
                     >
@@ -1084,6 +1090,7 @@ const MyCalendar: React.FC = () => {
                   onClose={closeModal}
                   event={modalEvent}
                   onSave={handleSave}
+                  onDelete={handleDelete} // 👈 ajouter ça
                 />
               )}
           </>
