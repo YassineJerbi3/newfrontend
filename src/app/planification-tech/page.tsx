@@ -26,9 +26,13 @@ const eventStyleGetter = (event: any) => {
   let bgColor: string, icon: JSX.Element;
 
   if (event.type === "preventive") {
-    // Maintenance préventive en violet
-    bgColor = "#8B5CF6";
-    icon = <FiAlertTriangle />;
+    if (event.statut === "VALIDE") {
+      bgColor = "#10B981"; // vert
+      icon = <FiCheckCircle />;
+    } else {
+      bgColor = "#8B5CF6"; // violet
+      icon = <FiAlertTriangle />;
+    }
   } else {
     // Rapports
     if (event.statut === "VALIDE") {
@@ -184,23 +188,44 @@ const CalendarOnlyPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        // Charger rapports planifiés
+        // 1) Charger rapports planifiés
         const res1 = await fetch(
           "http://localhost:2000/rapports/mes-planifies",
           { credentials: "include" },
         );
-        if (!res1.ok) throw new Error(`Rapports – Erreur ${res1.status}`);
+        if (!res1.ok) throw new Error(`Rapports – Erreur ${res1.status}`);
         const rapports = await res1.json();
 
-        // Charger maintenances préventives assignées
+        // 2) Charger maintenances préventives assignées
         const res2 = await fetch(
           "http://localhost:2000/occurrences-maintenance/assigned",
           { credentials: "include" },
         );
-        if (!res2.ok) throw new Error(`Préventives – Erreur ${res2.status}`);
+        if (!res2.ok) throw new Error(`Préventives – Erreur ${res2.status}`);
         const preventives = await res2.json();
 
-        // Transformer en events
+        // 3) Enrichir chaque preventive avec son rapportMaintenance (statut + id)
+        const enrichedPreventives = await Promise.all(
+          preventives.map(async (o: any) => {
+            try {
+              const rapRes = await fetch(
+                `http://localhost:2000/rapport-maintenance/${o.id}`,
+                { credentials: "include" },
+              );
+              if (!rapRes.ok) throw new Error("No report");
+              const rap = await rapRes.json();
+              return {
+                ...o,
+                reportStatut: rap.statut, // "VALIDE", "SOUMIS", etc.
+                reportId: rap.id,
+              };
+            } catch {
+              return { ...o, reportStatut: null, reportId: null };
+            }
+          }),
+        );
+
+        // 4) Transformer les rapports en events
         const eventsRapports = rapports.map((r: any) => {
           const d = new Date(r.datePlanification);
           return {
@@ -225,7 +250,8 @@ const CalendarOnlyPage: React.FC = () => {
           };
         });
 
-        const eventsPreventives = preventives.map((o: any) => {
+        // 5) Transformer les preventives enrichies en events
+        const eventsPreventives = enrichedPreventives.map((o: any) => {
           const d = new Date(o.datePlanification);
           return {
             id: o.id,
@@ -237,9 +263,12 @@ const CalendarOnlyPage: React.FC = () => {
             emplacement: o.maintenancePreventive.equipement.emplacement,
             description: o.maintenancePreventive.description,
             datePlanification: d,
+            statut: o.rapport?.statut ?? null, // ← ici on récupère directement le statut
+            rapportId: o.rapport?.id ?? null, // ← et l’ID de rapport
           };
         });
 
+        // 6) Combiner et stocker
         setEvents([...eventsRapports, ...eventsPreventives]);
       } catch (e) {
         setError((e as Error).message);
@@ -340,6 +369,16 @@ const CalendarOnlyPage: React.FC = () => {
                     jour(s)
                   </p>
                 )}
+
+                {/* Badge pour preventive validée */}
+                {selectedEvent.type === "preventive" &&
+                  selectedEvent.statut === "VALIDE" && (
+                    <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+                      ✔ Maintenance préventive validée
+                    </p>
+                  )}
+
+                {/* Badge pour rapport validé */}
                 {selectedEvent.type !== "preventive" &&
                   selectedEvent.statut === "VALIDE" && (
                     <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
@@ -357,12 +396,9 @@ const CalendarOnlyPage: React.FC = () => {
                     {selectedEvent.emplacement.nom}
                   </p>
                   {selectedEvent.type === "preventive" ? (
-                    <>
-                      <p>
-                        <strong>Description :</strong>{" "}
-                        {selectedEvent.description}
-                      </p>
-                    </>
+                    <p>
+                      <strong>Description :</strong> {selectedEvent.description}
+                    </p>
                   ) : (
                     <>
                       <p>
@@ -385,38 +421,35 @@ const CalendarOnlyPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="mt-4 flex justify-end">
-                  <button
-                    className={`rounded-full px-4 py-2 font-semibold text-white transition ${
-                      Date.now() >= selectedEvent.datePlanification.getTime()
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "cursor-not-allowed bg-gray-400"
-                    }`}
-                    disabled={
-                      Date.now() < selectedEvent.datePlanification.getTime()
-                    }
-                    onClick={() => {
-                      if (
+                {/* Bouton masqué si preventive déjà validée */}
+                {!(
+                  selectedEvent.type === "preventive" &&
+                  selectedEvent.statut === "VALIDE"
+                ) && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      className={`rounded-full px-4 py-2 font-semibold text-white transition ${
                         Date.now() >= selectedEvent.datePlanification.getTime()
-                      ) {
-                        // on considère que pour un event.preventive c'est l'occurrenceMaintenanceId
-                        // et pour un event.rapport (incidents) tu as peut‑être déjà un rapportId ou
-                        // tu gères ça ailleurs.
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "cursor-not-allowed bg-gray-400"
+                      }`}
+                      disabled={
+                        Date.now() < selectedEvent.datePlanification.getTime()
+                      }
+                      onClick={() => {
                         const path =
                           selectedEvent.type === "preventive"
-                            ? // on passe l'ID de l'occurrence ici pour créer/éditer le rapport
-                              `/rapport-maintenance/${selectedEvent.id}`
-                            : // si tu veux quand même rediriger vers un incident-report
-                              `/rapport/incident/${selectedEvent.incident.id}`;
+                            ? `/rapport-maintenance/${selectedEvent.id}`
+                            : `/rapport/incident/${selectedEvent.incident.id}`;
                         router.push(path);
-                      }
-                    }}
-                  >
-                    {selectedEvent.type === "preventive"
-                      ? "Saisir le rapport"
-                      : "Voir le rapport incident"}
-                  </button>
-                </div>
+                      }}
+                    >
+                      {selectedEvent.type === "preventive"
+                        ? "Saisir le rapport"
+                        : "Voir le rapport incident"}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </motion.div>
           )}
