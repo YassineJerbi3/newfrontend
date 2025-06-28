@@ -44,7 +44,8 @@ type NotificationType =
   | "RAPPORT_PREVENTIF_SOUMIS"
   | "RAPPORT_MAINTENANCE_A_CORRIGER"
   | "demande-deplacement-creee"
-  | "deplacement-equipment"; // ← ajouté
+  | "deplacement-equipment"
+  | "intervention-terminee";
 
 interface NotificationItem {
   id: string;
@@ -164,6 +165,11 @@ const TYPE_CONFIG: Record<
     icon: <FiCheckSquare size={20} />,
     accent: "border-green-600 text-green-600",
     label: "Équipement déplacé",
+  },
+  "intervention-terminee": {
+    icon: <FiCheckCircle size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Intervention terminée",
   },
 };
 
@@ -353,6 +359,7 @@ export default function NotificationResponsableSI() {
     socket.on("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
     socket.on("demande-deplacement-creee", handler);
     socket.on("deplacement-equipment", handler);
+    socket.on("intervention-terminee", handler);
 
     return () => {
       socket.off("incident", handler);
@@ -367,6 +374,7 @@ export default function NotificationResponsableSI() {
       socket.off("RAPPORT_MAINTENANCE_A_CORRIGER", handler);
       socket.off("demande-deplacement-creee", handler);
       socket.off("deplacement-equipment", handler);
+      socket.off("intervention-terminee", handler);
     };
   }, [loadNotifications]);
 
@@ -575,6 +583,9 @@ export default function NotificationResponsableSI() {
                 </option>
                 <option value="deplacement-equipment">
                   Équipement déplacé
+                </option>
+                <option value="intervention-terminee">
+                  Intervention terminée
                 </option>
               </select>
             </div>
@@ -851,6 +862,59 @@ export default function NotificationResponsableSI() {
                       </div>
                     );
                   }
+                  // ─── Intervention terminée ───
+                  if (n.type === "intervention-terminee") {
+                    return (
+                      <div
+                        key={n.id}
+                        className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm"
+                      >
+                        {/* Accent bar */}
+                        <div className="h-1 w-full border-green-500 bg-green-500" />
+
+                        {/* Contenu */}
+                        <div className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-green-500">
+                              <FiCheckCircle size={20} />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900">
+                              Intervention terminée
+                            </h3>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-700">
+                            Équipement :{" "}
+                            <strong>{n.payload.equipmentType}</strong>
+                          </p>
+                          <p className="mt-1 text-sm text-gray-700">
+                            {n.payload.message}
+                          </p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end border-t border-gray-200 px-5 py-3">
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <FiClock size={12} />
+                            <span>
+                              {new Date(n.payload.createdAt).toLocaleTimeString(
+                                "fr-FR",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Indicateur non lu */}
+                        {!n.read && (
+                          <div className="absolute right-3 top-3 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                        )}
+                      </div>
+                    );
+                  }
+
                   // 2) Carte générique pour les autres types
                   return (
                     <div

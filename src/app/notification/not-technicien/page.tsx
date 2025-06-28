@@ -24,7 +24,8 @@ type NotificationType =
   | "RAPPORT_MAINTENANCE_VALIDE"
   | "RAPPORT_MAINTENANCE_INVALIDE"
   | "demande-deplacement-autorisee"
-  | "demande-deplacement-non-autorisee";
+  | "demande-deplacement-non-autorisee"
+  | "intervention-terminee";
 
 interface RawNotification {
   id: string;
@@ -110,6 +111,11 @@ type NotificationItem =
       equipmentType: string;
       location: string;
       datePlanification: string;
+    })
+  | (BaseNotification & {
+      type: "intervention-terminee";
+      equipmentType: string;
+      message: string;
     });
 
 const TYPE_CONFIG: Record<
@@ -171,6 +177,11 @@ const TYPE_CONFIG: Record<
     accent: "border-red-500 text-red-500",
     label: "Déplacement non autorisé",
   },
+  "intervention-terminee": {
+    icon: <FiCheckCircle size={20} />,
+    accent: "border-green-500 text-green-500",
+    label: "Intervention terminée",
+  },
 };
 
 export default function NotificationTechnicien() {
@@ -204,6 +215,7 @@ export default function NotificationTechnicien() {
                 "RAPPORT_MAINTENANCE_INVALIDE",
                 "demande-deplacement-autorisee",
                 "demande-deplacement-non-autorisee",
+                "intervention-terminee",
               ].includes(n.type),
             )
             .map(async (n) => {
@@ -323,6 +335,14 @@ export default function NotificationTechnicien() {
                     equipmentType: p.equipmentType,
                     emplacement: p.emplacement,
                     remarqueResponsable: p.remarqueResponsable,
+                  } as NotificationItem;
+                }
+                case "intervention-terminee": {
+                  const p = n.payload;
+                  return {
+                    ...base,
+                    equipmentType: p.equipmentType,
+                    message: p.message,
                   } as NotificationItem;
                 }
               }
@@ -460,6 +480,9 @@ export default function NotificationTechnicien() {
                 <option value="RAPPORT_MAINTENANCE_INVALIDE">
                   Maint. invalidé
                 </option>
+                <option value="intervention-terminee">
+                  Intervention terminée
+                </option>
               </select>
             </div>
 
@@ -521,6 +544,60 @@ export default function NotificationTechnicien() {
               <div className="grid auto-rows-auto gap-6">
                 {items.map((n) => {
                   const cfg = TYPE_CONFIG[n.type];
+
+                  // ─── SPECIAL CASE: Intervention terminée ───
+                  if (n.type === "intervention-terminee") {
+                    return (
+                      <Link
+                        key={n.id}
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          conditionalMarkAsRead(e, n.id, n.type);
+                        }}
+                        className={`relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-transform hover:-translate-y-1 hover:shadow-lg ${
+                          n.read ? "opacity-70" : ""
+                        }`}
+                      >
+                        {/* Accent bar */}
+                        <div className={`h-1 w-full ${cfg.accent}`} />
+
+                        {/* Content */}
+                        <div className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex h-8 w-8 items-center justify-center rounded-full border ${cfg.accent} bg-white`}
+                            >
+                              {cfg.icon}
+                            </div>
+                            <h3 className="text-lg font-bold">{cfg.label}</h3>
+                          </div>
+                          <p className="mt-2 text-sm">
+                            Équipement : 
+                            <strong>{(n as any).equipmentType}</strong>
+                          </p>
+                          <p className="text-sm">{(n as any).message}</p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex justify-end border-t px-5 py-3 text-xs text-gray-600">
+                          <FiClock size={12} />
+                          <span className="ml-1">
+                            {new Date(n.createdAt).toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        {/* Unread dot */}
+                        {!n.read && (
+                          <div className="absolute right-3 top-3 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                        )}
+                      </Link>
+                    );
+                  }
+
                   return (
                     <Link
                       key={n.id}
