@@ -407,7 +407,7 @@ const CalendarOnlyPage: React.FC = () => {
                             ? // on passe l'ID de l'occurrence ici pour créer/éditer le rapport
                               `/rapport-maintenance/${selectedEvent.id}`
                             : // si tu veux quand même rediriger vers un incident-report
-                              `/rapport-incident/${selectedEvent.incident.id}`;
+                              `/rapport/incident/${selectedEvent.incident.id}`;
                         router.push(path);
                       }
                     }}

@@ -18,7 +18,12 @@ import { addDays, isAfter, isBefore, isEqual } from "date-fns";
 import { startOfToday } from "date-fns";
 
 const localizer = momentLocalizer(moment);
-
+interface RapportCalendarModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  event: Evenement;
+  onSave: (ev: Evenement) => void;
+}
 export interface Evenement {
   id: string;
   type: "rapport" | "maintenance";
@@ -157,6 +162,7 @@ const RapportListModal: React.FC<RapportListModalProps> = ({
     <Modal
       isOpen={isOpen}
       onRequestClose={onClose}
+      shouldCloseOnOverlayClick={false}
       ariaHideApp={false}
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
       className="outline-none"
@@ -236,65 +242,138 @@ const RapportListModal: React.FC<RapportListModalProps> = ({
 // Rapport Calendar Modal
 interface RapportCalendarModalProps extends BaseModalProps {
   event: Evenement;
+  onSave: (ev: Evenement) => void;
 }
 const RapportCalendarModal: React.FC<RapportCalendarModalProps> = ({
   isOpen,
   onClose,
   event,
-}) => (
-  <Modal
-    isOpen={isOpen}
-    onRequestClose={onClose}
-    ariaHideApp={false}
-    overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
-    className="outline-none"
-  >
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -30 }}
-          transition={{ duration: 0.2 }}
-          className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
-          >
-            ✕
-          </button>
-          <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
-            Détails du rapport
-          </h2>
-          <div className="space-y-3 text-gray-700">
-            <p>
-              <strong>Équipement :</strong> {event.equipement.equipmentType}
-            </p>
-            <p>
-              <strong>Emplacement :</strong> {event.emplacement.nom}
-            </p>
-            <p>
-              <strong>Incident :</strong> {event.incident.description}
-            </p>
-            <p>
-              <strong>Diagnostic :</strong> {event.diagnostique}
-            </p>
-            <p>
-              <strong>Technicien :</strong> {event.technicien?.prenom}{" "}
-              {event.technicien?.nom}
-            </p>
-            <p>
-              <strong>Date validation :</strong> {event.dateValidation}
-            </p>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </Modal>
-);
+  onSave,
+}) => {
+  const today = startOfToday();
+  const [datePlanif, setDatePlanif] = useState<Date>(
+    event.datePlanification || today,
+  );
+  const [isEditing, setIsEditing] = useState(false);
 
+  useEffect(() => {
+    setDatePlanif(event.datePlanification || today);
+    setIsEditing(false);
+  }, [event]);
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onRequestClose={onClose}
+      shouldCloseOnOverlayClick={false}
+      ariaHideApp={false}
+      overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
+      className="outline-none"
+    >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ duration: 0.2 }}
+            className="mx-4 w-full max-w-md rounded-3xl bg-white/80 p-6 shadow-2xl backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 text-xl text-gray-600 hover:text-gray-900"
+            >
+              ✕
+            </button>
+            <h2 className="mb-4 text-center text-2xl font-bold text-blue-800">
+              Détails du rapport
+            </h2>
+
+            <div className="space-y-3 text-gray-700">
+              <p>
+                <strong>Équipement :</strong> {event.equipement.equipmentType}
+              </p>
+              <p>
+                <strong>Emplacement :</strong> {event.emplacement.nom}
+              </p>
+              <p>
+                <strong>Incident :</strong> {event.incident.description}
+              </p>
+              <p>
+                <strong>Diagnostic :</strong> {event.diagnostique}
+              </p>
+              <p>
+                <strong>Technicien :</strong> {event.technicien?.prenom}{" "}
+                {event.technicien?.nom}
+              </p>
+              <p>
+                <strong>Date planification :</strong>{" "}
+                {event.datePlanification
+                  ? new Date(event.datePlanification).toLocaleDateString(
+                      "fr-FR",
+                    )
+                  : "—"}
+              </p>
+
+              {event.statut !== "A_CORRIGER" &&
+                event.statut !== "INVALIDE" &&
+                event.statut !== "VALIDE" && (
+                  <div className="mt-4 flex flex-col items-center space-y-3">
+                    {!isEditing ? (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="rounded-3xl bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+                      >
+                        Modifier la date
+                      </button>
+                    ) : (
+                      <>
+                        <DatePicker
+                          inline
+                          selected={datePlanif}
+                          onChange={(d) => {
+                            if (d) setDatePlanif(d);
+                          }}
+                          dateFormat="yyyy-MM-dd"
+                          minDate={today}
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => {
+                              onSave({
+                                ...event,
+                                datePlanification: datePlanif,
+                                start: datePlanif,
+                                end: datePlanif,
+                              });
+                              setIsEditing(false);
+                            }}
+                            className="rounded-3xl bg-blue-700 px-4 py-2 text-white shadow-md hover:bg-blue-800"
+                          >
+                            Valider
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDatePlanif(event.datePlanification || today);
+                              setIsEditing(false);
+                            }}
+                            className="rounded-3xl bg-red-200 px-4 py-2 text-red-700 hover:bg-red-300"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Modal>
+  );
+};
 // Maintenance List Modal
 interface MaintenanceListModalProps extends BaseModalProps {
   event: Evenement;
@@ -333,6 +412,7 @@ const MaintenanceListModal: React.FC<MaintenanceListModalProps> = ({
     <Modal
       isOpen={isOpen}
       onRequestClose={onClose}
+      shouldCloseOnOverlayClick={false}
       ariaHideApp={false}
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
       className="outline-none"
@@ -500,6 +580,7 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
     <Modal
       isOpen={isOpen}
       onRequestClose={onClose}
+      shouldCloseOnOverlayClick={false}
       ariaHideApp={false}
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-start justify-center pt-[90px] z-40"
       className="outline-none"
@@ -963,6 +1044,7 @@ const MyCalendar: React.FC = () => {
                 isOpen={modalOpen}
                 onClose={closeModal}
                 event={modalEvent}
+                onSave={handleSave} // ← ajoute cette ligne
               />
             )}
             {modalEvent.type === "maintenance" && modalContext === "list" && (
