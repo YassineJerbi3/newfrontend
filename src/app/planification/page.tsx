@@ -708,6 +708,7 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                       whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         onSave({
+                          ...event,
                           datePlanification: datePlanif,
                           start: datePlanif,
                           end: datePlanif,
@@ -720,6 +721,21 @@ const MaintenanceCalendarModal: React.FC<MaintenanceCalendarModalProps> = ({
                     >
                       Valider
                     </motion.button>
+                  )}
+                  {/* 3) Bouton “Annuler la planification” */}
+                  {!isEditingDate && event.datePlanification && (
+                    <button
+                      onClick={() =>
+                        onSave({
+                          ...event,
+                          datePlanification: null,
+                          plannedTechnicienId: undefined,
+                        })
+                      }
+                      className="rounded-3xl bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                    >
+                      Annuler la planification
+                    </button>
                   )}
                 </>
               )}
@@ -864,8 +880,10 @@ const MyCalendar: React.FC = () => {
     const body = isRapport
       ? { datePlanification: ev.datePlanification?.toISOString() }
       : {
-          datePlanification: ev.datePlanification?.toISOString(),
-          technicienId: ev.plannedTechnicienId,
+          datePlanification: ev.datePlanification
+            ? ev.datePlanification.toISOString()
+            : null, // ← ici, null pour annuler
+          technicienId: ev.plannedTechnicienId || null, // ← idem
         };
 
     await fetch(url, {
@@ -875,6 +893,7 @@ const MyCalendar: React.FC = () => {
       body: JSON.stringify(body),
     });
 
+    // On retire toujours l’événement des listes “à planifier”
     setRapportEvents((prev) => prev.filter((r) => r.id !== ev.id));
     setMaintenanceEvents((prev) => prev.filter((m) => m.id !== ev.id));
     closeModal();
