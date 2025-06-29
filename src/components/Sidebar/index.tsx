@@ -182,12 +182,7 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
             icon: <FaClipboardList size={18} />,
             roles: ["RESPONSABLE SI"],
           },
-          {
-            label: "Bon d'entrée",
-            route: "/depot/entree",
-            icon: <FaArrowCircleDown size={18} />,
-            roles: ["RESPONSABLE SI"],
-          },
+
           {
             label: "Bon de sortie",
             route: "/depot/sortie",
