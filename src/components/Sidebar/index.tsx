@@ -180,7 +180,7 @@ const menuGroups: { name: string; menuItems: MenuItem[] }[] = [
 
           {
             label: "Bon de sortie",
-            route: "/depot/sortie",
+            route: "/bonsortie",
             icon: <FaArrowCircleUp size={18} />,
             roles: ["RESPONSABLE SI"],
           },
