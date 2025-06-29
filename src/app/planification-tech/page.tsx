@@ -19,6 +19,7 @@ import {
   FiClock,
   FiAlertTriangle,
 } from "react-icons/fi";
+import { DayEventsModal, EventItem } from "@/components/DayEventsModal";
 
 const localizer = momentLocalizer(moment);
 
@@ -184,7 +185,8 @@ const CalendarOnlyPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const router = useRouter();
-
+  const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
+  const [dayEvents, setDayEvents] = useState<EventItem[]>([]);
   useEffect(() => {
     (async () => {
       try {
@@ -298,6 +300,25 @@ const CalendarOnlyPage: React.FC = () => {
               defaultView="month"
               views={["month"]}
               popup
+              selectable // ← rend le jour cliquable
+              onSelectSlot={({ start }) => {
+                // ← capture le jour cliqué
+                const dayStart = new Date(
+                  start.getFullYear(),
+                  start.getMonth(),
+                  start.getDate(),
+                );
+                const inDay = events.filter(
+                  (e) =>
+                    e.start.getFullYear() === dayStart.getFullYear() &&
+                    e.start.getMonth() === dayStart.getMonth() &&
+                    e.start.getDate() === dayStart.getDate(),
+                );
+                if (inDay.length) {
+                  setDayEvents(inDay as EventItem[]);
+                  setDayModalDate(dayStart);
+                }
+              }}
               events={events}
               style={{
                 height: "100%",
@@ -324,6 +345,22 @@ const CalendarOnlyPage: React.FC = () => {
                 },
               }}
               onSelectEvent={(e) => setSelectedEvent(e)}
+            />
+          )}
+
+          {/* Affiche le modal jour seulement si on a cliqué sur une date */}
+          {dayModalDate && (
+            <DayEventsModal
+              date={dayModalDate}
+              events={dayEvents}
+              onClose={() => setDayModalDate(null)}
+              onSelect={(ev) => {
+                const path =
+                  ev.type === "preventive"
+                    ? `/rapport-maintenance/${ev.id}`
+                    : `/rapport/incident/${ev.incident!.id}`;
+                router.push(path);
+              }}
             />
           )}
         </div>
