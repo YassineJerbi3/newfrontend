@@ -218,36 +218,65 @@ export default function ClasseDetailPage() {
             {viewMode === "grid" ? (
               <>
                 <div className="mb-10 flex justify-center">
-                  <div
-                    className="flex cursor-pointer flex-col items-center space-y-3 rounded-3xl border-2 border-blue-500 bg-white p-8 shadow-lg"
-                    onClick={() =>
-                      openEquipmentModal(
-                        emplacement.postes.find((p) => p.numero == null)!,
-                      )
-                    }
-                  >
-                    <FaDesktop className="text-blue-600" size={56} />
-                    <span className="text-2xl font-semibold text-blue-700">
-                      Poste Enseignant
-                    </span>
-                  </div>
+                  {(() => {
+                    const enseignant = emplacement.postes.find(
+                      (p) => p.numero == null,
+                    )!;
+                    const enseignantHasPanne = allEquipements
+                      .filter((e) => e.posteId === null)
+                      .some((e) => e.etat === "EN_PANNE");
+                    return (
+                      <div
+                        className={`
+              relative flex cursor-pointer flex-col items-center space-y-3 rounded-3xl border-2 bg-white p-8
+              shadow-lg ${enseignantHasPanne ? "border-red-500" : "border-blue-500"}
+            `}
+                        onClick={() => openEquipmentModal(enseignant)}
+                      >
+                        <FaDesktop className="text-blue-600" size={56} />
+                        {enseignantHasPanne && (
+                          <FaExclamationTriangle
+                            className="absolute right-3 top-3 text-red-600"
+                            size={24}
+                          />
+                        )}
+                        <span className="text-2xl font-semibold text-blue-700">
+                          Poste Enseignant
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {emplacement.postes
                     .filter((p) => p.numero != null)
-                    .map((poste) => (
-                      <div
-                        key={poste.id}
-                        className="flex cursor-pointer flex-col items-center space-y-4 rounded-2xl bg-white p-6 shadow-md transition-transform hover:scale-105"
-                        onClick={() => openEquipmentModal(poste)}
-                      >
-                        <FaDesktop className="text-gray-600" size={48} />
-                        <span className="text-xl font-medium text-gray-800">
-                          Poste {poste.numero}
-                        </span>
-                      </div>
-                    ))}
+                    .map((poste) => {
+                      const hasPanne = allEquipements
+                        .filter((e) => e.posteId === poste.id)
+                        .some((e) => e.etat === "EN_PANNE");
+                      return (
+                        <div
+                          key={poste.id}
+                          className={`
+                relative flex cursor-pointer flex-col items-center space-y-4 rounded-2xl bg-white p-6 shadow-md transition-transform hover:scale-105
+                ${hasPanne ? "border-2 border-red-500" : "border-transparent"}
+              `}
+                          onClick={() => openEquipmentModal(poste)}
+                        >
+                          <FaDesktop className="text-gray-600" size={48} />
+                          {hasPanne && (
+                            <FaExclamationTriangle
+                              className="absolute right-3 top-3 text-red-600"
+                              size={20}
+                            />
+                          )}
+                          <span className="text-xl font-medium text-gray-800">
+                            Poste {poste.numero}
+                          </span>
+                        </div>
+                      );
+                    })}
                 </div>
               </>
             ) : (
