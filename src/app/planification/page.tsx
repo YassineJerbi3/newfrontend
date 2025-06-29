@@ -365,6 +365,21 @@ const RapportCalendarModal: React.FC<RapportCalendarModalProps> = ({
                         </div>
                       </>
                     )}
+
+                    {/* Nouveau bouton « Annuler la planification » */}
+                    <button
+                      onClick={() =>
+                        onSave({
+                          ...event,
+                          datePlanification: null,
+                          start: event.start,
+                          end: event.end,
+                        })
+                      }
+                      className="mt-2 rounded-3xl bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                    >
+                      Annuler la planification
+                    </button>
                   </div>
                 )}
             </div>
