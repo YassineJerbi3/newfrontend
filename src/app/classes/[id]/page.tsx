@@ -450,6 +450,8 @@ export default function ClasseDetailPage() {
                     <FaTimes />
                   </button>
                 </div>
+
+                {/* Details Grid */}
                 <div className="grid grid-cols-1 gap-6 p-6 text-gray-700 md:grid-cols-3">
                   <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
                     <FaLayerGroup className="text-blue-600" />
@@ -462,6 +464,7 @@ export default function ClasseDetailPage() {
                       </p>
                     </div>
                   </div>
+
                   <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
                     <FaTag className="text-green-600" />
                     <div>
@@ -473,6 +476,7 @@ export default function ClasseDetailPage() {
                       </p>
                     </div>
                   </div>
+
                   <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
                     <FaInfoCircle className="text-yellow-600" />
                     <div>
@@ -484,6 +488,7 @@ export default function ClasseDetailPage() {
                       </p>
                     </div>
                   </div>
+
                   <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
                     <FaBarcode className="text-purple-600" />
                     <div>
@@ -495,6 +500,7 @@ export default function ClasseDetailPage() {
                       </p>
                     </div>
                   </div>
+
                   <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
                     <FaHashtag className="text-indigo-600" />
                     <div>
@@ -506,6 +512,7 @@ export default function ClasseDetailPage() {
                       </p>
                     </div>
                   </div>
+
                   <div className="flex items-center space-x-3 rounded-lg bg-gray-50 p-3">
                     <FaDesktop className="text-teal-600" />
                     <div>
@@ -522,6 +529,19 @@ export default function ClasseDetailPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Déclarer une intervention Button */}
+                <div className="p-6">
+                  <button
+                    onClick={() => {
+                      setIncidentEquipment(selectedEquipment);
+                      setShowIncidentModal(true);
+                    }}
+                    className="mt-4 w-full rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                  >
+                    Déclarer une intervention
+                  </button>
                 </div>
               </div>
             </div>
