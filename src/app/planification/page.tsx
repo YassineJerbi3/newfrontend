@@ -894,29 +894,87 @@ const MyCalendar: React.FC = () => {
 
   const handleSave = async (ev: Evenement) => {
     const isRapport = ev.type === "rapport";
+    // Détecte l'annulation pour les maintenances
+    const isUnplanMaintenance = !isRapport && ev.datePlanification === null;
+
+    // Choix de l'URL selon le type et le cas d'annulation
     const url = isRapport
       ? `http://localhost:2000/rapports/${ev.id}/planifier`
-      : `http://localhost:2000/occurrences-maintenance/${ev.id}/planifier`;
+      : isUnplanMaintenance
+        ? `http://localhost:2000/occurrences-maintenance/${ev.id}/unplanifier`
+        : `http://localhost:2000/occurrences-maintenance/${ev.id}/planifier`;
 
-    const body = isRapport
-      ? { datePlanification: ev.datePlanification?.toISOString() }
-      : {
-          datePlanification: ev.datePlanification
-            ? ev.datePlanification.toISOString()
-            : null, // ← ici, null pour annuler
-          technicienId: ev.plannedTechnicienId || null, // ← idem
-        };
+    // Méthode HTTP
+    const method = isRapport ? "POST" : "PATCH";
 
-    await fetch(url, {
-      method: isRapport ? "POST" : "PATCH", // ← use POST for rapports
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    // Corps de la requête : aucun body pour l'unplan d'une maintenance
+    const init: RequestInit = {
+      method,
+      credentials: "include" as RequestCredentials,
+      headers: {} as Record<string, string>,
+    };
 
-    // On retire toujours l’événement des listes “à planifier”
-    setRapportEvents((prev) => prev.filter((r) => r.id !== ev.id));
-    setMaintenanceEvents((prev) => prev.filter((m) => m.id !== ev.id));
+    if (isRapport) {
+      init.headers!["Content-Type"] = "application/json";
+      init.body = JSON.stringify({
+        datePlanification: ev.datePlanification
+          ? ev.datePlanification.toISOString()
+          : null,
+      });
+    } else if (!isUnplanMaintenance) {
+      // planification de maintenance
+      init.headers!["Content-Type"] = "application/json";
+      init.body = JSON.stringify({
+        datePlanification: ev.datePlanification!.toISOString(),
+        technicienId: ev.plannedTechnicienId!,
+      });
+    }
+    // pour unplan de maintenance, on n'ajoute pas de body
+
+    // Appel API
+    await fetch(url, init);
+
+    // Mise à jour locale
+    if (isRapport) {
+      // Retire le rapport des à-planifier
+      setRapportEvents((prev) => prev.filter((r) => r.id !== ev.id));
+      // Met à jour le calendrier
+      if (ev.datePlanification) {
+        setScheduledEvents((prev) => {
+          const exists = prev.some((e) => e.id === ev.id);
+          const updated = {
+            ...ev,
+            start: ev.datePlanification,
+            end: ev.datePlanification,
+          };
+          return exists
+            ? prev.map((e) => (e.id === ev.id ? updated : e))
+            : [...prev, updated];
+        });
+      } else {
+        // annulation de planif
+        setScheduledEvents((prev) => prev.filter((e) => e.id !== ev.id));
+      }
+    } else {
+      // Maintenance
+      if (isUnplanMaintenance) {
+        // ré-injecte dans la liste des unplanned
+        setMaintenanceEvents((prev) => [
+          ...prev,
+          { ...ev, datePlanification: null },
+        ]);
+        setScheduledEvents((prev) => prev.filter((e) => e.id !== ev.id));
+      } else {
+        // planification confirmée -> retire des unplanned
+        setMaintenanceEvents((prev) => prev.filter((m) => m.id !== ev.id));
+        // ajoute au calendrier
+        setScheduledEvents((prev) => [
+          ...prev,
+          { ...ev, start: ev.datePlanification!, end: ev.datePlanification! },
+        ]);
+      }
+    }
+
     closeModal();
   };
 
