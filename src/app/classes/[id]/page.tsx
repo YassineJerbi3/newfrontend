@@ -24,6 +24,7 @@ import {
   FaLayerGroup,
 } from "react-icons/fa";
 import EmplacementStats from "@/components/EmplacementStats";
+import IncidentModal from "@/components/IncidentModal";
 
 interface Poste {
   id: string;
@@ -71,6 +72,10 @@ export default function ClasseDetailPage() {
     null,
   );
   const [showEquipDetailModal, setShowEquipDetailModal] = useState(false);
+  const [showIncidentModal, setShowIncidentModal] = useState(false);
+  const [incidentEquipment, setIncidentEquipment] = useState<Equipment | null>(
+    null,
+  );
 
   // fetch data
   const fetchDetail = () => {
@@ -397,6 +402,17 @@ export default function ClasseDetailPage() {
                                     </div>
                                   </div>
                                 </div>
+
+                                {/* Button inside the map so eq is defined */}
+                                <button
+                                  onClick={() => {
+                                    setIncidentEquipment(eq);
+                                    setShowIncidentModal(true);
+                                  }}
+                                  className="mt-2 w-full rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                                >
+                                  Déclarer une intervention
+                                </button>
                               </div>
                             ))}
                           </div>
@@ -512,6 +528,19 @@ export default function ClasseDetailPage() {
           </>
         )}
       </div>
+      <IncidentModal
+        selected={incidentEquipment}
+        isOpen={showIncidentModal}
+        onClose={() => {
+          setShowIncidentModal(false);
+          setIncidentEquipment(null);
+        }}
+        onSuccess={() => {
+          setShowIncidentModal(false);
+          setIncidentEquipment(null);
+          fetchDetail();
+        }}
+      />
     </DefaultLayout>
   );
 }
