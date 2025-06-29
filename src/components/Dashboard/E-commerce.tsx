@@ -1,3 +1,5 @@
+// src/components/Dashboard/DashboardEquipements.tsx
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -38,7 +40,11 @@ const cardVariants = {
 };
 
 const DashboardEquipements: React.FC = () => {
-  // Equipment stats
+  // 1) Role-based rendering
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loadingRole, setLoadingRole] = useState(true);
+
+  // 2) Dashboard stats states
   const [total, setTotal] = useState(0);
   const [etat, setEtat] = useState({ fonctionnel: 0, enPanne: 0 });
   const [ageMoyen, setAgeMoyen] = useState(0);
@@ -48,67 +54,89 @@ const DashboardEquipements: React.FC = () => {
   const [parMaint, setParMaint] = useState<RepartType>({});
   const [parEmplacement, setParEmplacement] = useState<RepartType>({});
 
-  // Incident stats this month
   const [incidentsDeclared, setIncidentsDeclared] = useState(0);
   const [incidentsResolved, setIncidentsResolved] = useState(0);
   const [incidentsUnresolved, setIncidentsUnresolved] = useState(0);
 
-  // **User stats**
   const [totalUsers, setTotalUsers] = useState(0);
   const [usersByRole, setUsersByRole] = useState<RepartType>({});
 
+  // Fetch the logged-in user's role
   useEffect(() => {
+    fetch(`${API_BASE}/auth/me`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((user) => setUserRole(user.roles))
+      .catch(() => setUserRole(null))
+      .finally(() => setLoadingRole(false));
+  }, []);
+
+  // Only if Responsable SI, load stats
+  useEffect(() => {
+    if (userRole !== "RESPONSABLE SI") return;
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
 
-    // Equipment
-    fetch(`${API_BASE}/equipements/stats/total`)
+    // Equipement stats
+    fetch(`${API_BASE}/equipements/stats/total`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => setTotal(d));
-    fetch(`${API_BASE}/equipements/stats/etat`)
+      .then(setTotal);
+    fetch(`${API_BASE}/equipements/stats/etat`, { credentials: "include" })
       .then((r) => r.json())
       .then(setEtat);
-    fetch(`${API_BASE}/equipements/stats/age-moyen`)
+    fetch(`${API_BASE}/equipements/stats/age-moyen`, { credentials: "include" })
       .then((r) => r.json())
       .then(setAgeMoyen);
-    fetch(`${API_BASE}/equipements/stats/non-planifiees`)
+    fetch(`${API_BASE}/equipements/stats/non-planifiees`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then(setNonPlanifiees);
-    fetch(`${API_BASE}/equipements/stats/en-retard`)
+    fetch(`${API_BASE}/equipements/stats/en-retard`, { credentials: "include" })
       .then((r) => r.json())
       .then(setEnRetard);
-    fetch(`${API_BASE}/equipements/stats/par-type`)
+    fetch(`${API_BASE}/equipements/stats/par-type`, { credentials: "include" })
       .then((r) => r.json())
       .then(setParType);
-    fetch(`${API_BASE}/equipements/stats/maintenance-type`)
+    fetch(`${API_BASE}/equipements/stats/maintenance-type`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then(setParMaint);
-    fetch(`${API_BASE}/equipements/stats/par-emplacement`)
+    fetch(`${API_BASE}/equipements/stats/par-emplacement`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then(setParEmplacement);
 
-    // Incidents
-    fetch(`${API_BASE}/incidents/stats/declare?year=${year}&month=${month}`)
+    // Incident stats
+    fetch(`${API_BASE}/incidents/stats/declare?year=${year}&month=${month}`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then((d) => setIncidentsDeclared(d.declared));
-    fetch(`${API_BASE}/incidents/stats/resolved?year=${year}&month=${month}`)
+    fetch(`${API_BASE}/incidents/stats/resolved?year=${year}&month=${month}`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then((d) => setIncidentsResolved(d.resolved));
-    fetch(`${API_BASE}/incidents/stats/unresolved?year=${year}&month=${month}`)
+    fetch(
+      `${API_BASE}/incidents/stats/unresolved?year=${year}&month=${month}`,
+      { credentials: "include" },
+    )
       .then((r) => r.json())
       .then((d) => setIncidentsUnresolved(d.unresolved));
 
-    // **Users**
-    fetch(`${API_BASE}/users/stats/total`)
+    // User stats
+    fetch(`${API_BASE}/users/stats/total`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setTotalUsers(d.total));
-    fetch(`${API_BASE}/users/stats/by-role`)
+    fetch(`${API_BASE}/users/stats/by-role`, { credentials: "include" })
       .then((r) => r.json())
       .then(setUsersByRole);
-  }, []);
+  }, [userRole]);
 
-  // Transform chart data
+  // Prepare data for charts
   const dataParType = Object.entries(parType).map(([name, count]) => ({
     name,
     count,
@@ -118,16 +146,44 @@ const DashboardEquipements: React.FC = () => {
     value,
   }));
   const dataParEmplacement = Object.entries(parEmplacement).map(
-    ([name, count]) => ({
-      name,
-      count,
-    }),
+    ([name, count]) => ({ name, count }),
   );
-  const dataUsersByRole = Object.entries(usersByRole).map(([role, count]) => ({
-    name: role,
-    value: count,
+  const dataUsersByRole = Object.entries(usersByRole).map(([name, value]) => ({
+    name,
+    value,
   }));
 
+  // Loading state
+  if (loadingRole) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Chargement du rôle…</p>
+      </div>
+    );
+  }
+
+  // Non‑Responsable SI view
+  if (userRole !== "RESPONSABLE SI") {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="rounded-2xl bg-white/80 p-8 text-center shadow-xl backdrop-blur-md"
+        >
+          <h1 className="mb-4 text-3xl font-extrabold">Bienvenue sur ESCS</h1>
+          <p className="text-gray-600">
+            Bonjour{" "}
+            <span className="font-semibold">{userRole || "Utilisateur"}</span>,
+            <br />
+            Vous n'avez pas accès au tableau de bord complet.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Responsable SI full dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-6">
       <motion.h1
@@ -135,10 +191,10 @@ const DashboardEquipements: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-4xl font-extrabold text-transparent"
       >
-        Tableau de bord &amp; Statistiques
+        Tableau de bord & Statistiques
       </motion.h1>
 
-      {/* KPI Cards: Equipment */}
+      {/* KPI Cards */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {[
           { title: "Total équipements", value: total },
@@ -175,7 +231,7 @@ const DashboardEquipements: React.FC = () => {
 
       {/* Charts */}
       <div className="mt-12 grid gap-8 lg:grid-cols-3">
-        {/* Equip by Type */}
+        {/* Répartition par type */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -199,7 +255,7 @@ const DashboardEquipements: React.FC = () => {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Equip by Emplacement */}
+        {/* Répartition par emplacement */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -223,7 +279,7 @@ const DashboardEquipements: React.FC = () => {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Maint by Type */}
+        {/* Répartition par type de maintenance */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -252,7 +308,7 @@ const DashboardEquipements: React.FC = () => {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Users by Role */}
+        {/* Répartition par rôle (utilisateurs) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
