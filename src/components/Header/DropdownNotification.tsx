@@ -61,61 +61,40 @@ export default function DropdownNotification() {
     loadNotifications();
   }, [loadNotifications]);
 
-  // Tout lire
-  const markAllRead = (e: MouseEvent) => {
+  // Fermer la dropdown (sans marquer lu)
+  const closeDropdown = (e: MouseEvent) => {
     e.stopPropagation();
-    items.forEach((n) => {
-      fetch(`http://localhost:2000/notifications/${n.id}/read`, {
-        method: "PATCH",
-        credentials: "include",
-      }).catch(console.error);
-    });
-    setItems([]);
+    setOpen(false);
   };
 
-  // Lire une seule
-  const dismissOne = (e: MouseEvent, id: string) => {
-    e.stopPropagation();
-    fetch(`http://localhost:2000/notifications/${id}/read`, {
-      method: "PATCH",
-      credentials: "include",
-    }).catch(console.error);
-    setItems((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  // WebSocket temps réel
+  // WebSocket temps réel : écoute UN SEUL event "notification"
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
-    const handler = (payload: any) => {
+    const handler = (fullPayload: {
+      id: string;
+      type: string;
+      data: any;
+      createdAt: string;
+    }) => {
+      const { id, data, createdAt } = fullPayload;
       const newItem: NotificationItem = {
-        id: payload.id,
-        familleMI: payload.familleMI,
-        priorite: payload.priorite,
-        creator: payload.creator || "-",
-        equipmentType: payload.equipmentType || "-",
-        location: payload.location || "-",
-        dateCreation: payload.dateCreation,
+        id,
+        familleMI: data.familleMI,
+        priorite: data.priorite,
+        creator: data.creator || "-",
+        equipmentType: data.equipmentType || "-",
+        location: data.location || "-",
+        dateCreation: createdAt,
       };
       setItems((curr) => [newItem, ...curr]);
     };
 
-    const onConnect = () => {
-      socket.emit("joinNotifications", { recipientId: user.recipientId });
-      // on écoutait déjà 'newIncident' :
-      socket.on("newIncident", handler);
-      // maintenant on écoute aussi 'incident_assign' :
-      socket.on("incident_assign", handler);
-    };
-
-    socket.on("connect", onConnect);
-    if (socket.disconnected) socket.connect();
+    socket.on("notification", handler);
 
     return () => {
-      socket.off("connect", onConnect);
-      socket.off("newIncident", handler);
-      socket.off("incident_assign", handler);
+      socket.off("notification", handler);
     };
   }, [user.recipientId]);
 
@@ -147,6 +126,12 @@ export default function DropdownNotification() {
               {/* Header */}
               <div className="flex items-center justify-between border-b px-4 py-2">
                 <h5 className="font-semibold text-gray-800">Notifications</h5>
+                <button
+                  onClick={closeDropdown}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Fermer
+                </button>
               </div>
 
               {/* Liste */}
@@ -167,15 +152,12 @@ export default function DropdownNotification() {
                           overflow-hidden transition-shadow hover:bg-gray-50 hover:shadow-sm
                         `}
                       >
-                        {/* Bouton × */}
                         <button
-                          onClick={(e) => dismissOne(e, n.id)}
+                          onClick={closeDropdown}
                           className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                         >
                           <FiX size={14} />
                         </button>
-
-                        {/* Badge priorité */}
                         <span
                           className={`
                             self-start rounded-full border px-2 py-0.5 text-xs font-medium
@@ -184,8 +166,6 @@ export default function DropdownNotification() {
                         >
                           {n.priorite}
                         </span>
-
-                        {/* Type & Emplacement */}
                         <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-700">
                           <span className="flex items-center gap-1">
                             <FiTag size={14} />
@@ -196,14 +176,10 @@ export default function DropdownNotification() {
                             {n.location}
                           </span>
                         </div>
-
-                        {/* Créateur */}
                         <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                           <FiUser size={14} />
                           <span>{n.creator}</span>
                         </div>
-
-                        {/* Horodatage */}
                         <div className="mt-3 flex items-center justify-center text-xs text-gray-400">
                           <FiClock size={12} />
                           <span className="ml-1">
@@ -234,11 +210,6 @@ export default function DropdownNotification() {
               </ul>
 
               {/* Footer */}
-              <Link href="/notification/not-responsablesi">
-                <div className="cursor-pointer border-t px-4 py-2 text-center text-sm text-blue-600 hover:underline">
-                  Voir toutes
-                </div>
-              </Link>
             </motion.div>
           )}
         </AnimatePresence>
