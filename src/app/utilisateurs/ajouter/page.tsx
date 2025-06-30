@@ -118,6 +118,7 @@ export default function AddUserPage() {
   ];
   const fonctionOptions = ["MANAGER", "TECHNICIAN"];
   const directionOptions = ["IT", "HR", "FINANCE"];
+  const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/;
 
   useEffect(() => {
     fetch("http://localhost:2000/emplacements/bureaux", {
@@ -132,6 +133,16 @@ export default function AddUserPage() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
+    const { name, value } = e.target;
+
+    // si c’est nom ou prenom et que la valeur ne correspond pas à la regex, on sort
+    if (
+      (name === "nom" || name === "prenom") &&
+      value &&
+      !nameRegex.test(value)
+    ) {
+      return;
+    }
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -229,6 +240,8 @@ export default function AddUserPage() {
                     id="nom"
                     name="nom"
                     type="text"
+                    pattern="[A-Za-zÀ-ÖØ-öø-ÿ ]+"
+                    title="Veuillez n'utiliser que des lettres et des espaces."
                     value={formData.nom}
                     onChange={handleChange}
                     required
@@ -245,6 +258,8 @@ export default function AddUserPage() {
                     id="prenom"
                     name="prenom"
                     type="text"
+                    pattern="[A-Za-zÀ-ÖØ-öø-ÿ ]+"
+                    title="Veuillez n'utiliser que des lettres et des espaces."
                     value={formData.prenom}
                     onChange={handleChange}
                     required
